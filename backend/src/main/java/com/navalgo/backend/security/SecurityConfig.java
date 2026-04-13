@@ -32,7 +32,7 @@ public class SecurityConfig {
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtFilter,
-            @Value("${app.security.cors.allowed-origins:http://localhost:3000,http://localhost:4200,http://localhost:5000,http://localhost:8080,http://127.0.0.1:3000,http://127.0.0.1:4200,http://127.0.0.1:5000,http://127.0.0.1:8080,http://104.248.22.99:8080,https://tu-dominio.com,https://www.tu-dominio.com}") String allowedOriginsCsv
+            @Value("${app.security.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*,http://104.248.22.99:8080,https://tu-dominio.com,https://www.tu-dominio.com}") String allowedOriginsCsv
     ) {
         this.jwtFilter = jwtFilter;
         this.allowedOrigins = Arrays.stream(allowedOriginsCsv.split(","))
@@ -66,7 +66,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(allowedOrigins);
+        configuration.setAllowedOriginPatterns(allowedOrigins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         configuration.setAllowCredentials(false);
