@@ -7,7 +7,7 @@ services:
       SPRING_PROFILES_ACTIVE: postgres
       # Managed PostgreSQL (DigitalOcean):
       # jdbc:postgresql://<host>:25060/defaultdb?sslmode=require
-      SPRING_DATASOURCE_URL: jdbc:postgresql://your-managed-db-host:25060/defaultdb?sslmode=require
+      SPRING_DATASOURCE_URL: jdbc:postgresql://private-navalgo-db-do-user-33837097-0.h.db.ondigitalocean.com:25060/defaultdb?sslmode=require
       SPRING_DATASOURCE_USERNAME: doadmin
       SPRING_DATASOURCE_PASSWORD: change_me
       APP_JWT_SECRET: change-this-in-production-to-a-very-long-random-string
