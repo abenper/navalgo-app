@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/navalgo}
+    username: ${SPRING_DATASOURCE_USERNAME:navalgo}
+    password: ${SPRING_DATASOURCE_PASSWORD:change_me}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:change-this-super-secret-key-for-production-navalgo}
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:3600000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

@@ -1,0 +1,36 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:navalgo;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  h2:
+    console:
+      enabled: false
+      path: /h2-console
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  jwt:
+    secret: ${APP_JWT_SECRET:change-this-super-secret-key-for-production-navalgo}
+    expiration-ms: ${APP_JWT_EXPIRATION_MS:3600000}

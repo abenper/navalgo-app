@@ -1,0 +1,38 @@
+package com.navalgo.backend.worker;
+
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/workers")
+public class WorkerController {
+
+    private final WorkerService workerService;
+
+    public WorkerController(WorkerService workerService) {
+        this.workerService = workerService;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<WorkerDto>> list() {
+        return ResponseEntity.ok(workerService.findAll());
+    }
+
+    @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkerDto> create(@RequestBody @Valid CreateWorkerRequest request) {
+        return ResponseEntity.ok(workerService.create(request));
+    }
+
+    @PatchMapping("/{id}/active")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkerDto> updateStatus(@PathVariable Long id,
+                                                  @RequestBody UpdateWorkerStatusRequest request) {
+        return ResponseEntity.ok(workerService.setActive(id, request.active()));
+    }
+}

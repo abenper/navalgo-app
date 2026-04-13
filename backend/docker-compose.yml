@@ -1,0 +1,21 @@
+services:
+  backend:
+    build: .
+    container_name: navalgo-backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      # Managed PostgreSQL (DigitalOcean):
+      # jdbc:postgresql://<host>:25060/defaultdb?sslmode=require
+      SPRING_DATASOURCE_URL: jdbc:postgresql://your-managed-db-host:25060/defaultdb?sslmode=require
+      SPRING_DATASOURCE_USERNAME: doadmin
+      SPRING_DATASOURCE_PASSWORD: change_me
+      APP_JWT_SECRET: change-this-in-production-to-a-very-long-random-string
+      APP_JWT_EXPIRATION_MS: 3600000
+    ports:
+      - "8080:8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
