@@ -6,6 +6,8 @@ class WorkerProfile {
     required this.speciality,
     required this.role,
     required this.active,
+    required this.mustChangePassword,
+    required this.canEditWorkOrders,
   });
 
   final int id;
@@ -14,6 +16,8 @@ class WorkerProfile {
   final String? speciality;
   final String role;
   final bool active;
+  final bool mustChangePassword;
+  final bool canEditWorkOrders;
 
   factory WorkerProfile.fromJson(Map<String, dynamic> json) {
     return WorkerProfile(
@@ -23,6 +27,8 @@ class WorkerProfile {
       speciality: json['speciality'] as String?,
       role: json['role'] as String,
       active: json['active'] as bool,
+      mustChangePassword: json['mustChangePassword'] as bool? ?? false,
+      canEditWorkOrders: json['canEditWorkOrders'] as bool? ?? false,
     );
   }
 }

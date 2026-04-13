@@ -37,4 +37,55 @@ class WorkOrderService {
 
     return WorkOrder.fromJson(data as Map<String, dynamic>);
   }
+
+  Future<WorkOrder> createWorkOrder(
+    String token, {
+    required String title,
+    String? description,
+    required int ownerId,
+    int? vesselId,
+    List<int>? workerIds,
+    String priority = 'NORMAL',
+  }) async {
+    final data = await _apiClient.post(
+      '/work-orders',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'title': title,
+        'description': description,
+        'ownerId': ownerId,
+        'vesselId': vesselId,
+        'workerIds': workerIds,
+        'priority': priority,
+      },
+    );
+    return WorkOrder.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<WorkOrder> updateWorkOrder(
+    String token, {
+    required int workOrderId,
+    String? title,
+    String? description,
+    int? ownerId,
+    int? vesselId,
+    List<int>? workerIds,
+    String? priority,
+    String? status,
+  }) async {
+    final data = await _apiClient.patch(
+      '/work-orders/$workOrderId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'title': title,
+        'description': description,
+        'ownerId': ownerId,
+        'vesselId': vesselId,
+        'workerIds': workerIds,
+        'priority': priority,
+        'status': status,
+      },
+    );
+    return WorkOrder.fromJson(data as Map<String, dynamic>);
+  }
 }

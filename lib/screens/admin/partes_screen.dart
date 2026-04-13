@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-// Pantalla principal que muestra la lista de partes de trabajo
+import '../../models/owner.dart';
+import '../../models/worker_profile.dart';
+import '../../models/work_order.dart';
+import '../../services/work_order_service.dart';
+import '../../viewmodels/fleet_view_model.dart';
+import '../../viewmodels/session_view_model.dart';
+import '../../viewmodels/work_orders_view_model.dart';
+import '../../viewmodels/workers_view_model.dart';
+
 class PartesScreen extends StatefulWidget {
   const PartesScreen({super.key});
 
@@ -9,255 +18,325 @@ class PartesScreen extends StatefulWidget {
 }
 
 class _PartesScreenState extends State<PartesScreen> {
-  // Datos simulados que reflejan la nueva estructura de la DB
-  final List<Map<String, dynamic>> _partes = [
-    {
-      'titulo': 'Revisión anual de motor y casco',
-      'cliente': 'Naviera Sur S.A.',
-      'asignados': ['Carlos Jefe', 'Ana Mecánica'], // Ahora es una lista
-      'urgente': true,
-    },
-    {
-      'titulo': 'Reparación sistema eléctrico',
-      'cliente': 'Juan Pérez',
-      'asignados': ['Carlos Jefe'],
-      'urgente': false,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final session = context.read<SessionViewModel>();
+      final user = session.user;
+      if (user == null) {
+        return;
+      }
 
-  void _mostrarFormularioNuevoParte() {
-    showDialog(
+      await context.read<FleetViewModel>().loadFleet();
+      await context.read<WorkersViewModel>().loadWorkers();
+      await context.read<WorkOrdersViewModel>().loadWorkOrders(
+        workerId: user.role == 'ADMIN' ? null : user.id,
+      );
+    });
+  }
+
+  Future<void> _openCreateDialog() async {
+    final fleetVm = context.read<FleetViewModel>();
+    final workersVm = context.read<WorkersViewModel>();
+    final session = context.read<SessionViewModel>();
+    final token = session.token;
+    if (token == null) {
+      return;
+    }
+
+    if (fleetVm.owners.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Crea un propietario antes de crear partes')),
+      );
+      return;
+    }
+
+    final input = await showDialog<_CreatePartInput>(
       context: context,
-      builder: (context) => const _FormularioParteDialog(),
+      builder: (_) => _CreatePartDialog(
+        owners: fleetVm.owners,
+        workers: workersVm.workers,
+      ),
+    );
+
+    if (input == null) {
+      return;
+    }
+
+    try {
+      await context.read<WorkOrderService>().createWorkOrder(
+        token,
+        title: input.title,
+        description: input.description,
+        ownerId: input.ownerId,
+        vesselId: input.vesselId,
+        workerIds: input.workerIds,
+        priority: input.priority,
+      );
+
+      await context.read<WorkOrdersViewModel>().loadWorkOrders();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Parte creado correctamente')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo crear el parte: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateStatus(int id, String status) async {
+    await context.read<WorkOrdersViewModel>().updateWorkOrderStatus(
+      workOrderId: id,
+      status: status,
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<WorkOrdersViewModel>();
+    final isAdmin = context.watch<SessionViewModel>().user?.role == 'ADMIN';
+
     return Scaffold(
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _partes.length,
-        itemBuilder: (context, index) {
-          final parte = _partes[index];
-          final bool isUrgent = parte['urgente'];
-          
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              leading: CircleAvatar(
-                backgroundColor: isUrgent ? Colors.red.shade100 : Colors.blue.shade100,
-                child: Icon(Icons.build, color: isUrgent ? Colors.red.shade900 : Colors.blue.shade900),
-              ),
-              title: Text(parte['titulo'] as String, style: const TextStyle(fontWeight: FontWeight.bold)),
-              // Unimos la lista de asignados con comas
-              subtitle: Text('Cliente: ${parte['cliente']}\nAsignado a: ${(parte['asignados'] as List).join(', ')}'),
-              isThreeLine: true,
-              trailing: Chip(
-                label: Text(isUrgent ? 'Urgente' : 'En Curso'),
-                backgroundColor: isUrgent ? Colors.red.shade50 : Colors.orange.shade50,
-                side: BorderSide.none,
-              ),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _mostrarFormularioNuevoParte,
-        icon: const Icon(Icons.add),
-        label: const Text('Nuevo Parte'),
-        backgroundColor: Colors.blue.shade900,
-        foregroundColor: Colors.white,
-      ),
+      body: vm.isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : vm.error != null
+              ? Center(child: Text(vm.error!))
+              : RefreshIndicator(
+                  onRefresh: () async {
+                    final session = context.read<SessionViewModel>();
+                    await vm.loadWorkOrders(
+                      workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
+                    );
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: vm.workOrders.length,
+                    itemBuilder: (context, index) {
+                      final WorkOrder parte = vm.workOrders[index];
+                      final bool isUrgent = parte.priority == 'URGENT' || parte.priority == 'HIGH';
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          leading: CircleAvatar(
+                            backgroundColor: isUrgent ? Colors.red.shade100 : Colors.blue.shade100,
+                            child: Icon(
+                              Icons.build,
+                              color: isUrgent ? Colors.red.shade900 : Colors.blue.shade900,
+                            ),
+                          ),
+                          title: Text(
+                            parte.title,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            'Cliente: ${parte.ownerName}\n'
+                            'Asignado: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}\n'
+                            'Estado: ${parte.status}',
+                          ),
+                          isThreeLine: true,
+                          trailing: PopupMenuButton<String>(
+                            onSelected: (value) => _updateStatus(parte.id, value),
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(value: 'NEW', child: Text('Pendiente')),
+                              PopupMenuItem(value: 'IN_PROGRESS', child: Text('En curso')),
+                              PopupMenuItem(value: 'DONE', child: Text('Finalizado')),
+                              PopupMenuItem(value: 'CANCELLED', child: Text('Cancelado')),
+                            ],
+                            child: Chip(
+                              label: Text(parte.status),
+                              backgroundColor: _statusColor(parte.status).withValues(alpha: 0.12),
+                              side: BorderSide.none,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+      floatingActionButton: isAdmin
+          ? FloatingActionButton.extended(
+              onPressed: _openCreateDialog,
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo Parte'),
+              backgroundColor: Colors.blue.shade900,
+              foregroundColor: Colors.white,
+            )
+          : null,
     );
+  }
+
+  Color _statusColor(String status) {
+    switch (status) {
+      case 'DONE':
+        return Colors.green;
+      case 'IN_PROGRESS':
+        return Colors.orange;
+      case 'CANCELLED':
+        return Colors.red;
+      default:
+        return Colors.blue;
+    }
   }
 }
 
-// Widget interno y con estado para gestionar el formulario complejo
-class _FormularioParteDialog extends StatefulWidget {
-  const _FormularioParteDialog();
+class _CreatePartInput {
+  const _CreatePartInput({
+    required this.title,
+    required this.description,
+    required this.ownerId,
+    required this.vesselId,
+    required this.workerIds,
+    required this.priority,
+  });
 
-  @override
-  State<_FormularioParteDialog> createState() => _FormularioParteDialogState();
+  final String title;
+  final String description;
+  final int ownerId;
+  final int? vesselId;
+  final List<int> workerIds;
+  final String priority;
 }
 
-class _FormularioParteDialogState extends State<_FormularioParteDialog> {
-  final _formKey = GlobalKey<FormState>();
-  int _numeroMotores = 1;
-  
-  // Lista de trabajadores disponibles (simulada)
-  final List<Map<String, dynamic>> _trabajadoresDisponibles = [
-      {'id': 1, 'nombre': 'Carlos Jefe'},
-      {'id': 2, 'nombre': 'Ana Mecánica'},
-      {'id': 4, 'nombre': 'Juan Pérez'},
-  ];
-  // Lista para guardar los trabajadores que se van seleccionando
-  final List<Map<String, dynamic>> _trabajadoresSeleccionados = [];
+class _CreatePartDialog extends StatefulWidget {
+  const _CreatePartDialog({required this.owners, required this.workers});
 
-  // Muestra un diálogo para seleccionar múltiples trabajadores
-  void _seleccionarTrabajadores() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Asignar Trabajadores'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: _trabajadoresDisponibles.length,
-              itemBuilder: (context, index) {
-                final trabajador = _trabajadoresDisponibles[index];
-                // Usamos un StatefulWidget para manejar el estado del checkbox
-                return _CheckboxListTile(
-                  trabajador: trabajador,
-                  seleccionados: _trabajadoresSeleccionados,
-                  onChanged: (seleccionado) {
-                    setState(() {
-                      if (seleccionado) {
-                        _trabajadoresSeleccionados.add(trabajador);
-                      } else {
-                        _trabajadoresSeleccionados.removeWhere((t) => t['id'] == trabajador['id']);
-                      }
-                    });
-                  },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Aceptar'),
-            ),
-          ],
-        );
-      },
-    );
+  final List<Owner> owners;
+  final List<WorkerProfile> workers;
+
+  @override
+  State<_CreatePartDialog> createState() => _CreatePartDialogState();
+}
+
+class _CreatePartDialogState extends State<_CreatePartDialog> {
+  final _titleCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
+  late int _ownerId;
+  String _priority = 'NORMAL';
+  final Set<int> _selectedWorkers = <int>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _ownerId = widget.owners.first.id;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Nuevo Parte de Trabajo', style: TextStyle(fontWeight: FontWeight.bold)),
-      content: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // --- CAMPOS PRINCIPALES ---
-              TextFormField(decoration: InputDecoration(labelText: 'Título del Trabajo', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
-              const SizedBox(height: 12),
-              TextFormField(decoration: InputDecoration(labelText: 'Seleccionar Embarcación', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)))),
-              const SizedBox(height: 12),
-              
-              // --- ASIGNACIÓN DE TRABAJADORES ---
-              const Text('Trabajadores Asignados', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8.0,
-                runSpacing: 4.0,
-                children: [
-                  ..._trabajadoresSeleccionados.map((t) => Chip(label: Text(t['nombre']), onDeleted: () => setState(() => _trabajadoresSeleccionados.remove(t)))),
-                  ActionChip(
-                    avatar: const Icon(Icons.add, size: 16),
-                    label: const Text('Asignar'),
-                    onPressed: _seleccionarTrabajadores,
-                  ),
-                ],
+      title: const Text('Nuevo Parte'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Titulo',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 20),
-
-              // --- HORAS DE MOTOR ---
-              const Text('Registro de Motores', style: TextStyle(fontWeight: FontWeight.bold)),
-              TextFormField(
-                initialValue: '1',
-                decoration: InputDecoration(labelText: 'Número de motores', border: OutlineInputBorder(borderRadius: BorderRadius.circular(12))),
-                keyboardType: TextInputType.number,
-                onChanged: (value) => setState(() => _numeroMotores = int.tryParse(value) ?? 1),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _descriptionCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Descripcion',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 8),
-              if (_numeroMotores > 0)
-                ...List.generate(_numeroMotores, (index) => Padding(
-                  padding: const EdgeInsets.only(bottom: 8.0),
-                  child: Row(
-                    children: [
-                      Expanded(child: TextFormField(decoration: InputDecoration(labelText: 'Motor ${index + 1} (Babor, etc.)'))),
-                      const SizedBox(width: 8),
-                      Expanded(child: TextFormField(decoration: const InputDecoration(labelText: 'Horas'), keyboardType: TextInputType.number)),
-                    ],
-                  ),
-                )),
-              const SizedBox(height: 20),
-
-              // --- ADJUNTAR ARCHIVOS ---
-              const Text('Documentación Gráfica', style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.attach_file),
-                label: const Text('Adjuntar fotos o vídeos'),
-                onPressed: () { /* TODO: Implementar file picker */ },
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<int>(
+              initialValue: _ownerId,
+              decoration: const InputDecoration(
+                labelText: 'Propietario',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
+              items: widget.owners
+                  .map((o) => DropdownMenuItem(value: o.id, child: Text(o.displayName)))
+                  .toList(),
+              onChanged: (v) => setState(() => _ownerId = v ?? _ownerId),
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              initialValue: _priority,
+              decoration: const InputDecoration(
+                labelText: 'Prioridad',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(value: 'LOW', child: Text('LOW')),
+                DropdownMenuItem(value: 'NORMAL', child: Text('NORMAL')),
+                DropdownMenuItem(value: 'HIGH', child: Text('HIGH')),
+                DropdownMenuItem(value: 'URGENT', child: Text('URGENT')),
+              ],
+              onChanged: (v) => setState(() => _priority = v ?? 'NORMAL'),
+            ),
+            const SizedBox(height: 10),
+            const Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Asignar trabajadores', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            const SizedBox(height: 4),
+            SizedBox(
+              height: 180,
+              child: ListView(
+                children: widget.workers.map((worker) {
+                  final selected = _selectedWorkers.contains(worker.id);
+                  return CheckboxListTile(
+                    value: selected,
+                    title: Text(worker.fullName),
+                    subtitle: Text(worker.role),
+                    onChanged: (v) {
+                      setState(() {
+                        if (v == true) {
+                          _selectedWorkers.add(worker.id);
+                        } else {
+                          _selectedWorkers.remove(worker.id);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
         ),
       ),
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade900, 
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
           onPressed: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Parte creado exitosamente')));
+            Navigator.pop(
+              context,
+              _CreatePartInput(
+                title: _titleCtrl.text.trim(),
+                description: _descriptionCtrl.text.trim(),
+                ownerId: _ownerId,
+                vesselId: null,
+                workerIds: _selectedWorkers.toList(),
+                priority: _priority,
+              ),
+            );
           },
-          child: const Text('Guardar Parte'),
+          child: const Text('Crear'),
         ),
       ],
-    );
-  }
-}
-
-// Pequeño widget para manejar el estado del checkbox dentro del diálogo
-class _CheckboxListTile extends StatefulWidget {
-  final Map<String, dynamic> trabajador;
-  final List<Map<String, dynamic>> seleccionados;
-  final ValueChanged<bool> onChanged;
-
-  const _CheckboxListTile({required this.trabajador, required this.seleccionados, required this.onChanged});
-
-  @override
-  State<_CheckboxListTile> createState() => _CheckboxListTileState();
-}
-
-class _CheckboxListTileState extends State<_CheckboxListTile> {
-  late bool _isChecked;
-
-  @override
-  void initState() {
-    super.initState();
-    _isChecked = widget.seleccionados.any((t) => t['id'] == widget.trabajador['id']);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return CheckboxListTile(
-      title: Text(widget.trabajador['nombre']),
-      value: _isChecked,
-      onChanged: (bool? value) {
-        setState(() => _isChecked = value ?? false);
-        widget.onChanged(_isChecked);
-      },
     );
   }
 }

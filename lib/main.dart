@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
+import 'package:navalgo/services/leave_service.dart';
+import 'package:navalgo/services/time_tracking_service.dart';
 import 'package:navalgo/services/worker_service.dart';
 import 'package:navalgo/services/work_order_service.dart';
 import 'package:navalgo/viewmodels/fleet_view_model.dart';
@@ -21,6 +23,8 @@ void main() {
         Provider<AuthService>(create: (_) => AuthService()),
         Provider<WorkerService>(create: (_) => WorkerService()),
         Provider<FleetService>(create: (_) => FleetService()),
+        Provider<LeaveService>(create: (_) => LeaveService()),
+        Provider<TimeTrackingService>(create: (_) => TimeTrackingService()),
         Provider<WorkOrderService>(create: (_) => WorkOrderService()),
         ChangeNotifierProvider(
           create: (context) =>
