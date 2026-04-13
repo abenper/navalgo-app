@@ -31,6 +31,21 @@ class AuthService {
     }
   }
 
+  Future<void> changePassword(
+    String token, {
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await _apiClient.post(
+      '/auth/change-password',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'currentPassword': currentPassword,
+        'newPassword': newPassword,
+      },
+    );
+  }
+
   Map<String, dynamic> _mapLoginResponse(dynamic responseData) {
     if (responseData is! Map<String, dynamic>) {
       throw const FormatException('Respuesta invalida.');

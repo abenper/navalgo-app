@@ -29,6 +29,12 @@ public class Worker {
     @Column(nullable = false)
     private boolean active = true;
 
+    @Column(nullable = false)
+    private boolean mustChangePassword = false;
+
+    @Column(nullable = false)
+    private boolean canEditWorkOrders = false;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -49,4 +55,10 @@ public class Worker {
 
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
+
+    public boolean isMustChangePassword() { return mustChangePassword; }
+    public void setMustChangePassword(boolean mustChangePassword) { this.mustChangePassword = mustChangePassword; }
+
+    public boolean isCanEditWorkOrders() { return canEditWorkOrders; }
+    public void setCanEditWorkOrders(boolean canEditWorkOrders) { this.canEditWorkOrders = canEditWorkOrders; }
 }

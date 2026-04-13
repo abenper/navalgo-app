@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/viewmodels/login_view_model.dart';
 import '../admin/admin_shell_screen.dart';
 import '../worker/worker_shell_screen.dart';
@@ -24,6 +25,111 @@ class _LoginScreenState extends State<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
+  }
+
+  Future<bool> _enforcePasswordChange({
+    required String token,
+    required String currentPassword,
+  }) async {
+    final TextEditingController newPasswordController = TextEditingController();
+    final TextEditingController confirmPasswordController = TextEditingController();
+
+    try {
+      final result = await showDialog<bool>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('Cambio obligatorio de contrasena'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Tu administrador ha marcado tu cuenta con cambio de contrasena obligatorio.',
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nueva contrasena',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmar contrasena',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () async {
+                  final newPassword = newPasswordController.text.trim();
+                  final confirmPassword = confirmPasswordController.text.trim();
+
+                  if (newPassword.length < 8) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('La nueva contrasena debe tener al menos 8 caracteres'),
+                      ),
+                    );
+                    return;
+                  }
+                  if (newPassword != confirmPassword) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Las contrasenas no coinciden'),
+                      ),
+                    );
+                    return;
+                  }
+
+                  try {
+                    await context.read<AuthService>().changePassword(
+                      token,
+                      currentPassword: currentPassword,
+                      newPassword: newPassword,
+                    );
+                    if (context.mounted) {
+                      Navigator.of(context).pop(true);
+                    }
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('No se pudo cambiar la contrasena: $e')),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Guardar y continuar'),
+              ),
+            ],
+          );
+        },
+      );
+      return result == true;
+    } finally {
+      newPasswordController.dispose();
+      confirmPasswordController.dispose();
+    }
+  }
+
+  void _openShellForRole(String role) {
+    if (role == 'ADMIN') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const AdminShellScreen()),
+      );
+    } else {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const WorkerShellScreen()),
+      );
+    }
   }
 
   @override
@@ -151,11 +257,25 @@ class _LoginScreenState extends State<LoginScreen> {
 
                           if (mounted) { // Comprueba si el widget sigue en el árbol
                             if (success) {
-                              if (loginViewModel.currentUser?.role == 'ADMIN') {
-                                Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => const AdminShellScreen()));
-                              } else { // Asumimos que cualquier otro rol es Mecánico por ahora
-                                Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (context) => const WorkerShellScreen()));
+                              final currentUser = loginViewModel.currentUser;
+                              if (currentUser == null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('No se pudo obtener el usuario autenticado')),
+                                );
+                                return;
                               }
+
+                              if (currentUser.mustChangePassword) {
+                                final changed = await _enforcePasswordChange(
+                                  token: currentUser.token ?? '',
+                                  currentPassword: _passwordController.text,
+                                );
+                                if (!changed) {
+                                  return;
+                                }
+                              }
+
+                              _openShellForRole(currentUser.role);
                             } else {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(content: Text(loginViewModel.errorMessage ?? 'Error desconocido')),

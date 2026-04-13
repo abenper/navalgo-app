@@ -43,6 +43,8 @@ public class DataInitializer implements CommandLineRunner {
         admin.setSpeciality("Gestion");
         admin.setRole(Role.ADMIN);
         admin.setActive(true);
+        admin.setMustChangePassword(false);
+        admin.setCanEditWorkOrders(true);
         workerRepository.save(admin);
 
         Worker worker = new Worker();
@@ -52,6 +54,8 @@ public class DataInitializer implements CommandLineRunner {
         worker.setSpeciality("Motores Diesel");
         worker.setRole(Role.WORKER);
         worker.setActive(true);
+        worker.setMustChangePassword(false);
+        worker.setCanEditWorkOrders(false);
         workerRepository.save(worker);
 
         Company company = new Company();

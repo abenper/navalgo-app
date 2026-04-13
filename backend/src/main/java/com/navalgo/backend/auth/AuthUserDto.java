@@ -6,6 +6,8 @@ public record AuthUserDto(
         Long id,
         String name,
         String email,
-        Role role
+        Role role,
+        boolean mustChangePassword,
+        boolean canEditWorkOrders
 ) {
 }

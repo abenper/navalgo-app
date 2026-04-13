@@ -25,7 +25,7 @@ public class WorkerController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<WorkerDto> create(@RequestBody @Valid CreateWorkerRequest request) {
+    public ResponseEntity<CreateWorkerResponse> create(@RequestBody @Valid CreateWorkerRequest request) {
         return ResponseEntity.ok(workerService.create(request));
     }
 
@@ -34,5 +34,18 @@ public class WorkerController {
     public ResponseEntity<WorkerDto> updateStatus(@PathVariable Long id,
                                                   @RequestBody UpdateWorkerStatusRequest request) {
         return ResponseEntity.ok(workerService.setActive(id, request.active()));
+    }
+
+    @PatchMapping("/{id}/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ResetWorkerPasswordResponse> resetPassword(@PathVariable Long id) {
+        return ResponseEntity.ok(workerService.resetPassword(id));
+    }
+
+    @PatchMapping("/{id}/permissions/work-orders")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkerDto> updateWorkOrderPermission(@PathVariable Long id,
+                                                               @RequestBody UpdateWorkOrderEditPermissionRequest request) {
+        return ResponseEntity.ok(workerService.setWorkOrderEditPermission(id, request.canEditWorkOrders()));
     }
 }

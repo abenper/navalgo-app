@@ -8,7 +8,9 @@ public record WorkerDto(
         String email,
         String speciality,
         Role role,
-        boolean active
+    boolean active,
+    boolean mustChangePassword,
+    boolean canEditWorkOrders
 ) {
     public static WorkerDto from(Worker worker) {
         return new WorkerDto(
@@ -17,7 +19,9 @@ public record WorkerDto(
                 worker.getEmail(),
                 worker.getSpeciality(),
                 worker.getRole(),
-                worker.isActive()
+                worker.isActive(),
+                worker.isMustChangePassword(),
+                worker.isCanEditWorkOrders()
         );
     }
 }

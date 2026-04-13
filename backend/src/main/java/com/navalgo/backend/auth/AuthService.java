@@ -3,6 +3,7 @@ package com.navalgo.backend.auth;
 import com.navalgo.backend.security.JwtService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
+import com.navalgo.backend.worker.WorkerService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -14,13 +15,16 @@ public class AuthService {
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final WorkerService workerService;
 
     public AuthService(WorkerRepository workerRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       WorkerService workerService) {
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.workerService = workerService;
     }
 
     public LoginResponse login(LoginRequest request) {
@@ -40,7 +44,18 @@ public class AuthService {
                 "userId", worker.getId()
         ));
 
-        AuthUserDto userDto = new AuthUserDto(worker.getId(), worker.getFullName(), worker.getEmail(), worker.getRole());
+        AuthUserDto userDto = new AuthUserDto(
+                worker.getId(),
+                worker.getFullName(),
+                worker.getEmail(),
+                worker.getRole(),
+                worker.isMustChangePassword(),
+                worker.isCanEditWorkOrders()
+        );
         return new LoginResponse(userDto, token);
+    }
+
+    public void changePassword(String email, ChangePasswordRequest request) {
+        workerService.changeOwnPassword(email, request.currentPassword(), request.newPassword());
     }
 }

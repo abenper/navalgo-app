@@ -6,6 +6,7 @@ import com.navalgo.backend.fleet.Vessel;
 import com.navalgo.backend.fleet.VesselRepository;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
+import org.springframework.security.access.AccessDeniedException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +36,12 @@ public class WorkOrderService {
 
     public List<WorkOrderDto> findByWorker(Long workerId) {
         return workOrderRepository.findByAssignedWorkersId(workerId).stream().map(this::toDto).toList();
+    }
+
+    public Long findWorkerIdByEmail(String email) {
+        return workerRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"))
+                .getId();
     }
 
     public WorkOrderDto create(CreateWorkOrderRequest request) {
@@ -82,11 +89,94 @@ public class WorkOrderService {
         return toDto(workOrderRepository.save(workOrder));
     }
 
-    public WorkOrderDto updateStatus(Long id, UpdateWorkOrderStatusRequest request) {
+    public WorkOrderDto updateStatus(Long id, UpdateWorkOrderStatusRequest request, String currentUserEmail) {
         WorkOrder workOrder = workOrderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
+            throw new AccessDeniedException("No puedes actualizar el estado de este parte");
+        }
+
         workOrder.setStatus(request.status());
         return toDto(workOrderRepository.save(workOrder));
+    }
+
+    public WorkOrderDto updateWorkOrder(Long id, UpdateWorkOrderRequest request, String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current) && !(isAssignedToWorkOrder(current, workOrder) && current.isCanEditWorkOrders())) {
+            throw new AccessDeniedException("No tienes permiso para editar este parte");
+        }
+
+        if (request.title() != null && !request.title().isBlank()) {
+            workOrder.setTitle(request.title().trim());
+        }
+        if (request.description() != null) {
+            workOrder.setDescription(request.description());
+        }
+        if (request.priority() != null) {
+            workOrder.setPriority(request.priority());
+        }
+        if (request.status() != null) {
+            workOrder.setStatus(request.status());
+        }
+
+        if (request.ownerId() != null) {
+            Owner owner = ownerRepository.findById(request.ownerId())
+                    .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
+            workOrder.setOwner(owner);
+        }
+
+        if (request.vesselId() != null) {
+            Vessel vessel = vesselRepository.findById(request.vesselId())
+                    .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+            workOrder.setVessel(vessel);
+        }
+
+        if (request.workerIds() != null) {
+            Set<Worker> workers = new HashSet<>(workerRepository.findAllById(request.workerIds()));
+            workOrder.setAssignedWorkers(workers);
+        }
+
+        if (request.engineHours() != null) {
+            workOrder.getEngineHourLogs().clear();
+            for (EngineHourRequest engineReq : request.engineHours()) {
+                EngineHourLog log = new EngineHourLog();
+                log.setWorkOrder(workOrder);
+                log.setEngineLabel(engineReq.engineLabel());
+                log.setHours(engineReq.hours());
+                workOrder.getEngineHourLogs().add(log);
+            }
+        }
+
+        if (request.attachmentUrls() != null) {
+            workOrder.getAttachments().clear();
+            for (String url : request.attachmentUrls()) {
+                WorkOrderAttachment att = new WorkOrderAttachment();
+                att.setWorkOrder(workOrder);
+                att.setFileUrl(url);
+                att.setFileType(inferType(url));
+                workOrder.getAttachments().add(att);
+            }
+        }
+
+        return toDto(workOrderRepository.save(workOrder));
+    }
+
+    private Worker requireWorkerByEmail(String email) {
+        return workerRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+    }
+
+    private boolean isAdmin(Worker worker) {
+        return worker.getRole() == com.navalgo.backend.common.Role.ADMIN;
+    }
+
+    private boolean isAssignedToWorkOrder(Worker worker, WorkOrder workOrder) {
+        return workOrder.getAssignedWorkers().stream().anyMatch(w -> w.getId().equals(worker.getId()));
     }
 
     private WorkOrderDto toDto(WorkOrder w) {

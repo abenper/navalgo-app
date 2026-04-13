@@ -8,8 +8,9 @@ import jakarta.validation.constraints.NotNull;
 public record CreateWorkerRequest(
         @NotBlank String fullName,
         @NotBlank @Email String email,
-        @NotBlank String password,
+        String password,
         String speciality,
-        @NotNull Role role
+        @NotNull Role role,
+        boolean canEditWorkOrders
 ) {
 }

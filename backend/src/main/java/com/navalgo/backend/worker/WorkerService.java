@@ -4,6 +4,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.List;
 
 @Service
@@ -11,6 +12,8 @@ public class WorkerService {
 
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecureRandom secureRandom = new SecureRandom();
+    private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
 
     public WorkerService(WorkerRepository workerRepository, PasswordEncoder passwordEncoder) {
         this.workerRepository = workerRepository;
@@ -21,20 +24,64 @@ public class WorkerService {
         return workerRepository.findAll().stream().map(WorkerDto::from).toList();
     }
 
-    public WorkerDto create(CreateWorkerRequest request) {
+    public CreateWorkerResponse create(CreateWorkerRequest request) {
         workerRepository.findByEmailIgnoreCase(request.email()).ifPresent(existing -> {
             throw new IllegalArgumentException("Ya existe un trabajador con ese email");
         });
 
+        String rawPassword = (request.password() == null || request.password().isBlank())
+                ? generateTemporaryPassword(12)
+                : request.password().trim();
+        boolean generatedPassword = request.password() == null || request.password().isBlank();
+
         Worker worker = new Worker();
         worker.setFullName(request.fullName());
         worker.setEmail(request.email());
-        worker.setPasswordHash(passwordEncoder.encode(request.password()));
+        worker.setPasswordHash(passwordEncoder.encode(rawPassword));
         worker.setSpeciality(request.speciality());
         worker.setRole(request.role());
         worker.setActive(true);
+        worker.setMustChangePassword(true);
+        worker.setCanEditWorkOrders(request.canEditWorkOrders());
 
+        Worker saved = workerRepository.save(worker);
+        return new CreateWorkerResponse(WorkerDto.from(saved), generatedPassword ? rawPassword : null);
+    }
+
+    public ResetWorkerPasswordResponse resetPassword(Long workerId) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+
+        String temporaryPassword = generateTemporaryPassword(12);
+        worker.setPasswordHash(passwordEncoder.encode(temporaryPassword));
+        worker.setMustChangePassword(true);
+        workerRepository.save(worker);
+
+        return new ResetWorkerPasswordResponse(worker.getId(), worker.getEmail(), temporaryPassword);
+    }
+
+    public WorkerDto setWorkOrderEditPermission(Long workerId, boolean canEditWorkOrders) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        worker.setCanEditWorkOrders(canEditWorkOrders);
         return WorkerDto.from(workerRepository.save(worker));
+    }
+
+    public void changeOwnPassword(String email, String currentPassword, String newPassword) {
+        if (newPassword == null || newPassword.isBlank() || newPassword.length() < 8) {
+            throw new IllegalArgumentException("La nueva contrasena debe tener al menos 8 caracteres");
+        }
+
+        Worker worker = workerRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+
+        if (!passwordEncoder.matches(currentPassword, worker.getPasswordHash())) {
+            throw new IllegalArgumentException("La contrasena actual no es correcta");
+        }
+
+        worker.setPasswordHash(passwordEncoder.encode(newPassword));
+        worker.setMustChangePassword(false);
+        workerRepository.save(worker);
     }
 
     public WorkerDto setActive(Long workerId, boolean active) {
@@ -42,5 +89,14 @@ public class WorkerService {
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
         worker.setActive(active);
         return WorkerDto.from(workerRepository.save(worker));
+    }
+
+    private String generateTemporaryPassword(int length) {
+        StringBuilder password = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int index = secureRandom.nextInt(PASSWORD_CHARS.length());
+            password.append(PASSWORD_CHARS.charAt(index));
+        }
+        return password.toString();
     }
 }
