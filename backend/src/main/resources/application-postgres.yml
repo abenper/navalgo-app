@@ -12,6 +12,8 @@ spring:
     properties:
       hibernate:
         format_sql: true
+        timezone:
+          default_storage: NORMALIZE_UTC
 
 app:
   jwt:
