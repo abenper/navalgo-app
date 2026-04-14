@@ -15,7 +15,7 @@ git clean -fd
 # Limpia compilaciones anteriores
 echo "🧹 Limpiando artefactos anteriores..."
 rm -rf target/
-docker-compose down -v
+docker compose down -v
 
 # Verifica/genera archivo .env con secretos
 if [ ! -f .env ]; then
@@ -48,9 +48,9 @@ if grep -q "change-this" .env; then
 fi
 
 echo "🐳 Construyendo y desplegando contenedor..."
-docker-compose up -d --build
+docker compose up -d --build
 
 echo ""
 echo "✅ Deployment completado!"
-echo "📊 Verifica logs con: docker-compose logs -f backend"
+echo "📊 Verifica logs con: docker compose logs -f backend"
 echo "🔍 Health check: curl http://localhost:8080/api/health"

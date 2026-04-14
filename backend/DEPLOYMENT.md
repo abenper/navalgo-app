@@ -43,13 +43,13 @@ El script `deploy.sh` hace automáticamente:
 
 ```bash
 # Ver logs del backend
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # Reiniciar el servicio
-docker-compose restart backend
+docker compose restart backend
 
 # Detener
-docker-compose down
+docker compose down
 
 # Verificar que está funcionando
 curl http://localhost:8080/api/health
