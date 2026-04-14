@@ -29,6 +29,10 @@ public class WorkerService {
             throw new IllegalArgumentException("Ya existe un trabajador con ese email");
         });
 
+        if (request.password() != null && !request.password().isBlank() && !isStrongPassword(request.password().trim())) {
+            throw new IllegalArgumentException("La contrasena debe tener minimo 12 caracteres e incluir mayuscula, minuscula, numero y simbolo");
+        }
+
         String rawPassword = (request.password() == null || request.password().isBlank())
                 ? generateTemporaryPassword(12)
                 : request.password().trim();
@@ -68,8 +72,8 @@ public class WorkerService {
     }
 
     public void changeOwnPassword(String email, String currentPassword, String newPassword) {
-        if (newPassword == null || newPassword.isBlank() || newPassword.length() < 8) {
-            throw new IllegalArgumentException("La nueva contrasena debe tener al menos 8 caracteres");
+        if (newPassword == null || newPassword.isBlank() || !isStrongPassword(newPassword)) {
+            throw new IllegalArgumentException("La nueva contrasena debe tener minimo 12 caracteres e incluir mayuscula, minuscula, numero y simbolo");
         }
 
         Worker worker = workerRepository.findByEmailIgnoreCase(email)
@@ -98,5 +102,29 @@ public class WorkerService {
             password.append(PASSWORD_CHARS.charAt(index));
         }
         return password.toString();
+    }
+
+    private boolean isStrongPassword(String password) {
+        if (password.length() < 12) {
+            return false;
+        }
+        boolean hasUpper = false;
+        boolean hasLower = false;
+        boolean hasDigit = false;
+        boolean hasSymbol = false;
+
+        for (char c : password.toCharArray()) {
+            if (Character.isUpperCase(c)) {
+                hasUpper = true;
+            } else if (Character.isLowerCase(c)) {
+                hasLower = true;
+            } else if (Character.isDigit(c)) {
+                hasDigit = true;
+            } else {
+                hasSymbol = true;
+            }
+        }
+
+        return hasUpper && hasLower && hasDigit && hasSymbol;
     }
 }

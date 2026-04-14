@@ -32,7 +32,7 @@ public class SecurityConfig {
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtFilter,
-            @Value("${app.security.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*,http://104.248.22.99:8080,https://tu-dominio.com,https://www.tu-dominio.com}") String allowedOriginsCsv
+            @Value("${app.security.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}") String allowedOriginsCsv
     ) {
         this.jwtFilter = jwtFilter;
         this.allowedOrigins = Arrays.stream(allowedOriginsCsv.split(","))
@@ -79,7 +79,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(12);
     }
 
     @Bean

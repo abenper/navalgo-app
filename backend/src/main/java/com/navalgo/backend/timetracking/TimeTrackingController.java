@@ -2,8 +2,11 @@ package com.navalgo.backend.timetracking;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import com.navalgo.backend.worker.CurrentUserWorkerResolver;
 
 import java.util.List;
 
@@ -12,26 +15,49 @@ import java.util.List;
 public class TimeTrackingController {
 
     private final TimeTrackingService service;
+    private final CurrentUserWorkerResolver currentUserWorkerResolver;
 
-    public TimeTrackingController(TimeTrackingService service) {
+    public TimeTrackingController(TimeTrackingService service,
+                                  CurrentUserWorkerResolver currentUserWorkerResolver) {
         this.service = service;
+        this.currentUserWorkerResolver = currentUserWorkerResolver;
     }
 
     @PostMapping("/clock-in")
     @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
-    public ResponseEntity<TimeEntryDto> clockIn(@RequestBody @Valid ClockRequest request) {
+    public ResponseEntity<TimeEntryDto> clockIn(@RequestBody @Valid ClockRequest request,
+                                                Authentication authentication) {
+        validateWorkerScope(request.workerId(), authentication);
         return ResponseEntity.ok(service.clockIn(request.workerId()));
     }
 
     @PostMapping("/clock-out")
     @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
-    public ResponseEntity<TimeEntryDto> clockOut(@RequestBody @Valid ClockRequest request) {
+    public ResponseEntity<TimeEntryDto> clockOut(@RequestBody @Valid ClockRequest request,
+                                                 Authentication authentication) {
+        validateWorkerScope(request.workerId(), authentication);
         return ResponseEntity.ok(service.clockOut(request.workerId()));
     }
 
     @GetMapping("/worker/{workerId}")
     @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
-    public ResponseEntity<List<TimeEntryDto>> byWorker(@PathVariable Long workerId) {
+    public ResponseEntity<List<TimeEntryDto>> byWorker(@PathVariable Long workerId,
+                                                       Authentication authentication) {
+        validateWorkerScope(workerId, authentication);
         return ResponseEntity.ok(service.listByWorker(workerId));
+    }
+
+    private void validateWorkerScope(Long targetWorkerId, Authentication authentication) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+
+        if (isAdmin) {
+            return;
+        }
+
+        Long currentWorkerId = currentUserWorkerResolver.findWorkerIdByEmail(authentication.getName());
+        if (!currentWorkerId.equals(targetWorkerId)) {
+            throw new AccessDeniedException("Solo puedes operar sobre tus propios fichajes");
+        }
     }
 }
