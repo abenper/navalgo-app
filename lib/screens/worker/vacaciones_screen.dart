@@ -136,6 +136,104 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     }
   }
 
+  Future<void> _editRequest(LeaveRequestModel request) async {
+    final result = await showDialog<_LeaveFormResult>(
+      context: context,
+      builder: (_) => _FormularioAusenciaDialog(
+        title: 'Editar Solicitud',
+        submitLabel: 'Guardar cambios',
+        initialReason: request.reason,
+        initialRange: DateTimeRange(start: request.startDate, end: request.endDate),
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    final session = context.read<SessionViewModel>();
+    final token = session.token;
+    final messenger = ScaffoldMessenger.of(context);
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await context.read<LeaveService>().updateLeaveRequest(
+        token,
+        leaveRequestId: request.id,
+        reason: result.reason,
+        startDate: result.range.start,
+        endDate: result.range.end,
+      );
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Solicitud editada. Estado: pendiente de confirmacion')),
+      );
+      await _loadData();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo editar la solicitud: $e')),
+      );
+    }
+  }
+
+  Future<void> _cancelRequest(LeaveRequestModel request) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cancelar vacaciones'),
+        content: const Text('Esta accion cancelara la solicitud actual. ¿Deseas continuar?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Si, cancelar'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    final messenger = ScaffoldMessenger.of(context);
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await context.read<LeaveService>().cancelLeaveRequest(
+        token,
+        leaveRequestId: request.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Vacaciones canceladas.')),
+      );
+      await _loadData();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo cancelar la solicitud: $e')),
+      );
+    }
+  }
+
   Future<void> _adminAssignRequest() async {
     if (_workers.isEmpty) {
       return;
@@ -258,7 +356,8 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
             ..._requests.map((req) {
               final color = _statusColor(req.status);
               final statusLabel = _statusLabel(req.status);
-              final canModerate = _isAdmin && req.status == 'PENDING';
+              final workerCanEditOrCancel = !_isAdmin && req.status == 'APPROVED';
+              final adminCanChangeStatus = _isAdmin;
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
@@ -273,31 +372,75 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                   ),
                   subtitle: Text(
                     _isAdmin
-                        ? 'Trabajador: ${req.workerName}\nMotivo: ${req.reason}\nEstado: $statusLabel'
-                        : 'Motivo: ${req.reason}\nEstado: $statusLabel',
+                        ? 'Trabajador: ${req.workerName}\nMotivo: ${req.reason}'
+                        : 'Motivo: ${req.reason}',
                   ),
-                  isThreeLine: true,
-                  trailing: canModerate
-                      ? Wrap(
-                          spacing: 6,
-                          children: [
-                            IconButton(
-                              tooltip: 'Aceptar',
-                              icon: const Icon(Icons.check_circle, color: Colors.green),
-                              onPressed: () => _updateStatus(req.id, 'APPROVED'),
-                            ),
-                            IconButton(
-                              tooltip: 'Rechazar',
-                              icon: const Icon(Icons.cancel, color: Colors.red),
-                              onPressed: () => _updateStatus(req.id, 'REJECTED'),
-                            ),
-                          ],
-                        )
-                      : Chip(
+                  isThreeLine: _isAdmin,
+                  trailing: SizedBox(
+                    width: 156,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Chip(
                           label: Text(statusLabel),
                           backgroundColor: color.withValues(alpha: 0.12),
                           side: BorderSide.none,
                         ),
+                        if (workerCanEditOrCancel || adminCanChangeStatus)
+                          PopupMenuButton<String>(
+                            tooltip: 'Acciones',
+                            onSelected: (value) {
+                              if (value == 'EDIT') {
+                                _editRequest(req);
+                                return;
+                              }
+                              if (value == 'CANCEL') {
+                                _cancelRequest(req);
+                                return;
+                              }
+                              _updateStatus(req.id, value);
+                            },
+                            itemBuilder: (_) {
+                              final items = <PopupMenuEntry<String>>[];
+                              if (workerCanEditOrCancel) {
+                                items.add(
+                                  const PopupMenuItem(
+                                    value: 'EDIT',
+                                    child: Text('Editar (volver a pendiente)'),
+                                  ),
+                                );
+                                items.add(
+                                  const PopupMenuItem(
+                                    value: 'CANCEL',
+                                    child: Text('Cancelar vacaciones'),
+                                  ),
+                                );
+                              }
+                              if (adminCanChangeStatus) {
+                                if (req.status != 'PENDING') {
+                                  items.add(const PopupMenuItem(value: 'PENDING', child: Text('Marcar pendiente')));
+                                }
+                                if (req.status != 'APPROVED') {
+                                  items.add(const PopupMenuItem(value: 'APPROVED', child: Text('Marcar aceptada')));
+                                }
+                                if (req.status != 'REJECTED') {
+                                  items.add(const PopupMenuItem(value: 'REJECTED', child: Text('Marcar rechazada')));
+                                }
+                                if (req.status != 'CANCELLED') {
+                                  items.add(const PopupMenuItem(value: 'CANCELLED', child: Text('Marcar cancelada')));
+                                }
+                              }
+                              return items;
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(Icons.more_horiz, size: 20),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               );
             }),
@@ -351,6 +494,8 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         return 'Aceptada';
       case 'REJECTED':
         return 'Rechazada';
+      case 'CANCELLED':
+        return 'Cancelada';
       default:
         return 'Pendiente (A la espera)';
     }
@@ -362,6 +507,8 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         return Colors.green;
       case 'REJECTED':
         return Colors.red;
+      case 'CANCELLED':
+        return Colors.grey;
       default:
         return Colors.orange;
     }
@@ -388,7 +535,17 @@ class _AdminAssignLeaveFormResult {
 }
 
 class _FormularioAusenciaDialog extends StatefulWidget {
-  const _FormularioAusenciaDialog();
+  const _FormularioAusenciaDialog({
+    this.title = 'Solicitar Ausencia',
+    this.submitLabel = 'Enviar Solicitud',
+    this.initialReason,
+    this.initialRange,
+  });
+
+  final String title;
+  final String submitLabel;
+  final String? initialReason;
+  final DateTimeRange? initialRange;
 
   @override
   State<_FormularioAusenciaDialog> createState() => _FormularioAusenciaDialogState();
@@ -405,6 +562,13 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
     'Asuntos Propios',
     'Otro',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _motivo = widget.initialReason ?? 'Vacaciones';
+    _fechas = widget.initialRange;
+  }
 
   Future<void> _seleccionarFechas() async {
     final DateTime now = DateTime.now();
@@ -432,7 +596,7 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Solicitar Ausencia', style: TextStyle(fontWeight: FontWeight.bold)),
+      title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.bold)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,7 +658,7 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
               _LeaveFormResult(reason: _motivo, range: _fechas!),
             );
           },
-          child: const Text('Enviar Solicitud'),
+          child: Text(widget.submitLabel),
         ),
       ],
     );

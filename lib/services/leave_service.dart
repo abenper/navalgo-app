@@ -62,6 +62,39 @@ class LeaveService {
     return LeaveRequestModel.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<LeaveRequestModel> updateLeaveRequest(
+    String token, {
+    required int leaveRequestId,
+    required String reason,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final data = await _apiClient.patch(
+      '/leave-requests/$leaveRequestId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'reason': reason,
+        'startDate': _asDate(startDate),
+        'endDate': _asDate(endDate),
+      },
+    );
+
+    return LeaveRequestModel.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<LeaveRequestModel> cancelLeaveRequest(
+    String token, {
+    required int leaveRequestId,
+  }) async {
+    final data = await _apiClient.patch(
+      '/leave-requests/$leaveRequestId/cancel',
+      headers: {'Authorization': 'Bearer $token'},
+      body: const <String, dynamic>{},
+    );
+
+    return LeaveRequestModel.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<LeaveBalance> getLeaveBalance(
     String token, {
     int? workerId,

@@ -5,6 +5,7 @@ import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.timetracking.TimeEntryRepository;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
+import org.springframework.security.access.AccessDeniedException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,33 +61,55 @@ public class LeaveRequestService {
     public LeaveRequestDto updateStatus(Long id, UpdateLeaveStatusRequest request) {
         LeaveRequestEntity entity = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+        applyStatusChange(entity, request.status());
+        return LeaveRequestDto.from(repository.save(entity));
+    }
 
-        if (entity.getStatus() == LeaveStatus.APPROVED && request.status() != LeaveStatus.APPROVED) {
-            throw new IllegalArgumentException("Una solicitud aceptada no puede desaprobarse");
+    @Transactional
+    public LeaveRequestDto updateRequest(Long id,
+                                         UpdateLeaveRequest request,
+                                         Long currentWorkerId,
+                                         boolean isAdmin) {
+        LeaveRequestEntity entity = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        ensureCanModify(entity, currentWorkerId, isAdmin);
+
+        LocalDate startDate = request.startDate() != null ? request.startDate() : entity.getStartDate();
+        LocalDate endDate = request.endDate() != null ? request.endDate() : entity.getEndDate();
+        String reason = request.reason() != null ? request.reason().trim() : entity.getReason();
+
+        if (reason.isBlank()) {
+            throw new IllegalArgumentException("El motivo es obligatorio");
         }
 
-        if (request.status() == LeaveStatus.APPROVED && entity.getStatus() != LeaveStatus.APPROVED) {
-            validateRequestedDays(entity.getWorker(), entity.getStartDate(), entity.getEndDate(), entity.getId());
-            notificationService.notifyWorker(
-                    entity.getWorker().getId(),
-                    "Vacaciones aceptadas",
-                    "Tu solicitud de vacaciones ha sido aceptada.",
-                    "AUSENCIAS",
-                    NotificationType.SUCCESS
-            );
-        }
+        validateRequestedDays(entity.getWorker(), startDate, endDate, entity.getId());
 
-        if (request.status() == LeaveStatus.REJECTED) {
-            notificationService.notifyWorker(
-                    entity.getWorker().getId(),
-                    "Vacaciones rechazadas",
-                    "Tu solicitud de vacaciones ha sido rechazada.",
-                    "AUSENCIAS",
-                    NotificationType.WARNING
-            );
-        }
+        entity.setReason(reason);
+        entity.setStartDate(startDate);
+        entity.setEndDate(endDate);
 
-        entity.setStatus(request.status());
+        // Any edit requires admin confirmation again.
+        entity.setStatus(LeaveStatus.PENDING);
+
+        notificationService.notifyAdmins(
+                "Solicitud de vacaciones modificada",
+                entity.getWorker().getFullName() + " ha modificado una solicitud de vacaciones.",
+                "AUSENCIAS",
+                NotificationType.INFO
+        );
+
+        return LeaveRequestDto.from(repository.save(entity));
+    }
+
+    @Transactional
+    public LeaveRequestDto cancelRequest(Long id, Long currentWorkerId, boolean isAdmin) {
+        LeaveRequestEntity entity = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        ensureCanModify(entity, currentWorkerId, isAdmin);
+
+        applyStatusChange(entity, LeaveStatus.CANCELLED);
         return LeaveRequestDto.from(repository.save(entity));
     }
 
@@ -141,6 +164,43 @@ public class LeaveRequestService {
         }
 
         return LeaveRequestDto.from(saved);
+    }
+
+    private void ensureCanModify(LeaveRequestEntity entity, Long currentWorkerId, boolean isAdmin) {
+        if (!isAdmin && (currentWorkerId == null || !entity.getWorker().getId().equals(currentWorkerId))) {
+            throw new AccessDeniedException("Solo puedes modificar tus propias solicitudes");
+        }
+    }
+
+    private void applyStatusChange(LeaveRequestEntity entity, LeaveStatus newStatus) {
+        if (newStatus == LeaveStatus.APPROVED) {
+            validateRequestedDays(entity.getWorker(), entity.getStartDate(), entity.getEndDate(), entity.getId());
+            notificationService.notifyWorker(
+                    entity.getWorker().getId(),
+                    "Vacaciones aceptadas",
+                    "Tu solicitud de vacaciones ha sido aceptada.",
+                    "AUSENCIAS",
+                    NotificationType.SUCCESS
+            );
+        } else if (newStatus == LeaveStatus.REJECTED) {
+            notificationService.notifyWorker(
+                    entity.getWorker().getId(),
+                    "Vacaciones rechazadas",
+                    "Tu solicitud de vacaciones ha sido rechazada.",
+                    "AUSENCIAS",
+                    NotificationType.WARNING
+            );
+        } else if (newStatus == LeaveStatus.CANCELLED) {
+            notificationService.notifyWorker(
+                    entity.getWorker().getId(),
+                    "Vacaciones canceladas",
+                    "Tu solicitud de vacaciones ha sido cancelada.",
+                    "AUSENCIAS",
+                    NotificationType.WARNING
+            );
+        }
+
+        entity.setStatus(newStatus);
     }
 
     private void validateRequestedDays(Worker worker, LocalDate startDate, LocalDate endDate, Long excludeRequestId) {

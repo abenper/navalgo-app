@@ -63,6 +63,27 @@ public class LeaveRequestController {
         return ResponseEntity.ok(service.updateStatus(id, request));
     }
 
+    @PatchMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<LeaveRequestDto> updateRequest(@PathVariable Long id,
+                                                         @RequestBody @Valid UpdateLeaveRequest request,
+                                                         Authentication authentication) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        Long currentWorkerId = isAdmin ? null : currentUserWorkerResolver.findWorkerIdByEmail(authentication.getName());
+        return ResponseEntity.ok(service.updateRequest(id, request, currentWorkerId, isAdmin));
+    }
+
+    @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<LeaveRequestDto> cancelRequest(@PathVariable Long id,
+                                                         Authentication authentication) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        Long currentWorkerId = isAdmin ? null : currentUserWorkerResolver.findWorkerIdByEmail(authentication.getName());
+        return ResponseEntity.ok(service.cancelRequest(id, currentWorkerId, isAdmin));
+    }
+
     @PostMapping("/admin-assign")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LeaveRequestDto> adminAssign(@RequestBody @Valid AdminAssignLeaveRequest request) {
