@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
 import 'package:navalgo/services/leave_service.dart';
+import 'package:navalgo/services/notification_service.dart';
 import 'package:navalgo/services/time_tracking_service.dart';
 import 'package:navalgo/services/worker_service.dart';
+import 'package:navalgo/services/work_order_media_service.dart';
 import 'package:navalgo/services/work_order_service.dart';
 import 'package:navalgo/viewmodels/fleet_view_model.dart';
 import 'package:navalgo/viewmodels/login_view_model.dart';
+import 'package:navalgo/viewmodels/notifications_view_model.dart';
 import 'package:navalgo/viewmodels/session_view_model.dart';
 import 'package:navalgo/viewmodels/work_orders_view_model.dart';
 import 'package:navalgo/viewmodels/workers_view_model.dart';
@@ -26,8 +29,10 @@ Future<void> main() async {
         Provider<WorkerService>(create: (_) => WorkerService()),
         Provider<FleetService>(create: (_) => FleetService()),
         Provider<LeaveService>(create: (_) => LeaveService()),
+        Provider<NotificationService>(create: (_) => NotificationService()),
         Provider<TimeTrackingService>(create: (_) => TimeTrackingService()),
         Provider<WorkOrderService>(create: (_) => WorkOrderService()),
+        Provider<WorkOrderMediaService>(create: (_) => WorkOrderMediaService()),
         ChangeNotifierProvider(
           create: (context) =>
               LoginViewModel(
@@ -50,6 +55,12 @@ Future<void> main() async {
         ChangeNotifierProvider(
           create: (context) => WorkOrdersViewModel(
             workOrderService: context.read<WorkOrderService>(),
+            session: context.read<SessionViewModel>(),
+          ),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => NotificationsViewModel(
+            notificationService: context.read<NotificationService>(),
             session: context.read<SessionViewModel>(),
           ),
         ),
@@ -79,6 +90,10 @@ class MyApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(16.0), // Bordes más suaves
           ),
           clipBehavior: Clip.antiAlias, // Evita que el contenido se salga de los bordes
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          behavior: SnackBarBehavior.floating,
+          elevation: 3,
         ),
       ),
       home: const _RootScreen(),

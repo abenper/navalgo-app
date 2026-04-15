@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import '../common/login_screen.dart'; // Importamos el login para poder cerrar sesión
-import 'admin_dashboard_screen.dart'; // Dashboard específico de Admin
-import 'partes_screen.dart';
-import 'flota_screen.dart';
-import 'equipo_screen.dart';
-import '../worker/fichaje_screen.dart'; // Nueva ubicación
-import '../worker/vacaciones_screen.dart'; // El archivo físico sigue siendo vacaciones_screen.dart
 import 'package:provider/provider.dart';
+
+import '../../utils/app_toast.dart';
+import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
+import '../common/login_screen.dart';
+import '../worker/fichaje_screen.dart';
+import '../worker/vacaciones_screen.dart';
+import 'admin_dashboard_screen.dart';
+import 'equipo_screen.dart';
+import 'flota_screen.dart';
+import 'partes_screen.dart';
 
 class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
@@ -18,10 +21,10 @@ class AdminShellScreen extends StatefulWidget {
 
 class _AdminShellScreenState extends State<AdminShellScreen> {
   int _selectedIndex = 0;
+  bool _shownUnreadToast = false;
 
-  // Lista de nuestras pantallas. Al usar IndexedStack, estas mantendrán su estado.
   final List<Widget> _screens = [
-    const AdminDashboardScreen(), // <-- Corregido aquí
+    const AdminDashboardScreen(),
     const PartesScreen(),
     const FlotaScreen(),
     const EquipoScreen(),
@@ -29,29 +32,168 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     const AusenciasScreen(),
   ];
 
-  void _onDestinationSelected(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
-
-  // Títulos dinámicos para el AppBar global
   final List<String> _titles = const [
     'Dashboard',
-    'Gestión de Partes',
+    'Gestion de Partes',
     'Clientes y Flota',
     'Equipo',
     'Control Horario',
     'Ausencias',
   ];
 
-  // Nuestro nuevo Navbar superior
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final notificationsVm = context.read<NotificationsViewModel>();
+      await notificationsVm.refresh();
+      if (!mounted || _shownUnreadToast) {
+        return;
+      }
+      if (notificationsVm.unreadCount > 0) {
+        _shownUnreadToast = true;
+        AppToast.info(
+          context,
+          'Tienes ${notificationsVm.unreadCount} notificacion(es) nuevas.',
+        );
+      }
+    });
+  }
+
+  void _onDestinationSelected(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
+  int _mapActionRouteToTab(String actionRoute) {
+    switch (actionRoute) {
+      case 'PARTES':
+        return 1;
+      case 'AUSENCIAS':
+        return 5;
+      default:
+        return 0;
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    final vm = context.read<NotificationsViewModel>();
+    await vm.refresh();
+
+    if (!mounted) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return Consumer<NotificationsViewModel>(
+          builder: (context, notificationsVm, _) {
+            final notifications = notificationsVm.notifications;
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Notificaciones',
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: notificationsVm.unreadCount == 0
+                              ? null
+                              : () async {
+                                  await notificationsVm.markAllAsRead();
+                                },
+                          child: const Text('Marcar todas leidas'),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: notifications.isEmpty
+                          ? const Center(child: Text('No hay notificaciones'))
+                          : ListView.builder(
+                              itemCount: notifications.length,
+                              itemBuilder: (context, index) {
+                                final item = notifications[index];
+                                return Card(
+                                  color: item.isRead ? null : Colors.blue.shade50,
+                                  child: ListTile(
+                                    leading: Icon(
+                                      item.isRead ? Icons.notifications_none : Icons.notifications_active,
+                                      color: item.isRead ? Colors.grey : Colors.blue.shade900,
+                                    ),
+                                    title: Text(item.title),
+                                    subtitle: Text(item.message),
+                                    trailing: item.isRead
+                                        ? null
+                                        : const Icon(Icons.fiber_manual_record, size: 12, color: Colors.red),
+                                    onTap: () async {
+                                      await notificationsVm.markAsRead(item.id);
+                                      if (!mounted) {
+                                        return;
+                                      }
+                                      Navigator.of(this.context).pop();
+                                      setState(() {
+                                        _selectedIndex = _mapActionRouteToTab(item.actionRoute);
+                                      });
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   AppBar _buildAppBar(BuildContext context) {
+    final notificationsVm = context.watch<NotificationsViewModel>();
+
     return AppBar(
       title: Text(_titles[_selectedIndex], style: const TextStyle(fontWeight: FontWeight.bold)),
       actions: [
+        IconButton(
+          tooltip: 'Notificaciones',
+          onPressed: _openNotifications,
+          icon: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Icon(Icons.notifications_none),
+              if (notificationsVm.unreadCount > 0)
+                Positioned(
+                  right: -6,
+                  top: -6,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      notificationsVm.unreadCount > 9 ? '9+' : '${notificationsVm.unreadCount}',
+                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
         PopupMenuButton<String>(
-          offset: const Offset(0, 50), // Desplaza el menú un poco hacia abajo
+          offset: const Offset(0, 50),
           tooltip: 'Opciones de cuenta',
           onSelected: (value) async {
             if (value == 'salir') {
@@ -59,15 +201,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               if (!mounted) {
                 return;
               }
-              // Cierra sesión y vuelve a la pantalla de Login
               Navigator.of(this.context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
             } else {
-              // Placeholder para futuras pantallas (Perfil, Ajustes)
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Abriendo: $value')),
-              );
+              AppToast.info(context, 'Abriendo: $value');
             }
           },
           child: Padding(
@@ -77,14 +215,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                 CircleAvatar(
                   radius: 16,
                   backgroundColor: Colors.blue.shade100,
-                  // TODO: Cuando conectes la API, usa backgroundImage: NetworkImage(trabajador.fotoUrl)
                   child: Icon(Icons.person, size: 20, color: Colors.blue.shade900),
                 ),
                 const SizedBox(width: 8),
-                // Ocultamos el texto en pantallas muy pequeñas (móviles estrechos)
                 if (MediaQuery.of(context).size.width > 400) ...[
                   const Text(
-                    'Hola, Admin', // TODO: Reemplazar con el nombre real
+                    'Hola, Admin',
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                   const Icon(Icons.arrow_drop_down),
@@ -102,10 +238,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               ),
             ),
             const PopupMenuItem<String>(
-              value: 'Cambiar Contraseña',
+              value: 'Cambiar Contrasena',
               child: ListTile(
                 leading: Icon(Icons.lock_outline),
-                title: Text('Cambiar Contraseña'),
+                title: Text('Cambiar Contrasena'),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -114,7 +250,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               value: 'salir',
               child: ListTile(
                 leading: Icon(Icons.logout, color: Colors.red),
-                title: Text('Cerrar Sesión', style: TextStyle(color: Colors.red)),
+                title: Text('Cerrar Sesion', style: TextStyle(color: Colors.red)),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -126,11 +262,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // LayoutBuilder nos permite saber el ancho disponible de la pantalla.
-    // Así podemos hacer la app adaptativa (SaaS B2B suele usarse en Web/Escritorio y Móvil).
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Si la pantalla es ancha (Web, Tablet, Desktop)
         if (constraints.maxWidth >= 600) {
           return Scaffold(
             appBar: _buildAppBar(context),
@@ -179,7 +312,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   ],
                 ),
                 const VerticalDivider(thickness: 1, width: 1),
-                // IndexedStack envuelto en Expanded para que tome el resto del ancho
                 Expanded(
                   child: IndexedStack(
                     index: _selectedIndex,
@@ -190,8 +322,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
             ),
           );
         }
-        
-        // Si la pantalla es estrecha (Teléfono Móvil) -> NavigationBar (Material 3)
+
         return Scaffold(
           appBar: _buildAppBar(context),
           body: IndexedStack(
@@ -201,12 +332,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           bottomNavigationBar: NavigationBar(
             selectedIndex: _selectedIndex,
             onDestinationSelected: _onDestinationSelected,
-            // Tinte sutil basado en el color primario
             indicatorColor: Colors.blue.shade100,
             destinations: const [
               NavigationDestination(
                 icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard, color: Color(0xFF0D47A1)), // shade900
+                selectedIcon: Icon(Icons.dashboard, color: Color(0xFF0D47A1)),
                 label: 'Dashboard',
               ),
               NavigationDestination(

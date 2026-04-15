@@ -1,5 +1,7 @@
 package com.navalgo.backend.leave;
 
+import com.navalgo.backend.notification.NotificationService;
+import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -17,10 +19,14 @@ public class LeaveRequestService {
 
     private final LeaveRequestRepository repository;
     private final WorkerRepository workerRepository;
+    private final NotificationService notificationService;
 
-    public LeaveRequestService(LeaveRequestRepository repository, WorkerRepository workerRepository) {
+    public LeaveRequestService(LeaveRequestRepository repository,
+                               WorkerRepository workerRepository,
+                               NotificationService notificationService) {
         this.repository = repository;
         this.workerRepository = workerRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -54,6 +60,23 @@ public class LeaveRequestService {
 
         if (request.status() == LeaveStatus.APPROVED && entity.getStatus() != LeaveStatus.APPROVED) {
             validateRequestedDays(entity.getWorker(), entity.getStartDate(), entity.getEndDate(), entity.getId());
+            notificationService.notifyWorker(
+                    entity.getWorker().getId(),
+                    "Vacaciones aceptadas",
+                    "Tu solicitud de vacaciones ha sido aceptada.",
+                    "AUSENCIAS",
+                    NotificationType.SUCCESS
+            );
+        }
+
+        if (request.status() == LeaveStatus.REJECTED) {
+            notificationService.notifyWorker(
+                    entity.getWorker().getId(),
+                    "Vacaciones rechazadas",
+                    "Tu solicitud de vacaciones ha sido rechazada.",
+                    "AUSENCIAS",
+                    NotificationType.WARNING
+            );
         }
 
         entity.setStatus(request.status());
@@ -89,8 +112,28 @@ public class LeaveRequestService {
         entity.setStartDate(startDate);
         entity.setEndDate(endDate);
         entity.setStatus(status);
+        LeaveRequestEntity saved = repository.save(entity);
 
-        return LeaveRequestDto.from(repository.save(entity));
+        if (status == LeaveStatus.PENDING) {
+            notificationService.notifyAdmins(
+                    "Nueva solicitud de vacaciones",
+                    worker.getFullName() + " ha solicitado vacaciones. Haz click para ver mas informacion.",
+                    "AUSENCIAS",
+                    NotificationType.INFO
+            );
+        }
+
+        if (status == LeaveStatus.APPROVED) {
+            notificationService.notifyWorker(
+                    worker.getId(),
+                    "Vacaciones asignadas",
+                    "Se te han asignado nuevas vacaciones.",
+                    "AUSENCIAS",
+                    NotificationType.SUCCESS
+            );
+        }
+
+        return LeaveRequestDto.from(saved);
     }
 
     private void validateRequestedDays(Worker worker, LocalDate startDate, LocalDate endDate, Long excludeRequestId) {

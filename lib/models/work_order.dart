@@ -12,6 +12,56 @@ class EngineHourLog {
   }
 }
 
+class WorkOrderAttachmentItem {
+  const WorkOrderAttachmentItem({
+    required this.fileUrl,
+    required this.fileType,
+    this.originalFileName,
+    this.capturedAt,
+    this.latitude,
+    this.longitude,
+    required this.watermarked,
+    required this.audioRemoved,
+  });
+
+  final String fileUrl;
+  final String fileType;
+  final String? originalFileName;
+  final DateTime? capturedAt;
+  final double? latitude;
+  final double? longitude;
+  final bool watermarked;
+  final bool audioRemoved;
+
+  factory WorkOrderAttachmentItem.fromJson(Map<String, dynamic> json) {
+    return WorkOrderAttachmentItem(
+      fileUrl: json['fileUrl'] as String,
+      fileType: json['fileType'] as String,
+      originalFileName: json['originalFileName'] as String?,
+      capturedAt: json['capturedAt'] == null
+          ? null
+          : DateTime.parse(json['capturedAt'] as String),
+      latitude: (json['latitude'] as num?)?.toDouble(),
+      longitude: (json['longitude'] as num?)?.toDouble(),
+      watermarked: json['watermarked'] as bool? ?? false,
+      audioRemoved: json['audioRemoved'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'fileUrl': fileUrl,
+      'fileType': fileType,
+      'originalFileName': originalFileName,
+      'capturedAt': capturedAt?.toIso8601String(),
+      'latitude': latitude,
+      'longitude': longitude,
+      'watermarked': watermarked,
+      'audioRemoved': audioRemoved,
+    };
+  }
+}
+
 class WorkOrder {
   const WorkOrder({
     required this.id,
@@ -27,6 +77,7 @@ class WorkOrder {
     required this.workerNames,
     required this.engineHours,
     required this.attachmentUrls,
+    required this.attachments,
     required this.createdAt,
   });
 
@@ -43,6 +94,7 @@ class WorkOrder {
   final List<String> workerNames;
   final List<EngineHourLog> engineHours;
   final List<String> attachmentUrls;
+  final List<WorkOrderAttachmentItem> attachments;
   final DateTime createdAt;
 
   factory WorkOrder.fromJson(Map<String, dynamic> json) {
@@ -62,6 +114,9 @@ class WorkOrder {
           .map((e) => EngineHourLog.fromJson(e as Map<String, dynamic>))
           .toList(),
       attachmentUrls: (json['attachmentUrls'] as List<dynamic>).cast<String>(),
+      attachments: (json['attachments'] as List<dynamic>? ?? const <dynamic>[])
+          .map((e) => WorkOrderAttachmentItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }

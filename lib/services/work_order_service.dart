@@ -46,6 +46,8 @@ class WorkOrderService {
     int? vesselId,
     List<int>? workerIds,
     List<Map<String, dynamic>>? engineHours,
+    List<String>? attachmentUrls,
+    List<WorkOrderAttachmentItem>? attachments,
     String priority = 'NORMAL',
   }) async {
     final data = await _apiClient.post(
@@ -58,6 +60,8 @@ class WorkOrderService {
         'vesselId': vesselId,
         'workerIds': workerIds,
         'engineHours': engineHours,
+        'attachmentUrls': attachmentUrls,
+        'attachments': attachments?.map((item) => item.toJson()).toList(),
         'priority': priority,
       },
     );
@@ -74,6 +78,7 @@ class WorkOrderService {
     List<int>? workerIds,
     String? priority,
     String? status,
+    List<WorkOrderAttachmentItem>? attachments,
   }) async {
     final data = await _apiClient.patch(
       '/work-orders/$workOrderId',
@@ -86,6 +91,7 @@ class WorkOrderService {
         'workerIds': workerIds,
         'priority': priority,
         'status': status,
+        'attachments': attachments?.map((item) => item.toJson()).toList(),
       },
     );
     return WorkOrder.fromJson(data as Map<String, dynamic>);

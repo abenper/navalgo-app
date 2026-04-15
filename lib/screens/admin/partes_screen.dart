@@ -1,10 +1,16 @@
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/owner.dart';
 import '../../models/vessel.dart';
 import '../../models/worker_profile.dart';
 import '../../models/work_order.dart';
+import '../../services/work_order_media_service.dart';
+import '../../utils/app_toast.dart';
 import '../../services/work_order_service.dart';
 import '../../viewmodels/fleet_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
@@ -90,6 +96,8 @@ class _PartesScreenState extends State<PartesScreen> {
                   'hours': item.hours,
                 })
             .toList(),
+        attachmentUrls: input.attachments.map((item) => item.fileUrl).toList(),
+        attachments: input.attachments,
         priority: input.priority,
       );
 
@@ -99,16 +107,12 @@ class _PartesScreenState extends State<PartesScreen> {
       if (!mounted) {
         return;
       }
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Parte creado correctamente')),
-      );
+      AppToast.success(context, 'Parte creado correctamente');
     } catch (e) {
       if (!mounted) {
         return;
       }
-      messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo crear el parte: $e')),
-      );
+      AppToast.error(context, 'No se pudo crear el parte: $e');
     }
   }
 
@@ -117,6 +121,114 @@ class _PartesScreenState extends State<PartesScreen> {
       workOrderId: id,
       status: status,
     );
+  }
+
+  Future<void> _openAttachmentsDialog(WorkOrder parte) async {
+    if (parte.attachments.isEmpty && parte.attachmentUrls.isEmpty) {
+      AppToast.info(context, 'Este parte no tiene adjuntos.');
+      return;
+    }
+
+    final attachments = parte.attachments.isNotEmpty
+        ? parte.attachments
+        : parte.attachmentUrls
+            .map((url) => WorkOrderAttachmentItem(
+                  fileUrl: url,
+                  fileType: url.toLowerCase().endsWith('.mp4') ? 'VIDEO' : 'IMAGE',
+                  originalFileName: null,
+                  capturedAt: null,
+                  latitude: null,
+                  longitude: null,
+                  watermarked: false,
+                  audioRemoved: false,
+                ))
+            .toList();
+
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Adjuntos del parte',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: attachments.length,
+                    itemBuilder: (context, index) {
+                      final item = attachments[index];
+                      return Card(
+                        child: ListTile(
+                          leading: Icon(
+                            item.fileType == 'VIDEO' ? Icons.videocam : Icons.image,
+                            color: item.fileType == 'VIDEO' ? Colors.deepPurple : Colors.blue,
+                          ),
+                          title: Text(item.originalFileName ?? 'Adjunto ${index + 1}'),
+                          subtitle: Text(
+                            item.capturedAt == null
+                                ? item.fileUrl
+                                : 'Hora: ${item.capturedAt!.toLocal()}\nGPS: ${item.latitude?.toStringAsFixed(5) ?? 'N/D'}, ${item.longitude?.toStringAsFixed(5) ?? 'N/D'}',
+                          ),
+                          isThreeLine: item.capturedAt != null,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.open_in_new),
+                            onPressed: () async {
+                              final uri = Uri.parse(item.fileUrl);
+                              final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                              if (!opened && context.mounted) {
+                                AppToast.error(context, 'No se pudo abrir el adjunto');
+                              }
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _markUrgent(WorkOrder parte) async {
+    final session = context.read<SessionViewModel>();
+    final workOrderService = context.read<WorkOrderService>();
+    final workOrdersViewModel = context.read<WorkOrdersViewModel>();
+    final token = session.token;
+    final messenger = ScaffoldMessenger.of(context);
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await workOrderService.updateWorkOrder(
+            token,
+            workOrderId: parte.id,
+            priority: 'URGENT',
+          );
+      await workOrdersViewModel.loadWorkOrders(
+        workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      AppToast.warning(context, 'Parte marcado como URGENTE');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(SnackBar(content: Text('No se pudo marcar urgente: $e')));
+    }
   }
 
   @override
@@ -141,7 +253,7 @@ class _PartesScreenState extends State<PartesScreen> {
                     itemCount: vm.workOrders.length,
                     itemBuilder: (context, index) {
                       final WorkOrder parte = vm.workOrders[index];
-                      final bool isUrgent = parte.priority == 'URGENT' || parte.priority == 'HIGH';
+                      final bool isUrgent = parte.priority == 'URGENT';
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -161,19 +273,31 @@ class _PartesScreenState extends State<PartesScreen> {
                           subtitle: Text(
                             'Cliente: ${parte.ownerName}\n'
                             'Asignado: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}\n'
-                            'Estado: ${parte.status}',
+                            'Estado: ${parte.status} • Prioridad: ${parte.priority} • Adjuntos: ${parte.attachments.isNotEmpty ? parte.attachments.length : parte.attachmentUrls.length}',
                           ),
                           isThreeLine: true,
+                          onTap: () => _openAttachmentsDialog(parte),
                           trailing: PopupMenuButton<String>(
-                            onSelected: (value) => _updateStatus(parte.id, value),
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(value: 'NEW', child: Text('Pendiente')),
-                              PopupMenuItem(value: 'IN_PROGRESS', child: Text('En curso')),
-                              PopupMenuItem(value: 'DONE', child: Text('Finalizado')),
-                              PopupMenuItem(value: 'CANCELLED', child: Text('Cancelado')),
+                            onSelected: (value) {
+                              if (value == 'MARK_URGENT') {
+                                _markUrgent(parte);
+                                return;
+                              }
+                              _updateStatus(parte.id, value);
+                            },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(value: 'NEW', child: Text('Pendiente')),
+                              const PopupMenuItem(value: 'IN_PROGRESS', child: Text('En curso')),
+                              const PopupMenuItem(value: 'DONE', child: Text('Finalizado')),
+                              const PopupMenuItem(value: 'CANCELLED', child: Text('Cancelado')),
+                              if (isAdmin && parte.priority != 'URGENT')
+                                const PopupMenuItem(
+                                  value: 'MARK_URGENT',
+                                  child: Text('Marcar como urgente'),
+                                ),
                             ],
                             child: Chip(
-                              label: Text(parte.status),
+                              label: Text(parte.priority == 'URGENT' ? 'URGENTE' : parte.status),
                               backgroundColor: _statusColor(parte.status).withValues(alpha: 0.12),
                               side: BorderSide.none,
                             ),
@@ -221,6 +345,7 @@ class _CreatePartInput {
     required this.vesselId,
     required this.workerIds,
     required this.engineHours,
+    required this.attachments,
     required this.priority,
   });
 
@@ -230,6 +355,7 @@ class _CreatePartInput {
   final int? vesselId;
   final List<int> workerIds;
   final List<EngineHourLog> engineHours;
+  final List<WorkOrderAttachmentItem> attachments;
   final String priority;
 }
 
@@ -254,7 +380,9 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   late int _ownerId;
   int? _vesselId;
   String _priority = 'NORMAL';
+  bool _uploadingMedia = false;
   final Set<int> _selectedWorkers = <int>{};
+  final List<WorkOrderAttachmentItem> _uploadedAttachments = <WorkOrderAttachmentItem>[];
   final Map<String, TextEditingController> _engineHoursControllers =
       <String, TextEditingController>{};
   String? _validationError;
@@ -361,6 +489,45 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                     _syncEngineHoursForSelectedVessel();
                   },
                 ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _uploadingMedia ? null : _pickAndUploadMedia,
+                        icon: _uploadingMedia
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.upload_file),
+                        label: Text(_uploadingMedia ? 'Subiendo...' : 'Subir foto/video (web)'),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_uploadedAttachments.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _uploadedAttachments
+                        .map((item) => Chip(
+                              avatar: Icon(
+                                item.fileType == 'VIDEO' ? Icons.videocam : Icons.image,
+                                size: 18,
+                              ),
+                              label: Text(item.originalFileName ?? 'Adjunto'),
+                              onDeleted: () {
+                                setState(() {
+                                  _uploadedAttachments.remove(item);
+                                });
+                              },
+                            ))
+                        .toList(),
+                  ),
+                ],
                 const SizedBox(height: 10),
                 DropdownButtonFormField<String>(
                   initialValue: _priority,
@@ -489,9 +656,106 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
         vesselId: _vesselId,
         workerIds: _selectedWorkers.toList(),
         engineHours: engineHours,
+        attachments: List<WorkOrderAttachmentItem>.from(_uploadedAttachments),
         priority: _priority,
       ),
     );
+  }
+
+  Future<void> _pickAndUploadMedia() async {
+    if (!kIsWeb) {
+      AppToast.warning(context, 'La subida de multimedia esta habilitada solo en la web.');
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null || token.isEmpty) {
+      AppToast.error(context, 'No hay sesion activa para subir archivos.');
+      return;
+    }
+
+    setState(() {
+      _uploadingMedia = true;
+    });
+
+    final mediaService = context.read<WorkOrderMediaService>();
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: true,
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov'],
+      );
+
+      if (result == null || result.files.isEmpty) {
+        return;
+      }
+
+      Position? position;
+      try {
+        final enabled = await Geolocator.isLocationServiceEnabled();
+        if (enabled) {
+          position = await Geolocator.getCurrentPosition();
+        }
+      } catch (_) {
+        position = null;
+      }
+
+      for (final file in result.files) {
+        final bytes = file.bytes;
+        if (bytes == null || bytes.isEmpty) {
+          continue;
+        }
+
+        final uploaded = await mediaService.uploadMedia(
+          token,
+          fileName: file.name,
+          bytes: bytes,
+          mimeType: _guessMimeType(file.name),
+          latitude: position?.latitude,
+          longitude: position?.longitude,
+          capturedAt: DateTime.now(),
+        );
+
+        _uploadedAttachments.add(uploaded);
+      }
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {});
+      AppToast.success(context, 'Multimedia subida correctamente.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo subir multimedia: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _uploadingMedia = false;
+        });
+      }
+    }
+  }
+
+  String _guessMimeType(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'mov':
+        return 'video/quicktime';
+      case 'mp4':
+      default:
+        return 'video/mp4';
+    }
   }
 
   void _syncVesselSelectionForOwner() {

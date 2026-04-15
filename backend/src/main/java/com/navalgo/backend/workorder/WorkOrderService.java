@@ -4,6 +4,8 @@ import com.navalgo.backend.fleet.Owner;
 import com.navalgo.backend.fleet.OwnerRepository;
 import com.navalgo.backend.fleet.Vessel;
 import com.navalgo.backend.fleet.VesselRepository;
+import com.navalgo.backend.notification.NotificationService;
+import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import org.springframework.security.access.AccessDeniedException;
@@ -21,15 +23,18 @@ public class WorkOrderService {
     private final OwnerRepository ownerRepository;
     private final VesselRepository vesselRepository;
     private final WorkerRepository workerRepository;
+    private final NotificationService notificationService;
 
     public WorkOrderService(WorkOrderRepository workOrderRepository,
                             OwnerRepository ownerRepository,
                             VesselRepository vesselRepository,
-                            WorkerRepository workerRepository) {
+                            WorkerRepository workerRepository,
+                            NotificationService notificationService) {
         this.workOrderRepository = workOrderRepository;
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.workerRepository = workerRepository;
+        this.notificationService = notificationService;
     }
 
     public List<WorkOrderDto> findAll() {
@@ -79,7 +84,12 @@ public class WorkOrderService {
             }
         }
 
-        if (request.attachmentUrls() != null) {
+        if (request.attachments() != null) {
+            for (AttachmentRequest item : request.attachments()) {
+                WorkOrderAttachment att = mapAttachmentRequest(workOrder, item);
+                workOrder.getAttachments().add(att);
+            }
+        } else if (request.attachmentUrls() != null) {
             for (String url : request.attachmentUrls()) {
                 WorkOrderAttachment att = new WorkOrderAttachment();
                 att.setWorkOrder(workOrder);
@@ -89,7 +99,19 @@ public class WorkOrderService {
             }
         }
 
-        return toDto(workOrderRepository.save(workOrder));
+        WorkOrder saved = workOrderRepository.save(workOrder);
+
+        for (Worker worker : saved.getAssignedWorkers()) {
+            notificationService.notifyWorker(
+                    worker.getId(),
+                    "Nuevo parte asignado",
+                    "Se te ha asignado el parte: " + saved.getTitle(),
+                    "PARTES",
+                    saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO
+            );
+        }
+
+        return toDto(saved);
     }
 
     @Transactional
@@ -110,6 +132,7 @@ public class WorkOrderService {
     public WorkOrderDto updateWorkOrder(Long id, UpdateWorkOrderRequest request, String currentUserEmail) {
         WorkOrder workOrder = workOrderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+        Set<Long> previousWorkerIds = workOrder.getAssignedWorkers().stream().map(Worker::getId).collect(java.util.stream.Collectors.toSet());
 
         Worker current = requireWorkerByEmail(currentUserEmail);
         if (!isAdmin(current) && !(isAssignedToWorkOrder(current, workOrder) && current.isCanEditWorkOrders())) {
@@ -168,7 +191,30 @@ public class WorkOrderService {
             }
         }
 
-        return toDto(workOrderRepository.save(workOrder));
+        if (request.attachments() != null) {
+            workOrder.getAttachments().clear();
+            for (AttachmentRequest item : request.attachments()) {
+                WorkOrderAttachment att = mapAttachmentRequest(workOrder, item);
+                workOrder.getAttachments().add(att);
+            }
+        }
+
+        WorkOrder saved = workOrderRepository.save(workOrder);
+        Set<Long> updatedWorkerIds = saved.getAssignedWorkers().stream().map(Worker::getId).collect(java.util.stream.Collectors.toSet());
+
+        for (Long workerId : updatedWorkerIds) {
+            if (!previousWorkerIds.contains(workerId)) {
+                notificationService.notifyWorker(
+                        workerId,
+                        "Nuevo parte asignado",
+                        "Se te ha asignado el parte: " + saved.getTitle(),
+                        "PARTES",
+                        saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO
+                );
+            }
+        }
+
+        return toDto(saved);
     }
 
     private Worker requireWorkerByEmail(String email) {
@@ -199,8 +245,23 @@ public class WorkOrderService {
                 w.getAssignedWorkers().stream().map(Worker::getFullName).toList(),
                 w.getEngineHourLogs().stream().map(e -> new EngineHourRequest(e.getEngineLabel(), e.getHours())).toList(),
                 w.getAttachments().stream().map(WorkOrderAttachment::getFileUrl).toList(),
+                w.getAttachments().stream().map(AttachmentInfoDto::from).toList(),
                 w.getCreatedAt()
         );
+    }
+
+    private WorkOrderAttachment mapAttachmentRequest(WorkOrder workOrder, AttachmentRequest item) {
+        WorkOrderAttachment att = new WorkOrderAttachment();
+        att.setWorkOrder(workOrder);
+        att.setFileUrl(item.fileUrl());
+        att.setFileType(item.fileType());
+        att.setOriginalFileName(item.originalFileName());
+        att.setCapturedAt(item.capturedAt());
+        att.setLatitude(item.latitude());
+        att.setLongitude(item.longitude());
+        att.setWatermarked(item.watermarked());
+        att.setAudioRemoved(item.audioRemoved());
+        return att;
     }
 
     private String inferType(String fileUrl) {

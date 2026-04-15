@@ -13,6 +13,7 @@ public record UpdateWorkOrderRequest(
         WorkOrderPriority priority,
         WorkOrderStatus status,
         @Valid List<EngineHourRequest> engineHours,
-        List<String> attachmentUrls
+        List<String> attachmentUrls,
+        @Valid List<AttachmentRequest> attachments
 ) {
 }

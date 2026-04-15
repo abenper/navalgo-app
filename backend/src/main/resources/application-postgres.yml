@@ -19,6 +19,13 @@ app:
   jwt:
     secret: ${APP_JWT_SECRET}
     expiration-ms: ${APP_JWT_EXPIRATION_MS:3600000}
+  media:
+    spaces-endpoint: ${APP_MEDIA_SPACES_ENDPOINT}
+    spaces-region: ${APP_MEDIA_SPACES_REGION:fra1}
+    spaces-bucket: ${APP_MEDIA_SPACES_BUCKET}
+    spaces-access-key: ${APP_MEDIA_SPACES_ACCESS_KEY}
+    spaces-secret-key: ${APP_MEDIA_SPACES_SECRET_KEY}
+    public-base-url: ${APP_MEDIA_PUBLIC_BASE_URL}
 
 management:
   endpoints:

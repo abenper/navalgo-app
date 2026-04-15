@@ -5,8 +5,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.List;
 
 @RestController
@@ -14,9 +18,12 @@ import java.util.List;
 public class WorkOrderController {
 
     private final WorkOrderService service;
+    private final WorkOrderMediaService mediaService;
 
-    public WorkOrderController(WorkOrderService service) {
+    public WorkOrderController(WorkOrderService service,
+                               WorkOrderMediaService mediaService) {
         this.service = service;
+        this.mediaService = mediaService;
     }
 
     @GetMapping
@@ -60,5 +67,19 @@ public class WorkOrderController {
                                                         @RequestBody @Valid UpdateWorkOrderRequest request,
                                                         Authentication authentication) {
         return ResponseEntity.ok(service.updateWorkOrder(id, request, authentication.getName()));
+    }
+
+    @PostMapping("/uploads")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<UploadedAttachmentDto> uploadAttachment(@RequestParam("file") MultipartFile file,
+                                                                  @RequestParam(required = false) Double latitude,
+                                                                  @RequestParam(required = false) Double longitude,
+                                                                  @RequestParam(required = false) Instant capturedAt,
+                                                                  @RequestHeader(value = "X-Client-Platform", required = false) String clientPlatform,
+                                                                  Authentication authentication) {
+        if (clientPlatform == null || !"web".equalsIgnoreCase(clientPlatform)) {
+            throw new IllegalArgumentException("La subida multimedia solo esta permitida desde la web");
+        }
+        return ResponseEntity.ok(mediaService.uploadMedia(file, latitude, longitude, capturedAt, authentication.getName()));
     }
 }

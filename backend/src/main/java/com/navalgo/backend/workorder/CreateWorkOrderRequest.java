@@ -14,6 +14,7 @@ public record CreateWorkOrderRequest(
         List<Long> workerIds,
         WorkOrderPriority priority,
         @Valid List<EngineHourRequest> engineHours,
-        List<String> attachmentUrls
+        List<String> attachmentUrls,
+        @Valid List<AttachmentRequest> attachments
 ) {
 }

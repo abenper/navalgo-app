@@ -17,6 +17,7 @@ public record WorkOrderDto(
         List<String> workerNames,
         List<EngineHourRequest> engineHours,
         List<String> attachmentUrls,
+        List<AttachmentInfoDto> attachments,
         Instant createdAt
 ) {
 }
