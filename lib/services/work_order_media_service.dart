@@ -16,6 +16,9 @@ class WorkOrderMediaService {
     double? latitude,
     double? longitude,
     DateTime? capturedAt,
+    String? ownerName,
+    String? vesselName,
+    DateTime? workOrderDate,
   }) async {
     final uri = Uri.parse('${ApiConfig.baseUrl}/work-orders/uploads');
     final request = http.MultipartRequest('POST', uri)
@@ -26,6 +29,18 @@ class WorkOrderMediaService {
     if (longitude != null) request.fields['longitude'] = longitude.toString();
     if (capturedAt != null) {
       request.fields['capturedAt'] = capturedAt.toUtc().toIso8601String();
+    }
+    if (ownerName != null && ownerName.trim().isNotEmpty) {
+      request.fields['ownerName'] = ownerName.trim();
+    }
+    if (vesselName != null && vesselName.trim().isNotEmpty) {
+      request.fields['vesselName'] = vesselName.trim();
+    }
+    if (workOrderDate != null) {
+      final y = workOrderDate.year.toString().padLeft(4, '0');
+      final m = workOrderDate.month.toString().padLeft(2, '0');
+      final d = workOrderDate.day.toString().padLeft(2, '0');
+      request.fields['workOrderDate'] = '$y-$m-$d';
     }
 
     request.files.add(http.MultipartFile.fromBytes(

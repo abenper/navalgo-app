@@ -20,6 +20,8 @@ public record WorkOrderDto(
         List<AttachmentInfoDto> attachments,
         Instant createdAt,
         String signatureUrl,
-        Instant signedAt
+        Instant signedAt,
+        Long signedByWorkerId,
+        String signedByWorkerName
 ) {
 }

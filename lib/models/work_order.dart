@@ -85,6 +85,8 @@ class WorkOrder {
     required this.createdAt,
     this.signatureUrl,
     this.signedAt,
+    this.signedByWorkerId,
+    this.signedByWorkerName,
   });
 
   final int id;
@@ -104,6 +106,8 @@ class WorkOrder {
   final DateTime createdAt;
   final String? signatureUrl;
   final DateTime? signedAt;
+  final int? signedByWorkerId;
+  final String? signedByWorkerName;
 
   factory WorkOrder.fromJson(Map<String, dynamic> json) {
     return WorkOrder(
@@ -128,6 +132,8 @@ class WorkOrder {
       createdAt: DateTime.parse(json['createdAt'] as String),
       signatureUrl: json['signatureUrl'] as String?,
       signedAt: json['signedAt'] == null ? null : DateTime.parse(json['signedAt'] as String),
+      signedByWorkerId: json['signedByWorkerId'] as int?,
+      signedByWorkerName: json['signedByWorkerName'] as String?,
     );
   }
 }

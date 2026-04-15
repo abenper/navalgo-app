@@ -11,6 +11,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -83,12 +84,28 @@ public class WorkOrderController {
                                                                   @RequestParam(required = false) Double latitude,
                                                                   @RequestParam(required = false) Double longitude,
                                                                   @RequestParam(required = false) Instant capturedAt,
+                                                                  @RequestParam(required = false) String ownerName,
+                                                                  @RequestParam(required = false) String vesselName,
+                                                                  @RequestParam(required = false) String workOrderDate,
                                                                   @RequestHeader(value = "X-Client-Platform", required = false) String clientPlatform,
                                                                   Authentication authentication) {
         if (clientPlatform == null || !"web".equalsIgnoreCase(clientPlatform)) {
             throw new IllegalArgumentException("La subida multimedia solo esta permitida desde la web");
         }
-        return ResponseEntity.ok(mediaService.uploadMedia(file, latitude, longitude, capturedAt, authentication.getName()));
+        LocalDate parsedDate = null;
+        if (workOrderDate != null && !workOrderDate.isBlank()) {
+            parsedDate = LocalDate.parse(workOrderDate);
+        }
+        return ResponseEntity.ok(mediaService.uploadWorkOrderAttachment(
+                file,
+                latitude,
+                longitude,
+                capturedAt,
+                authentication.getName(),
+                ownerName,
+                vesselName,
+                parsedDate
+        ));
     }
 
     @PostMapping(value = "/{id}/sign", consumes = "multipart/form-data")
@@ -103,15 +120,33 @@ public class WorkOrderController {
 
         String email = authentication.getName();
         Instant now = Instant.now();
+        WorkOrderService.WorkOrderMediaContext context = service.getSigningMediaContext(id, email);
 
         UploadedAttachmentDto signatureWithoutWatermark = mediaService.uploadSignature(
-                signatureFile, latitude, longitude, now, email);
+            signatureFile,
+            latitude,
+            longitude,
+            now,
+            email,
+            context.ownerName(),
+            context.vesselName(),
+            context.workOrderDate()
+        );
 
         List<UploadedAttachmentDto> proofDtos = new java.util.ArrayList<>();
         if (proofFiles != null) {
             for (MultipartFile proof : proofFiles) {
                 if (!proof.isEmpty()) {
-                    proofDtos.add(mediaService.uploadMedia(proof, latitude, longitude, now, email));
+                    proofDtos.add(mediaService.uploadWorkOrderAttachment(
+                            proof,
+                            latitude,
+                            longitude,
+                            now,
+                            email,
+                            context.ownerName(),
+                            context.vesselName(),
+                            context.workOrderDate()
+                    ));
                 }
             }
         }

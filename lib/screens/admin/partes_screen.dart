@@ -387,6 +387,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   const Text('Firma', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 6),
                   if (_isSigned) ...[
+                    Text(
+                      'Firmado por: ${_workOrder.signedByWorkerName ?? 'Usuario no disponible'}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    const SizedBox(height: 4),
                     if (_workOrder.signedAt != null)
                       Text('Firmado el: ${_workOrder.signedAt!.toLocal()}'),
                     const SizedBox(height: 8),
@@ -1244,6 +1249,9 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
           continue;
         }
 
+        final owner = widget.owners.where((o) => o.id == _ownerId).firstOrNull;
+        final vessel = widget.vessels.where((v) => v.id == _vesselId).firstOrNull;
+
         final uploaded = await mediaService.uploadMedia(
           token,
           fileName: file.name,
@@ -1252,6 +1260,9 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
           latitude: position?.latitude,
           longitude: position?.longitude,
           capturedAt: DateTime.now(),
+          ownerName: owner?.displayName,
+          vesselName: vessel?.name,
+          workOrderDate: DateTime.now(),
         );
 
         _uploadedAttachments.add(uploaded);

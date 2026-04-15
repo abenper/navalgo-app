@@ -23,8 +23,10 @@ import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.text.Normalizer;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.UUID;
@@ -32,6 +34,8 @@ import java.util.UUID;
 @Service
 @Transactional(readOnly = true)
 public class WorkOrderMediaService {
+
+    private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final S3Client s3Client;
     private final MediaProperties mediaProperties;
@@ -50,20 +54,42 @@ public class WorkOrderMediaService {
                                              Double longitude,
                                              Instant capturedAt,
                                              String uploaderEmail) {
-        return uploadMedia(file, latitude, longitude, capturedAt, uploaderEmail, true, true);
+        return uploadWorkOrderAttachment(file, latitude, longitude, capturedAt, uploaderEmail,
+            null, null, null);
     }
 
-    public UploadedAttachmentDto uploadSignature(MultipartFile file,
-                                                 Double latitude,
-                                                 Double longitude,
-                                                 Instant capturedAt,
-                                                 String uploaderEmail) {
-        return uploadMedia(file, latitude, longitude, capturedAt, uploaderEmail, false, true);
+        public UploadedAttachmentDto uploadWorkOrderAttachment(MultipartFile file,
+                                   Double latitude,
+                                   Double longitude,
+                                   Instant capturedAt,
+                                   String uploaderEmail,
+                                   String ownerName,
+                                   String vesselName,
+                                   LocalDate workOrderDate) {
+        String basePath = buildWorkOrderBasePath(ownerName, vesselName, workOrderDate);
+        return uploadMedia(file, latitude, longitude, capturedAt, uploaderEmail,
+            true, true, basePath + "/adjuntos", true);
+        }
+
+        public UploadedAttachmentDto uploadSignature(MultipartFile file,
+                             Double latitude,
+                             Double longitude,
+                             Instant capturedAt,
+                             String uploaderEmail,
+                             String ownerName,
+                             String vesselName,
+                             LocalDate workOrderDate) {
+        String basePath = buildWorkOrderBasePath(ownerName, vesselName, workOrderDate);
+        return uploadMedia(file, latitude, longitude, capturedAt, uploaderEmail,
+            false, true, basePath + "/firma", false);
     }
 
     public UploadedAttachmentDto uploadProfilePhoto(MultipartFile file,
                                                     String uploaderEmail) {
-        return uploadMedia(file, null, null, null, uploaderEmail, false, false);
+        String emailFolder = sanitizeSegment(uploaderEmail == null ? "usuario" : uploaderEmail.toLowerCase(Locale.ROOT));
+        String basePath = "usuarios/" + emailFolder + "/perfil";
+        return uploadMedia(file, null, null, null, uploaderEmail,
+            false, false, basePath, false);
     }
 
     private UploadedAttachmentDto uploadMedia(MultipartFile file,
@@ -72,7 +98,9 @@ public class WorkOrderMediaService {
                                               Instant capturedAt,
                                               String uploaderEmail,
                                               boolean applyWatermark,
-                                              boolean includeMetadata) {
+                              boolean includeMetadata,
+                              String keyPrefix,
+                              boolean allowVideo) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("El archivo es obligatorio");
         }
@@ -85,13 +113,24 @@ public class WorkOrderMediaService {
 
         try {
             if (contentType.startsWith("image/")) {
-                return processAndUploadImage(file, worker, latitude, longitude, capturedInstant, applyWatermark, includeMetadata);
+                String imageKey = buildObjectKey(keyPrefix, ".jpg");
+                return processAndUploadImage(
+                        file,
+                        worker,
+                        latitude,
+                        longitude,
+                        capturedInstant,
+                        applyWatermark,
+                        includeMetadata,
+                        imageKey
+                );
             }
             if (contentType.startsWith("video/")) {
-                if (!applyWatermark) {
-                    throw new IllegalArgumentException("Solo se permiten videos para evidencia multimedia");
+                if (!allowVideo) {
+                    throw new IllegalArgumentException("Este tipo de archivo no esta permitido para este flujo");
                 }
-                return processAndUploadVideo(file, worker, latitude, longitude, capturedInstant);
+                String videoKey = buildObjectKey(keyPrefix, ".mp4");
+                return processAndUploadVideo(file, worker, latitude, longitude, capturedInstant, videoKey);
             }
         } catch (IOException e) {
             throw new IllegalStateException("No se pudo procesar el archivo multimedia", e);
@@ -106,7 +145,8 @@ public class WorkOrderMediaService {
                                                         Double longitude,
                                                         Instant capturedAt,
                                                         boolean applyWatermark,
-                                                        boolean includeMetadata) throws IOException {
+                                                        boolean includeMetadata,
+                                                        String objectKey) throws IOException {
         BufferedImage original = ImageIO.read(file.getInputStream());
         if (original == null) {
             throw new IllegalArgumentException("Formato de imagen no soportado");
@@ -125,11 +165,10 @@ public class WorkOrderMediaService {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         writeCompressedJpeg(rgbImage, output);
 
-        String key = buildObjectKey("images", worker.getId(), ".jpg");
-        uploadToSpaces(key, output.toByteArray(), "image/jpeg");
+        uploadToSpaces(objectKey, output.toByteArray(), "image/jpeg");
 
         return new UploadedAttachmentDto(
-                buildPublicUrl(key),
+            buildPublicUrl(objectKey),
                 "IMAGE",
                 file.getOriginalFilename(),
             includeMetadata ? capturedAt : null,
@@ -144,7 +183,8 @@ public class WorkOrderMediaService {
                                                         Worker worker,
                                                         Double latitude,
                                                         Double longitude,
-                                                        Instant capturedAt) throws IOException {
+                                                        Instant capturedAt,
+                                                        String objectKey) throws IOException {
         Path inputFile = Files.createTempFile("navalgo-upload-", ".mp4");
         Path outputFile = Files.createTempFile("navalgo-upload-processed-", ".mp4");
 
@@ -171,11 +211,10 @@ public class WorkOrderMediaService {
             }
 
             byte[] bytes = Files.readAllBytes(outputFile);
-            String key = buildObjectKey("videos", worker.getId(), ".mp4");
-            uploadToSpaces(key, bytes, "video/mp4");
+                uploadToSpaces(objectKey, bytes, "video/mp4");
 
             return new UploadedAttachmentDto(
-                    buildPublicUrl(key),
+                    buildPublicUrl(objectKey),
                     "VIDEO",
                     file.getOriginalFilename(),
                     capturedAt,
@@ -240,8 +279,29 @@ public class WorkOrderMediaService {
         s3Client.putObject(request, RequestBody.fromBytes(bytes));
     }
 
-    private String buildObjectKey(String folder, Long workerId, String extension) {
-        return "work-orders/" + folder + "/worker-" + workerId + "/" + UUID.randomUUID() + extension;
+    private String buildObjectKey(String keyPrefix, String extension) {
+        return keyPrefix + "/" + UUID.randomUUID() + extension;
+    }
+
+    private String buildWorkOrderBasePath(String ownerName, String vesselName, LocalDate workOrderDate) {
+        String ownerFolder = sanitizeSegment(ownerName == null ? "sin-cliente" : ownerName);
+        String vesselFolder = sanitizeSegment(vesselName == null ? "sin-embarcacion" : vesselName);
+        LocalDate date = workOrderDate == null ? LocalDate.now() : workOrderDate;
+        return "adjuntos-partes/" + ownerFolder + "/" + vesselFolder + "/" + DATE_FORMATTER.format(date);
+    }
+
+    private String sanitizeSegment(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "na";
+        }
+
+        String normalized = Normalizer.normalize(raw.trim().toLowerCase(Locale.ROOT), Normalizer.Form.NFD)
+                .replaceAll("\\p{M}+", "");
+        String safe = normalized
+                .replaceAll("[^a-z0-9._-]+", "-")
+                .replaceAll("-+", "-")
+                .replaceAll("^-|-$", "");
+        return safe.isBlank() ? "na" : safe;
     }
 
     private String buildPublicUrl(String key) {

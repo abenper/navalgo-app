@@ -13,6 +13,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.*;
 
 @Service
@@ -46,6 +47,26 @@ public class WorkOrderService {
 
     public List<WorkOrderDto> findByWorker(Long workerId) {
         return workOrderRepository.findByAssignedWorkersId(workerId).stream().map(this::toDto).toList();
+    }
+
+    public WorkOrderMediaContext getSigningMediaContext(Long workOrderId, String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
+            throw new AccessDeniedException("No puedes subir firma a este parte");
+        }
+
+        LocalDate workOrderDate = java.time.LocalDateTime
+                .ofInstant(workOrder.getCreatedAt(), java.time.ZoneId.systemDefault())
+                .toLocalDate();
+
+        return new WorkOrderMediaContext(
+                workOrder.getOwner().getDisplayName(),
+                workOrder.getVessel() != null ? workOrder.getVessel().getName() : null,
+                workOrderDate
+        );
     }
 
     public Long findWorkerIdByEmail(String email) {
@@ -161,6 +182,7 @@ public class WorkOrderService {
             }
             workOrder.setSignatureUrl(null);
             workOrder.setSignedAt(null);
+            workOrder.setSignedByWorker(null);
         }
 
         if (request.ownerId() != null) {
@@ -300,7 +322,9 @@ public class WorkOrderService {
                 w.getAttachments().stream().map(AttachmentInfoDto::from).toList(),
                 w.getCreatedAt(),
                 w.getSignatureUrl(),
-                w.getSignedAt()
+                w.getSignedAt(),
+                w.getSignedByWorker() != null ? w.getSignedByWorker().getId() : null,
+                w.getSignedByWorker() != null ? w.getSignedByWorker().getFullName() : null
         );
     }
 
@@ -319,6 +343,7 @@ public class WorkOrderService {
 
         workOrder.setSignatureUrl(signature.fileUrl());
         workOrder.setSignedAt(java.time.Instant.now());
+        workOrder.setSignedByWorker(signer);
 
         for (UploadedAttachmentDto proof : proofAttachments) {
             WorkOrderAttachment att = new WorkOrderAttachment();
@@ -357,5 +382,12 @@ public class WorkOrderService {
             return "VIDEO";
         }
         return "IMAGE";
+    }
+
+    public record WorkOrderMediaContext(
+            String ownerName,
+            String vesselName,
+            LocalDate workOrderDate
+    ) {
     }
 }

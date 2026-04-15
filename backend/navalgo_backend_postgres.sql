@@ -169,6 +169,9 @@ ALTER TABLE work_orders
 ALTER TABLE work_orders
     ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP WITHOUT TIME ZONE;
 
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS signed_by_worker_id BIGINT;
+
 ALTER TABLE workers
     ADD COLUMN IF NOT EXISTS contract_start_date DATE NOT NULL DEFAULT CURRENT_DATE;
 

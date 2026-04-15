@@ -61,6 +61,10 @@ public class WorkOrder {
 
     private Instant signedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "signed_by_worker_id")
+    private Worker signedByWorker;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -99,4 +103,7 @@ public class WorkOrder {
 
     public Instant getSignedAt() { return signedAt; }
     public void setSignedAt(Instant signedAt) { this.signedAt = signedAt; }
+
+    public Worker getSignedByWorker() { return signedByWorker; }
+    public void setSignedByWorker(Worker signedByWorker) { this.signedByWorker = signedByWorker; }
 }
