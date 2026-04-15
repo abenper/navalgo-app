@@ -125,103 +125,22 @@ class _PartesScreenState extends State<PartesScreen> {
     );
   }
 
-  Future<void> _openWorkerParteDialog(WorkOrder parte) async {
-    final session = context.read<SessionViewModel>();
-    final workOrdersVm = context.read<WorkOrdersViewModel>();
-
-    if (parte.signatureUrl != null) {
-      // Already signed: just show attachments
-      await _openAttachmentsDialog(parte);
-      return;
-    }
-
-    final signed = await showModalBottomSheet<bool>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: false,
-      builder: (_) => _WorkerSignDialog(parte: parte),
-    );
-
-    if (signed == true && mounted) {
-      AppToast.success(context, 'Parte firmado correctamente.');
-      await workOrdersVm.loadWorkOrders(workerId: session.user?.id);
-    }
-  }
-
-  Future<void> _openAttachmentsDialog(WorkOrder parte) async {    if (parte.attachments.isEmpty && parte.attachmentUrls.isEmpty) {
-      AppToast.info(context, 'Este parte no tiene adjuntos.');
-      return;
-    }
-
-    final attachments = parte.attachments.isNotEmpty
-        ? parte.attachments
-        : parte.attachmentUrls
-            .map((url) => WorkOrderAttachmentItem(
-                  fileUrl: url,
-                  fileType: url.toLowerCase().endsWith('.mp4') ? 'VIDEO' : 'IMAGE',
-                  originalFileName: null,
-                  capturedAt: null,
-                  latitude: null,
-                  longitude: null,
-                  watermarked: false,
-                  audioRemoved: false,
-                ))
-            .toList();
-
+  Future<void> _openPartDetails(WorkOrder parte) async {
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Adjuntos del parte',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 10),
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: attachments.length,
-                    itemBuilder: (context, index) {
-                      final item = attachments[index];
-                      return Card(
-                        child: ListTile(
-                          leading: Icon(
-                            item.fileType == 'VIDEO' ? Icons.videocam : Icons.image,
-                            color: item.fileType == 'VIDEO' ? Colors.deepPurple : Colors.blue,
-                          ),
-                          title: Text(item.originalFileName ?? 'Adjunto ${index + 1}'),
-                          subtitle: Text(
-                            item.capturedAt == null
-                                ? item.fileUrl
-                                : 'Hora: ${item.capturedAt!.toLocal()}\nGPS: ${item.latitude?.toStringAsFixed(5) ?? 'N/D'}, ${item.longitude?.toStringAsFixed(5) ?? 'N/D'}',
-                          ),
-                          isThreeLine: item.capturedAt != null,
-                          trailing: IconButton(
-                            icon: const Icon(Icons.open_in_new),
-                            onPressed: () async {
-                              final uri = Uri.parse(item.fileUrl);
-                              final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-                              if (!opened && context.mounted) {
-                                AppToast.error(context, 'No se pudo abrir el adjunto');
-                              }
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      builder: (_) => _WorkOrderDetailsSheet(initialWorkOrder: parte),
     );
+
+    if (!mounted) {
+      return;
+    }
+
+    final session = context.read<SessionViewModel>();
+    await context.read<WorkOrdersViewModel>().loadWorkOrders(
+          workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
+        );
   }
 
   Future<void> _markUrgent(WorkOrder parte) async {
@@ -301,9 +220,7 @@ class _PartesScreenState extends State<PartesScreen> {
                             '${parte.signatureUrl != null ? ' • ✓ Firmado' : ''}',
                           ),
                           isThreeLine: true,
-                          onTap: () => isAdmin
-                              ? _openAttachmentsDialog(parte)
-                              : _openWorkerParteDialog(parte),
+                            onTap: () => _openPartDetails(parte),
                           trailing: PopupMenuButton<String>(
                             onSelected: (value) {
                               if (value == 'MARK_URGENT') {
@@ -361,6 +278,598 @@ class _PartesScreenState extends State<PartesScreen> {
       default:
         return Colors.blue;
     }
+  }
+}
+
+class _WorkOrderDetailsSheet extends StatefulWidget {
+  const _WorkOrderDetailsSheet({required this.initialWorkOrder});
+
+  final WorkOrder initialWorkOrder;
+
+  @override
+  State<_WorkOrderDetailsSheet> createState() => _WorkOrderDetailsSheetState();
+}
+
+class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
+  late WorkOrder _workOrder;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _workOrder = widget.initialWorkOrder;
+  }
+
+  bool get _isAdmin => context.read<SessionViewModel>().user?.role == 'ADMIN';
+  bool get _canEditPart => _isAdmin || (context.read<SessionViewModel>().user?.canEditWorkOrders ?? false);
+  bool get _isSigned => _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
+  bool get _canSign => !_isAdmin && !_isSigned;
+
+  bool get _canDeleteMedia {
+    if (_isAdmin || _canEditPart) {
+      return true;
+    }
+    return !_isSigned;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final attachments = _workOrder.attachments.isNotEmpty
+        ? _workOrder.attachments
+        : _workOrder.attachmentUrls
+            .map((url) => WorkOrderAttachmentItem(
+                  id: null,
+                  fileUrl: url,
+                  fileType: url.toLowerCase().endsWith('.mp4') ? 'VIDEO' : 'IMAGE',
+                  originalFileName: null,
+                  capturedAt: null,
+                  latitude: null,
+                  longitude: null,
+                  watermarked: false,
+                  audioRemoved: false,
+                ))
+            .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _workOrder.title,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                Chip(label: Text('Estado: ${_workOrder.status}')),
+                Chip(label: Text('Prioridad: ${_workOrder.priority}')),
+                if (_isSigned) const Chip(label: Text('Firmado')),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Expanded(
+              child: ListView(
+                children: [
+                  _DetailRow(label: 'Propietario', value: _workOrder.ownerName),
+                  _DetailRow(label: 'Embarcacion', value: _workOrder.vesselName ?? 'Sin embarcacion'),
+                  _DetailRow(
+                    label: 'Asignados',
+                    value: _workOrder.workerNames.isEmpty
+                        ? 'Sin asignar'
+                        : _workOrder.workerNames.join(', '),
+                  ),
+                  _DetailRow(
+                    label: 'Creado',
+                    value: _workOrder.createdAt.toLocal().toString(),
+                  ),
+                  if (_workOrder.description != null && _workOrder.description!.trim().isNotEmpty)
+                    _DetailRow(label: 'Descripcion', value: _workOrder.description!),
+                  if (_workOrder.engineHours.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    const Text('Horas de motor', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 4),
+                    ..._workOrder.engineHours.map(
+                      (item) => _DetailRow(label: item.engineLabel, value: '${item.hours} h'),
+                    ),
+                  ],
+                  const SizedBox(height: 14),
+                  const Text('Firma', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 6),
+                  if (_isSigned) ...[
+                    if (_workOrder.signedAt != null)
+                      Text('Firmado el: ${_workOrder.signedAt!.toLocal()}'),
+                    const SizedBox(height: 8),
+                    AspectRatio(
+                      aspectRatio: 3.4,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade300),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Image.network(
+                          _workOrder.signatureUrl!,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, _, _) => const Center(
+                            child: Text('No se pudo cargar la firma'),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () => _openExternal(_workOrder.signatureUrl!),
+                          icon: const Icon(Icons.open_in_new),
+                          label: const Text('Abrir firma'),
+                        ),
+                        const SizedBox(width: 8),
+                        if (_canEditPart)
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _clearSignature,
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('Borrar firma'),
+                          ),
+                      ],
+                    ),
+                  ] else
+                    const Text('Este parte todavia no tiene firma.'),
+                  const SizedBox(height: 14),
+                  const Text('Multimedia', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 6),
+                  if (attachments.isEmpty)
+                    const Text('Sin adjuntos')
+                  else
+                    ...attachments.map((item) {
+                      return Card(
+                        child: ListTile(
+                          leading: Icon(item.fileType == 'VIDEO' ? Icons.videocam : Icons.image),
+                          title: Text(item.originalFileName ?? 'Adjunto'),
+                          subtitle: Text(item.capturedAt == null
+                              ? item.fileUrl
+                              : 'Hora: ${item.capturedAt!.toLocal()}'),
+                          trailing: Wrap(
+                            spacing: 4,
+                            children: [
+                              IconButton(
+                                onPressed: () => _openExternal(item.fileUrl),
+                                icon: const Icon(Icons.open_in_new),
+                              ),
+                              if (_canDeleteMedia)
+                                IconButton(
+                                  onPressed: _busy ? null : () => _deleteAttachment(item),
+                                  icon: const Icon(Icons.delete_outline),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (_canSign)
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : _openSignFlow,
+                      icon: const Icon(Icons.draw),
+                      label: const Text('Firmar parte'),
+                    ),
+                  ),
+                if (_canSign && _canEditPart) const SizedBox(width: 8),
+                if (_canEditPart)
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _busy ? null : _openEditDialog,
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Editar parte'),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openExternal(String url) async {
+    final opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    if (!opened && mounted) {
+      AppToast.error(context, 'No se pudo abrir el archivo.');
+    }
+  }
+
+  Future<void> _openSignFlow() async {
+    final signed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _WorkerSignDialog(parte: _workOrder),
+    );
+    if (signed == true && mounted) {
+      await _reloadFromServer();
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(context, 'Parte firmado correctamente.');
+    }
+  }
+
+  Future<void> _openEditDialog() async {
+    final session = context.read<SessionViewModel>();
+    final workOrderService = context.read<WorkOrderService>();
+    final fleetVm = context.read<FleetViewModel>();
+    if (fleetVm.owners.isEmpty) {
+      AppToast.warning(context, 'No hay propietarios cargados.');
+      return;
+    }
+
+    final result = await showModalBottomSheet<_EditPartInput>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (_) => _EditPartDialog(
+        workOrder: _workOrder,
+        owners: fleetVm.owners,
+        vessels: fleetVm.vessels,
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    final token = session.token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final updated = await workOrderService.updateWorkOrder(
+            token,
+            workOrderId: _workOrder.id,
+            title: result.title,
+            description: result.description,
+            ownerId: result.ownerId,
+            vesselId: result.vesselId,
+            priority: result.priority,
+            status: result.status,
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _workOrder = updated;
+      });
+      AppToast.success(context, 'Parte actualizado.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo actualizar: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _clearSignature() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final updated = await context.read<WorkOrderService>().updateWorkOrder(
+            token,
+            workOrderId: _workOrder.id,
+            clearSignature: true,
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _workOrder = updated;
+      });
+      AppToast.success(context, 'Firma eliminada.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo borrar la firma: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _deleteAttachment(WorkOrderAttachmentItem item) async {
+    if (item.id == null) {
+      AppToast.warning(context, 'Este adjunto no soporta borrado individual.');
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Borrar adjunto'),
+        content: const Text('Esta accion no se puede deshacer. ¿Continuar?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Borrar')),
+        ],
+      ),
+    );
+
+    if (!mounted || confirm != true) {
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final updated = await context.read<WorkOrderService>().deleteAttachment(
+            token,
+            workOrderId: _workOrder.id,
+            attachmentId: item.id!,
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _workOrder = updated;
+      });
+      AppToast.success(context, 'Adjunto eliminado.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo borrar el adjunto: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _reloadFromServer() async {
+    final session = context.read<SessionViewModel>();
+    final vm = context.read<WorkOrdersViewModel>();
+    await vm.loadWorkOrders(workerId: _isAdmin ? null : session.user?.id);
+    final updated = vm.workOrders.where((item) => item.id == _workOrder.id).firstOrNull;
+    if (updated != null && mounted) {
+      setState(() {
+        _workOrder = updated;
+      });
+    }
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: RichText(
+        text: TextSpan(
+          style: DefaultTextStyle.of(context).style,
+          children: [
+            TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+            TextSpan(text: value),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditPartInput {
+  const _EditPartInput({
+    required this.title,
+    required this.description,
+    required this.ownerId,
+    required this.vesselId,
+    required this.priority,
+    required this.status,
+  });
+
+  final String title;
+  final String description;
+  final int ownerId;
+  final int? vesselId;
+  final String priority;
+  final String status;
+}
+
+class _EditPartDialog extends StatefulWidget {
+  const _EditPartDialog({
+    required this.workOrder,
+    required this.owners,
+    required this.vessels,
+  });
+
+  final WorkOrder workOrder;
+  final List<Owner> owners;
+  final List<Vessel> vessels;
+
+  @override
+  State<_EditPartDialog> createState() => _EditPartDialogState();
+}
+
+class _EditPartDialogState extends State<_EditPartDialog> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _descriptionCtrl;
+  late int _ownerId;
+  int? _vesselId;
+  late String _priority;
+  late String _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.workOrder.title);
+    _descriptionCtrl = TextEditingController(text: widget.workOrder.description ?? '');
+    _ownerId = widget.workOrder.ownerId;
+    _vesselId = widget.workOrder.vesselId;
+    _priority = widget.workOrder.priority;
+    _status = widget.workOrder.status;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ownerVessels = widget.vessels.where((v) => v.ownerId == _ownerId).toList();
+    final validVessel = ownerVessels.any((v) => v.id == _vesselId) ? _vesselId : null;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Editar parte', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _titleCtrl,
+                decoration: const InputDecoration(labelText: 'Titulo', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _descriptionCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Descripcion', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<int>(
+                initialValue: _ownerId,
+                decoration: const InputDecoration(labelText: 'Propietario', border: OutlineInputBorder()),
+                items: widget.owners
+                    .map((o) => DropdownMenuItem<int>(value: o.id, child: Text(o.displayName)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value == null) return;
+                  setState(() {
+                    _ownerId = value;
+                    if (!widget.vessels.any((v) => v.ownerId == _ownerId && v.id == _vesselId)) {
+                      _vesselId = null;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<int?>(
+                initialValue: validVessel,
+                decoration: const InputDecoration(labelText: 'Embarcacion', border: OutlineInputBorder()),
+                items: [
+                  const DropdownMenuItem<int?>(value: null, child: Text('Sin embarcacion')),
+                  ...ownerVessels.map((v) => DropdownMenuItem<int?>(value: v.id, child: Text(v.name))),
+                ],
+                onChanged: (value) => setState(() => _vesselId = value),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _priority,
+                decoration: const InputDecoration(labelText: 'Prioridad', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(value: 'LOW', child: Text('LOW')),
+                  DropdownMenuItem(value: 'NORMAL', child: Text('NORMAL')),
+                  DropdownMenuItem(value: 'HIGH', child: Text('HIGH')),
+                  DropdownMenuItem(value: 'URGENT', child: Text('URGENT')),
+                ],
+                onChanged: (value) => setState(() => _priority = value ?? _priority),
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                initialValue: _status,
+                decoration: const InputDecoration(labelText: 'Estado', border: OutlineInputBorder()),
+                items: const [
+                  DropdownMenuItem(value: 'NEW', child: Text('Pendiente')),
+                  DropdownMenuItem(value: 'IN_PROGRESS', child: Text('En curso')),
+                  DropdownMenuItem(value: 'DONE', child: Text('Finalizado')),
+                  DropdownMenuItem(value: 'CANCELLED', child: Text('Cancelado')),
+                ],
+                onChanged: (value) => setState(() => _status = value ?? _status),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text('Cancelar'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () {
+                        final title = _titleCtrl.text.trim();
+                        if (title.isEmpty) {
+                          AppToast.warning(context, 'El titulo es obligatorio.');
+                          return;
+                        }
+                        Navigator.pop(
+                          context,
+                          _EditPartInput(
+                            title: title,
+                            description: _descriptionCtrl.text.trim(),
+                            ownerId: _ownerId,
+                            vesselId: _vesselId,
+                            priority: _priority,
+                            status: _status,
+                          ),
+                        );
+                      },
+                      child: const Text('Guardar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

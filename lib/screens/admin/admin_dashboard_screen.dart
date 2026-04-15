@@ -119,18 +119,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 ),
               )
             else
-              GridView.count(
-                crossAxisCount: MediaQuery.of(context).size.width > 600 ? 4 : 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _buildStatCard('Partes Pendientes', '$_pendingWorkOrders', Icons.assignment, Colors.orange),
-                  _buildStatCard('Partes Urgentes', '$_urgentWorkOrders', Icons.warning, Colors.red),
-                  _buildStatCard('Mecanicos Activos', '$_activeWorkers/$_totalWorkers', Icons.engineering, Colors.blue),
-                  _buildStatCard('Ausencias Pendientes', '$_pendingLeaves', Icons.event_busy, Colors.purple),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final crossAxisCount = constraints.maxWidth > 900
+                      ? 4
+                      : (constraints.maxWidth > 520 ? 2 : 1);
+                  final childAspectRatio = crossAxisCount == 1 ? 2.1 : 1.15;
+                  return GridView.count(
+                    crossAxisCount: crossAxisCount,
+                    childAspectRatio: childAspectRatio,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    children: [
+                      _buildStatCard('Partes Pendientes', '$_pendingWorkOrders', Icons.assignment, Colors.orange),
+                      _buildStatCard('Partes Urgentes', '$_urgentWorkOrders', Icons.warning, Colors.red),
+                      _buildStatCard('Mecanicos Activos', '$_activeWorkers/$_totalWorkers', Icons.engineering, Colors.blue),
+                      _buildStatCard('Ausencias Pendientes', '$_pendingLeaves', Icons.event_busy, Colors.purple),
+                    ],
+                  );
+                },
               ),
             const SizedBox(height: 18),
             Card(
@@ -153,15 +162,39 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: color),
-            const SizedBox(height: 12),
-            Text(count, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 4),
-            Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxHeight < 140;
+            return Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: compact ? 30 : 40, color: color),
+                SizedBox(height: compact ? 8 : 12),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    count,
+                    style: TextStyle(
+                      fontSize: compact ? 24 : 32,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.bold,
+                    fontSize: compact ? 13 : 14,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

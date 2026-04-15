@@ -14,6 +14,7 @@ class EngineHourLog {
 
 class WorkOrderAttachmentItem {
   const WorkOrderAttachmentItem({
+    this.id,
     required this.fileUrl,
     required this.fileType,
     this.originalFileName,
@@ -24,6 +25,7 @@ class WorkOrderAttachmentItem {
     required this.audioRemoved,
   });
 
+  final int? id;
   final String fileUrl;
   final String fileType;
   final String? originalFileName;
@@ -35,6 +37,7 @@ class WorkOrderAttachmentItem {
 
   factory WorkOrderAttachmentItem.fromJson(Map<String, dynamic> json) {
     return WorkOrderAttachmentItem(
+      id: json['id'] as int?,
       fileUrl: json['fileUrl'] as String,
       fileType: json['fileType'] as String,
       originalFileName: json['originalFileName'] as String?,
@@ -50,6 +53,7 @@ class WorkOrderAttachmentItem {
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'fileUrl': fileUrl,
       'fileType': fileType,
       'originalFileName': originalFileName,

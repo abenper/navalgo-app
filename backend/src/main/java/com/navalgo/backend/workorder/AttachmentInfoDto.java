@@ -3,6 +3,7 @@ package com.navalgo.backend.workorder;
 import java.time.Instant;
 
 public record AttachmentInfoDto(
+    Long id,
         String fileUrl,
         String fileType,
         String originalFileName,
@@ -14,6 +15,7 @@ public record AttachmentInfoDto(
 ) {
     public static AttachmentInfoDto from(WorkOrderAttachment attachment) {
         return new AttachmentInfoDto(
+                attachment.getId(),
                 attachment.getFileUrl(),
                 attachment.getFileType(),
                 attachment.getOriginalFileName(),

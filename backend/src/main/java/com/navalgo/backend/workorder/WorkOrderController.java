@@ -69,6 +69,14 @@ public class WorkOrderController {
         return ResponseEntity.ok(service.updateWorkOrder(id, request, authentication.getName()));
     }
 
+    @DeleteMapping("/{id}/attachments/{attachmentId}")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkOrderDto> deleteAttachment(@PathVariable Long id,
+                                                         @PathVariable Long attachmentId,
+                                                         Authentication authentication) {
+        return ResponseEntity.ok(service.deleteAttachment(id, attachmentId, authentication.getName()));
+    }
+
     @PostMapping("/uploads")
     @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
     public ResponseEntity<UploadedAttachmentDto> uploadAttachment(@RequestParam("file") MultipartFile file,

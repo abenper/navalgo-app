@@ -12,6 +12,7 @@ public record UpdateWorkOrderRequest(
         List<Long> workerIds,
         WorkOrderPriority priority,
         WorkOrderStatus status,
+        Boolean clearSignature,
         @Valid List<EngineHourRequest> engineHours,
         List<String> attachmentUrls,
         @Valid List<AttachmentRequest> attachments

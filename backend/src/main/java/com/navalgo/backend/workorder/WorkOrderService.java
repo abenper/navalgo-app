@@ -24,17 +24,20 @@ public class WorkOrderService {
     private final VesselRepository vesselRepository;
     private final WorkerRepository workerRepository;
     private final NotificationService notificationService;
+    private final WorkOrderMediaService workOrderMediaService;
 
     public WorkOrderService(WorkOrderRepository workOrderRepository,
                             OwnerRepository ownerRepository,
                             VesselRepository vesselRepository,
                             WorkerRepository workerRepository,
-                            NotificationService notificationService) {
+                            NotificationService notificationService,
+                            WorkOrderMediaService workOrderMediaService) {
         this.workOrderRepository = workOrderRepository;
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.workerRepository = workerRepository;
         this.notificationService = notificationService;
+        this.workOrderMediaService = workOrderMediaService;
     }
 
     public List<WorkOrderDto> findAll() {
@@ -135,7 +138,7 @@ public class WorkOrderService {
         Set<Long> previousWorkerIds = workOrder.getAssignedWorkers().stream().map(Worker::getId).collect(java.util.stream.Collectors.toSet());
 
         Worker current = requireWorkerByEmail(currentUserEmail);
-        if (!isAdmin(current) && !(isAssignedToWorkOrder(current, workOrder) && current.isCanEditWorkOrders())) {
+        if (!canEditWorkOrder(current, workOrder)) {
             throw new AccessDeniedException("No tienes permiso para editar este parte");
         }
 
@@ -150,6 +153,14 @@ public class WorkOrderService {
         }
         if (request.status() != null) {
             workOrder.setStatus(request.status());
+        }
+
+        if (Boolean.TRUE.equals(request.clearSignature())) {
+            if (workOrder.getSignatureUrl() != null && !workOrder.getSignatureUrl().isBlank()) {
+                workOrderMediaService.deleteByPublicUrl(workOrder.getSignatureUrl());
+            }
+            workOrder.setSignatureUrl(null);
+            workOrder.setSignedAt(null);
         }
 
         if (request.ownerId() != null) {
@@ -217,6 +228,27 @@ public class WorkOrderService {
         return toDto(saved);
     }
 
+    @Transactional
+    public WorkOrderDto deleteAttachment(Long workOrderId, Long attachmentId, String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!canDeleteAttachment(current, workOrder)) {
+            throw new AccessDeniedException("No tienes permiso para borrar multimedia de este parte");
+        }
+
+        WorkOrderAttachment attachment = workOrder.getAttachments().stream()
+                .filter(item -> item.getId().equals(attachmentId))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Adjunto no encontrado en este parte"));
+
+        workOrder.getAttachments().remove(attachment);
+        workOrderMediaService.deleteByPublicUrl(attachment.getFileUrl());
+
+        return toDto(workOrderRepository.save(workOrder));
+    }
+
     private Worker requireWorkerByEmail(String email) {
         return workerRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
@@ -224,6 +256,26 @@ public class WorkOrderService {
 
     private boolean isAdmin(Worker worker) {
         return worker.getRole() == com.navalgo.backend.common.Role.ADMIN;
+    }
+
+    private boolean canEditWorkOrder(Worker worker, WorkOrder workOrder) {
+        return isAdmin(worker) || (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders());
+    }
+
+    private boolean canDeleteAttachment(Worker worker, WorkOrder workOrder) {
+        if (isAdmin(worker)) {
+            return true;
+        }
+        if (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders()) {
+            return true;
+        }
+        // Workers without edit permission can only remove media while work order is unsigned.
+        return isAssignedToWorkOrder(worker, workOrder) && !isSigned(workOrder);
+    }
+
+    private boolean isSigned(WorkOrder workOrder) {
+        return (workOrder.getSignatureUrl() != null && !workOrder.getSignatureUrl().isBlank())
+                || workOrder.getSignedAt() != null;
     }
 
     private boolean isAssignedToWorkOrder(Worker worker, WorkOrder workOrder) {

@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 import javax.imageio.IIOImage;
@@ -240,5 +241,32 @@ public class WorkOrderMediaService {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("Proceso de video interrumpido", e);
         }
+    }
+
+    public void deleteByPublicUrl(String fileUrl) {
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return;
+        }
+
+        String base = mediaProperties.publicBaseUrl();
+        if (base == null || base.isBlank()) {
+            return;
+        }
+
+        String normalizedBase = base.endsWith("/") ? base : base + "/";
+        if (!fileUrl.startsWith(normalizedBase)) {
+            return;
+        }
+
+        String key = fileUrl.substring(normalizedBase.length());
+        if (key.isBlank()) {
+            return;
+        }
+
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(mediaProperties.spacesBucket())
+                .key(key)
+                .build();
+        s3Client.deleteObject(request);
     }
 }

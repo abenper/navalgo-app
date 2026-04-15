@@ -361,85 +361,104 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
 
               return Card(
                 margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: color.withValues(alpha: 0.12),
-                    child: Icon(Icons.event_note, color: color),
-                  ),
-                  title: Text(
-                    '${_fmt(req.startDate)} - ${_fmt(req.endDate)} (${req.requestedDays} dias)',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    _isAdmin
-                        ? 'Trabajador: ${req.workerName}\nMotivo: ${req.reason}'
-                        : 'Motivo: ${req.reason}',
-                  ),
-                  isThreeLine: _isAdmin,
-                  trailing: SizedBox(
-                    width: 156,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Chip(
-                          label: Text(statusLabel),
-                          backgroundColor: color.withValues(alpha: 0.12),
-                          side: BorderSide.none,
-                        ),
-                        if (workerCanEditOrCancel || adminCanChangeStatus)
-                          PopupMenuButton<String>(
-                            tooltip: 'Acciones',
-                            onSelected: (value) {
-                              if (value == 'EDIT') {
-                                _editRequest(req);
-                                return;
-                              }
-                              if (value == 'CANCEL') {
-                                _cancelRequest(req);
-                                return;
-                              }
-                              _updateStatus(req.id, value);
-                            },
-                            itemBuilder: (_) {
-                              final items = <PopupMenuEntry<String>>[];
-                              if (workerCanEditOrCancel) {
-                                items.add(
-                                  const PopupMenuItem(
-                                    value: 'EDIT',
-                                    child: Text('Editar (volver a pendiente)'),
-                                  ),
-                                );
-                                items.add(
-                                  const PopupMenuItem(
-                                    value: 'CANCEL',
-                                    child: Text('Cancelar vacaciones'),
-                                  ),
-                                );
-                              }
-                              if (adminCanChangeStatus) {
-                                if (req.status != 'PENDING') {
-                                  items.add(const PopupMenuItem(value: 'PENDING', child: Text('Marcar pendiente')));
-                                }
-                                if (req.status != 'APPROVED') {
-                                  items.add(const PopupMenuItem(value: 'APPROVED', child: Text('Marcar aceptada')));
-                                }
-                                if (req.status != 'REJECTED') {
-                                  items.add(const PopupMenuItem(value: 'REJECTED', child: Text('Marcar rechazada')));
-                                }
-                                if (req.status != 'CANCELLED') {
-                                  items.add(const PopupMenuItem(value: 'CANCELLED', child: Text('Marcar cancelada')));
-                                }
-                              }
-                              return items;
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.only(top: 2),
-                              child: Icon(Icons.more_horiz, size: 20),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: color.withValues(alpha: 0.12),
+                        child: Icon(Icons.event_note, color: color),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_fmt(req.startDate)} - ${_fmt(req.endDate)} (${req.requestedDays} dias)',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
+                            if (_isAdmin) ...[
+                              const SizedBox(height: 6),
+                              Text(
+                                'Trabajador: ${req.workerName}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                            const SizedBox(height: 2),
+                            Text(
+                              'Motivo: ${req.reason}',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Chip(
+                            label: Text(statusLabel),
+                            backgroundColor: color.withValues(alpha: 0.12),
+                            side: BorderSide.none,
                           ),
-                      ],
-                    ),
+                          if (workerCanEditOrCancel || adminCanChangeStatus)
+                            PopupMenuButton<String>(
+                              tooltip: 'Acciones',
+                              onSelected: (value) {
+                                if (value == 'EDIT') {
+                                  _editRequest(req);
+                                  return;
+                                }
+                                if (value == 'CANCEL') {
+                                  _cancelRequest(req);
+                                  return;
+                                }
+                                _updateStatus(req.id, value);
+                              },
+                              itemBuilder: (_) {
+                                final items = <PopupMenuEntry<String>>[];
+                                if (workerCanEditOrCancel) {
+                                  items.add(
+                                    const PopupMenuItem(
+                                      value: 'EDIT',
+                                      child: Text('Editar (volver a pendiente)'),
+                                    ),
+                                  );
+                                  items.add(
+                                    const PopupMenuItem(
+                                      value: 'CANCEL',
+                                      child: Text('Cancelar vacaciones'),
+                                    ),
+                                  );
+                                }
+                                if (adminCanChangeStatus) {
+                                  if (req.status != 'PENDING') {
+                                    items.add(const PopupMenuItem(value: 'PENDING', child: Text('Marcar pendiente')));
+                                  }
+                                  if (req.status != 'APPROVED') {
+                                    items.add(const PopupMenuItem(value: 'APPROVED', child: Text('Marcar aceptada')));
+                                  }
+                                  if (req.status != 'REJECTED') {
+                                    items.add(const PopupMenuItem(value: 'REJECTED', child: Text('Marcar rechazada')));
+                                  }
+                                  if (req.status != 'CANCELLED') {
+                                    items.add(const PopupMenuItem(value: 'CANCELLED', child: Text('Marcar cancelada')));
+                                  }
+                                }
+                                return items;
+                              },
+                              icon: const Icon(Icons.more_horiz, size: 20),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               );
