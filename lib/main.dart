@@ -11,9 +11,7 @@ import 'package:navalgo/viewmodels/session_view_model.dart';
 import 'package:navalgo/viewmodels/work_orders_view_model.dart';
 import 'package:navalgo/viewmodels/workers_view_model.dart';
 import 'package:provider/provider.dart';
-import 'screens/admin/admin_shell_screen.dart';
 import 'screens/common/login_screen.dart';
-import 'screens/worker/worker_shell_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -101,12 +99,8 @@ class _RootScreen extends StatelessWidget {
       );
     }
 
-    if (!session.isAuthenticated || session.user == null) {
-      return const LoginScreen();
-    }
-
-    return session.user!.role == 'ADMIN'
-        ? const AdminShellScreen()
-        : const WorkerShellScreen();
+    // Always show LoginScreen — it handles routing for both
+    // remember-me (auto-navigate in initState) and normal login.
+    return const LoginScreen();
   }
 }

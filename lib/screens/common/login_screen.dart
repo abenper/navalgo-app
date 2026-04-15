@@ -29,6 +29,16 @@ class _LoginScreenState extends State<LoginScreen> {
     if (session.rememberedEmail.isNotEmpty) {
       _emailController.text = session.rememberedEmail;
     }
+
+    // If session was restored via remember-me, skip the login form
+    // and navigate directly to the appropriate shell screen.
+    if (session.isAuthenticated && session.user != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _openShellForRole(session.user!.role);
+        }
+      });
+    }
   }
 
   // Es buena práctica "destruir" los controladores cuando la pantalla se cierra para liberar memoria.
