@@ -4,11 +4,13 @@ import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class TimeTrackingService {
 
     private final TimeEntryRepository timeEntryRepository;
@@ -20,6 +22,7 @@ public class TimeTrackingService {
         this.workerRepository = workerRepository;
     }
 
+    @Transactional
     public TimeEntryDto clockIn(Long workerId) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
@@ -36,6 +39,7 @@ public class TimeTrackingService {
         return TimeEntryDto.from(timeEntryRepository.save(entry));
     }
 
+    @Transactional
     public TimeEntryDto clockOut(Long workerId) {
         TimeEntry entry = timeEntryRepository.findFirstByWorkerIdAndClockOutIsNullOrderByClockInDesc(workerId)
                 .orElseThrow(() -> new IllegalArgumentException("No hay fichaje abierto para ese trabajador"));

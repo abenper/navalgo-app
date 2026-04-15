@@ -9,10 +9,12 @@ import com.navalgo.backend.worker.WorkerRepository;
 import org.springframework.security.access.AccessDeniedException;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 
 @Service
+@Transactional(readOnly = true)
 public class WorkOrderService {
 
     private final WorkOrderRepository workOrderRepository;
@@ -44,6 +46,7 @@ public class WorkOrderService {
                 .getId();
     }
 
+    @Transactional
     public WorkOrderDto create(CreateWorkOrderRequest request) {
         Owner owner = ownerRepository.findById(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
@@ -89,6 +92,7 @@ public class WorkOrderService {
         return toDto(workOrderRepository.save(workOrder));
     }
 
+    @Transactional
     public WorkOrderDto updateStatus(Long id, UpdateWorkOrderStatusRequest request, String currentUserEmail) {
         WorkOrder workOrder = workOrderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
@@ -102,6 +106,7 @@ public class WorkOrderService {
         return toDto(workOrderRepository.save(workOrder));
     }
 
+    @Transactional
     public WorkOrderDto updateWorkOrder(Long id, UpdateWorkOrderRequest request, String currentUserEmail) {
         WorkOrder workOrder = workOrderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));

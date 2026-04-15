@@ -4,6 +4,8 @@ import 'worker_dashboard_screen.dart';
 import '../admin/partes_screen.dart'; // Comparten la pantalla de partes
 import 'fichaje_screen.dart';
 import 'vacaciones_screen.dart';
+import 'package:provider/provider.dart';
+import '../../viewmodels/session_view_model.dart';
 
 class WorkerShellScreen extends StatefulWidget {
   const WorkerShellScreen({super.key});
@@ -41,10 +43,14 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       actions: [
         PopupMenuButton<String>(
           offset: const Offset(0, 50),
-          onSelected: (value) {
+          onSelected: (value) async {
             if (value == 'salir') {
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              await context.read<SessionViewModel>().clearSession();
+              if (!mounted) {
+                return;
+              }
+              Navigator.of(this.context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
             }
           },

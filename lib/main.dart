@@ -11,15 +11,19 @@ import 'package:navalgo/viewmodels/session_view_model.dart';
 import 'package:navalgo/viewmodels/work_orders_view_model.dart';
 import 'package:navalgo/viewmodels/workers_view_model.dart';
 import 'package:provider/provider.dart';
+import 'screens/admin/admin_shell_screen.dart';
 import 'screens/common/login_screen.dart';
+import 'screens/worker/worker_shell_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final sessionViewModel = SessionViewModel();
+  await sessionViewModel.restoreSession();
+
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider<SessionViewModel>(
-          create: (_) => SessionViewModel(),
-        ),
+        ChangeNotifierProvider<SessionViewModel>.value(value: sessionViewModel),
         Provider<AuthService>(create: (_) => AuthService()),
         Provider<WorkerService>(create: (_) => WorkerService()),
         Provider<FleetService>(create: (_) => FleetService()),
@@ -79,7 +83,30 @@ class MyApp extends StatelessWidget {
           clipBehavior: Clip.antiAlias, // Evita que el contenido se salga de los bordes
         ),
       ),
-      home: const LoginScreen(),
+      home: const _RootScreen(),
     );
+  }
+}
+
+class _RootScreen extends StatelessWidget {
+  const _RootScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    final session = context.watch<SessionViewModel>();
+
+    if (!session.isReady) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!session.isAuthenticated || session.user == null) {
+      return const LoginScreen();
+    }
+
+    return session.user!.role == 'ADMIN'
+        ? const AdminShellScreen()
+        : const WorkerShellScreen();
   }
 }

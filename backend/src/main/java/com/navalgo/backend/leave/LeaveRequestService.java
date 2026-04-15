@@ -4,10 +4,12 @@ import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class LeaveRequestService {
 
     private final LeaveRequestRepository repository;
@@ -18,6 +20,7 @@ public class LeaveRequestService {
         this.workerRepository = workerRepository;
     }
 
+    @Transactional
     public LeaveRequestDto create(CreateLeaveRequest request) {
         Worker worker = workerRepository.findById(request.workerId())
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
@@ -46,6 +49,7 @@ public class LeaveRequestService {
                 .toList();
     }
 
+    @Transactional
     public LeaveRequestDto updateStatus(Long id, UpdateLeaveStatusRequest request) {
         LeaveRequestEntity entity = repository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));

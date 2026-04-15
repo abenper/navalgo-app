@@ -6,12 +6,14 @@ import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/fleet")
+@Transactional(readOnly = true)
 public class FleetController {
 
     private final OwnerRepository ownerRepository;
@@ -34,6 +36,7 @@ public class FleetController {
 
     @PostMapping("/owners")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ResponseEntity<OwnerDto> createOwner(@RequestBody @Valid CreateOwnerRequest request) {
         Owner owner = new Owner();
         owner.setType(request.type());
@@ -62,6 +65,7 @@ public class FleetController {
 
     @PostMapping("/vessels")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ResponseEntity<VesselDto> createVessel(@RequestBody @Valid CreateVesselRequest request) {
         Owner owner = ownerRepository.findById(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));

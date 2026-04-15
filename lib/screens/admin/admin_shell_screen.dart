@@ -6,6 +6,8 @@ import 'flota_screen.dart';
 import 'equipo_screen.dart';
 import '../worker/fichaje_screen.dart'; // Nueva ubicación
 import '../worker/vacaciones_screen.dart'; // El archivo físico sigue siendo vacaciones_screen.dart
+import 'package:provider/provider.dart';
+import '../../viewmodels/session_view_model.dart';
 
 class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
@@ -51,11 +53,15 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         PopupMenuButton<String>(
           offset: const Offset(0, 50), // Desplaza el menú un poco hacia abajo
           tooltip: 'Opciones de cuenta',
-          onSelected: (value) {
+          onSelected: (value) async {
             if (value == 'salir') {
+              await context.read<SessionViewModel>().clearSession();
+              if (!mounted) {
+                return;
+              }
               // Cierra sesión y vuelve a la pantalla de Login
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(builder: (context) => const LoginScreen()),
+              Navigator.of(this.context).pushReplacement(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
             } else {
               // Placeholder para futuras pantallas (Perfil, Ajustes)

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/viewmodels/login_view_model.dart';
+import 'package:navalgo/viewmodels/session_view_model.dart';
 import '../admin/admin_shell_screen.dart';
 import '../worker/worker_shell_screen.dart';
 import 'package:provider/provider.dart';
@@ -18,6 +19,17 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _recuerdame = false; // Se mantiene para la funcionalidad de "Recuérdame"
+  bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    final session = context.read<SessionViewModel>();
+    _recuerdame = session.rememberMeEnabled;
+    if (session.rememberedEmail.isNotEmpty) {
+      _emailController.text = session.rememberedEmail;
+    }
+  }
 
   // Es buena práctica "destruir" los controladores cuando la pantalla se cierra para liberar memoria.
   @override
@@ -206,10 +218,22 @@ class _LoginScreenState extends State<LoginScreen> {
                     // --- CAMPO DE CONTRASEÑA ---
                     TextField(
                       controller: _passwordController,
-                      obscureText: true, // Esto convierte el texto en asteriscos
+                      obscureText: _obscurePassword,
                       decoration: InputDecoration(
                         labelText: 'Contraseña',
                         prefixIcon: Icon(Icons.lock, color: Colors.blue.shade700),
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                            color: Colors.blue.shade700,
+                          ),
+                          tooltip: _obscurePassword ? 'Mostrar contraseña' : 'Ocultar contraseña',
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -253,34 +277,37 @@ class _LoginScreenState extends State<LoginScreen> {
                           bool success = await loginViewModel.login(
                             _emailController.text,
                             _passwordController.text,
+                            rememberMe: _recuerdame,
                           );
 
-                          if (mounted) { // Comprueba si el widget sigue en el árbol
-                            if (success) {
-                              final currentUser = loginViewModel.currentUser;
-                              if (currentUser == null) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('No se pudo obtener el usuario autenticado')),
-                                );
+                          if (!context.mounted) {
+                            return;
+                          }
+
+                          if (success) {
+                            final currentUser = loginViewModel.currentUser;
+                            if (currentUser == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('No se pudo obtener el usuario autenticado')),
+                              );
+                              return;
+                            }
+
+                            if (currentUser.mustChangePassword) {
+                              final changed = await _enforcePasswordChange(
+                                token: currentUser.token ?? '',
+                                currentPassword: _passwordController.text,
+                              );
+                              if (!context.mounted || !changed) {
                                 return;
                               }
-
-                              if (currentUser.mustChangePassword) {
-                                final changed = await _enforcePasswordChange(
-                                  token: currentUser.token ?? '',
-                                  currentPassword: _passwordController.text,
-                                );
-                                if (!changed) {
-                                  return;
-                                }
-                              }
-
-                              _openShellForRole(currentUser.role);
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(loginViewModel.errorMessage ?? 'Error desconocido')),
-                              );
                             }
+
+                            _openShellForRole(currentUser.role);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(loginViewModel.errorMessage ?? 'Error desconocido')),
+                            );
                           }
                         },
                         child: loginViewModel.isLoading
