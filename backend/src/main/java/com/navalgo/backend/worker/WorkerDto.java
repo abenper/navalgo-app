@@ -13,7 +13,8 @@ public record WorkerDto(
     boolean active,
     boolean mustChangePassword,
     boolean canEditWorkOrders,
-    LocalDate contractStartDate
+    LocalDate contractStartDate,
+    String photoUrl
 ) {
     public static WorkerDto from(Worker worker) {
         return new WorkerDto(
@@ -25,7 +26,8 @@ public record WorkerDto(
                 worker.isActive(),
                 worker.isMustChangePassword(),
                 worker.isCanEditWorkOrders(),
-                worker.getContractStartDate()
+                worker.getContractStartDate(),
+                worker.getPhotoUrl()
         );
     }
 }

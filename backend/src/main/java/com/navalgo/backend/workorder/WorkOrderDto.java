@@ -18,6 +18,8 @@ public record WorkOrderDto(
         List<EngineHourRequest> engineHours,
         List<String> attachmentUrls,
         List<AttachmentInfoDto> attachments,
-        Instant createdAt
+        Instant createdAt,
+        String signatureUrl,
+        Instant signedAt
 ) {
 }

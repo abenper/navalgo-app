@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../utils/app_toast.dart';
 import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../admin/partes_screen.dart';
 import '../common/login_screen.dart';
+import '../../services/worker_photo_service.dart';
 import 'fichaje_screen.dart';
 import 'vacaciones_screen.dart';
 import 'worker_dashboard_screen.dart';
@@ -188,32 +190,44 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
           onSelected: (value) async {
             if (value == 'salir') {
               await context.read<SessionViewModel>().clearSession();
-              if (!mounted) {
-                return;
-              }
+              if (!mounted) return;
               Navigator.of(this.context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
+            } else if (value == 'foto') {
+              await _changeProfilePhoto();
             }
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.green.shade100,
-                  child: Icon(Icons.engineering, size: 20, color: Colors.green.shade900),
-                ),
+                _buildAvatarWidget(context),
                 const SizedBox(width: 8),
                 if (MediaQuery.of(context).size.width > 400) ...[
-                  const Text('Area Trabajador', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Flexible(
+                    child: Text(
+                      context.watch<SessionViewModel>().user?.name ?? 'Trabajador',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
                   const Icon(Icons.arrow_drop_down),
                 ],
               ],
             ),
           ),
           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+            const PopupMenuItem<String>(
+              value: 'foto',
+              child: ListTile(
+                leading: Icon(Icons.photo_camera),
+                title: Text('Cambiar foto'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
             const PopupMenuItem<String>(
               value: 'salir',
               child: ListTile(
@@ -226,6 +240,56 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildAvatarWidget(BuildContext context) {
+    final photoUrl = context.watch<SessionViewModel>().user?.photoUrl;
+    if (photoUrl != null && photoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundImage: NetworkImage(photoUrl),
+        backgroundColor: Colors.green.shade100,
+      );
+    }
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: Colors.green.shade100,
+      child: Icon(Icons.person, size: 20, color: Colors.green.shade900),
+    );
+  }
+
+  Future<void> _changeProfilePhoto() async {
+    final session = context.read<SessionViewModel>();
+    final token = session.token;
+    final userId = session.user?.id;
+    if (token == null || userId == null) return;
+    final photoService = context.read<WorkerPhotoService>();
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+      maxWidth: 800,
+    );
+    if (picked == null) return;
+
+    if (!mounted) return;
+    final bytes = await picked.readAsBytes();
+    final mimeType = picked.mimeType ?? 'image/jpeg';
+    final fileName = picked.name;
+
+    try {
+      await photoService.uploadPhoto(
+        token,
+        workerId: userId,
+        fileName: fileName,
+        bytes: bytes,
+        mimeType: mimeType,
+      );
+      if (mounted) AppToast.success(context, 'Foto de perfil actualizada.');
+    } catch (e) {
+      if (mounted) AppToast.error(context, 'Error al subir foto: $e');
+    }
   }
 
   @override

@@ -56,6 +56,11 @@ public class WorkOrder {
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
+    @Column(length = 2000)
+    private String signatureUrl;
+
+    private Instant signedAt;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -88,4 +93,10 @@ public class WorkOrder {
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public String getSignatureUrl() { return signatureUrl; }
+    public void setSignatureUrl(String signatureUrl) { this.signatureUrl = signatureUrl; }
+
+    public Instant getSignedAt() { return signedAt; }
+    public void setSignedAt(Instant signedAt) { this.signedAt = signedAt; }
 }

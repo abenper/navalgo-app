@@ -7,6 +7,7 @@ import '../config/api_config.dart';
 import '../models/work_order.dart';
 
 class WorkOrderMediaService {
+  /// Upload one file to /work-orders/uploads (web-only, enforced by backend).
   Future<WorkOrderAttachmentItem> uploadMedia(
     String token, {
     required String fileName,
@@ -21,24 +22,18 @@ class WorkOrderMediaService {
       ..headers['Authorization'] = 'Bearer $token'
       ..headers['X-Client-Platform'] = 'web';
 
-    if (latitude != null) {
-      request.fields['latitude'] = latitude.toString();
-    }
-    if (longitude != null) {
-      request.fields['longitude'] = longitude.toString();
-    }
+    if (latitude != null) request.fields['latitude'] = latitude.toString();
+    if (longitude != null) request.fields['longitude'] = longitude.toString();
     if (capturedAt != null) {
       request.fields['capturedAt'] = capturedAt.toUtc().toIso8601String();
     }
 
-    request.files.add(
-      http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: fileName,
-        contentType: _parseMediaType(mimeType),
-      ),
-    );
+    request.files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: fileName,
+      contentType: _parseMediaType(mimeType),
+    ));
 
     final streamed = await request.send();
     final response = await http.Response.fromStream(streamed);
@@ -51,11 +46,66 @@ class WorkOrderMediaService {
     return WorkOrderAttachmentItem.fromJson(decoded);
   }
 
+  /// Sign a work order: sends the drawn signature + optional proof attachments.
+  /// Works from both web and mobile (no platform restriction).
+  Future<WorkOrder> signWorkOrder(
+    String token, {
+    required int workOrderId,
+    required String signatureFileName,
+    required List<int> signatureBytes,
+    required String signatureMimeType,
+    List<ProofFile> proofFiles = const [],
+    double? latitude,
+    double? longitude,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/work-orders/$workOrderId/sign');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token';
+
+    if (latitude != null) request.fields['latitude'] = latitude.toString();
+    if (longitude != null) request.fields['longitude'] = longitude.toString();
+
+    request.files.add(http.MultipartFile.fromBytes(
+      'signatureFile',
+      signatureBytes,
+      filename: signatureFileName,
+      contentType: _parseMediaType(signatureMimeType),
+    ));
+
+    for (final proof in proofFiles) {
+      request.files.add(http.MultipartFile.fromBytes(
+        'proofFile',
+        proof.bytes,
+        filename: proof.fileName,
+        contentType: _parseMediaType(proof.mimeType),
+      ));
+    }
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Error firmando parte (${response.statusCode}): ${response.body}');
+    }
+
+    return WorkOrder.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   MediaType _parseMediaType(String mimeType) {
     final parts = mimeType.split('/');
-    if (parts.length == 2) {
-      return MediaType(parts[0], parts[1]);
-    }
+    if (parts.length == 2) return MediaType(parts[0], parts[1]);
     return MediaType('application', 'octet-stream');
   }
+}
+
+class ProofFile {
+  const ProofFile({
+    required this.fileName,
+    required this.bytes,
+    required this.mimeType,
+  });
+
+  final String fileName;
+  final List<int> bytes;
+  final String mimeType;
 }

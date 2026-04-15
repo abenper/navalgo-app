@@ -2,6 +2,7 @@ package com.navalgo.backend.leave;
 
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
+import com.navalgo.backend.timetracking.TimeEntryRepository;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -20,13 +21,19 @@ public class LeaveRequestService {
     private final LeaveRequestRepository repository;
     private final WorkerRepository workerRepository;
     private final NotificationService notificationService;
+    private final TimeEntryRepository timeEntryRepository;
+
+    // 22 vacation days per year / 220 typical working days per year = 0.1 days vacation per day worked
+    private static final double VACATION_DAYS_PER_WORKED_DAY = 22.0 / 220.0;
 
     public LeaveRequestService(LeaveRequestRepository repository,
                                WorkerRepository workerRepository,
-                               NotificationService notificationService) {
+                               NotificationService notificationService,
+                               TimeEntryRepository timeEntryRepository) {
         this.repository = repository;
         this.workerRepository = workerRepository;
         this.notificationService = notificationService;
+        this.timeEntryRepository = timeEntryRepository;
     }
 
     @Transactional
@@ -152,14 +159,8 @@ public class LeaveRequestService {
     }
 
     private double calculateAccruedDays(Worker worker) {
-        LocalDate contractStart = worker.getContractStartDate();
-        LocalDate today = LocalDate.now();
-        if (contractStart == null || contractStart.isAfter(today)) {
-            return 0.0;
-        }
-
-        long completedMonths = ChronoUnit.MONTHS.between(contractStart, today);
-        return completedMonths * 2.5;
+        long workedDays = timeEntryRepository.countDistinctWorkedDays(worker.getId());
+        return workedDays * VACATION_DAYS_PER_WORKED_DAY;
     }
 
     private long calculateConsumedDays(Long workerId, Long excludeRequestId) {

@@ -79,6 +79,8 @@ class WorkOrder {
     required this.attachmentUrls,
     required this.attachments,
     required this.createdAt,
+    this.signatureUrl,
+    this.signedAt,
   });
 
   final int id;
@@ -96,6 +98,8 @@ class WorkOrder {
   final List<String> attachmentUrls;
   final List<WorkOrderAttachmentItem> attachments;
   final DateTime createdAt;
+  final String? signatureUrl;
+  final DateTime? signedAt;
 
   factory WorkOrder.fromJson(Map<String, dynamic> json) {
     return WorkOrder(
@@ -118,6 +122,8 @@ class WorkOrder {
           .map((e) => WorkOrderAttachmentItem.fromJson(e as Map<String, dynamic>))
           .toList(),
       createdAt: DateTime.parse(json['createdAt'] as String),
+      signatureUrl: json['signatureUrl'] as String?,
+      signedAt: json['signedAt'] == null ? null : DateTime.parse(json['signedAt'] as String),
     );
   }
 }

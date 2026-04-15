@@ -7,6 +7,7 @@ import 'package:navalgo/services/time_tracking_service.dart';
 import 'package:navalgo/services/worker_service.dart';
 import 'package:navalgo/services/work_order_media_service.dart';
 import 'package:navalgo/services/work_order_service.dart';
+import 'package:navalgo/services/worker_photo_service.dart';
 import 'package:navalgo/viewmodels/fleet_view_model.dart';
 import 'package:navalgo/viewmodels/login_view_model.dart';
 import 'package:navalgo/viewmodels/notifications_view_model.dart';
@@ -33,6 +34,7 @@ Future<void> main() async {
         Provider<TimeTrackingService>(create: (_) => TimeTrackingService()),
         Provider<WorkOrderService>(create: (_) => WorkOrderService()),
         Provider<WorkOrderMediaService>(create: (_) => WorkOrderMediaService()),
+        Provider<WorkerPhotoService>(create: (_) => WorkerPhotoService()),
         ChangeNotifierProvider(
           create: (context) =>
               LoginViewModel(

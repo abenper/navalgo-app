@@ -211,6 +211,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 CircleAvatar(
                   radius: 16,
@@ -219,9 +220,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                 ),
                 const SizedBox(width: 8),
                 if (MediaQuery.of(context).size.width > 400) ...[
-                  const Text(
-                    'Hola, Admin',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  Flexible(
+                    child: Text(
+                      context.watch<SessionViewModel>().user?.name ?? 'Admin',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
                   const Icon(Icons.arrow_drop_down),
                 ],

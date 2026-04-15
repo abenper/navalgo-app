@@ -82,4 +82,32 @@ public class WorkOrderController {
         }
         return ResponseEntity.ok(mediaService.uploadMedia(file, latitude, longitude, capturedAt, authentication.getName()));
     }
+
+    @PostMapping(value = "/{id}/sign", consumes = "multipart/form-data")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkOrderDto> signWorkOrder(
+            @PathVariable Long id,
+            @RequestParam("signatureFile") MultipartFile signatureFile,
+            @RequestParam(value = "proofFile", required = false) List<MultipartFile> proofFiles,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+        Instant now = Instant.now();
+
+        UploadedAttachmentDto signatureDto = mediaService.uploadMedia(
+                signatureFile, latitude, longitude, now, email);
+
+        List<UploadedAttachmentDto> proofDtos = new java.util.ArrayList<>();
+        if (proofFiles != null) {
+            for (MultipartFile proof : proofFiles) {
+                if (!proof.isEmpty()) {
+                    proofDtos.add(mediaService.uploadMedia(proof, latitude, longitude, now, email));
+                }
+            }
+        }
+
+        return ResponseEntity.ok(service.signWorkOrder(id, signatureDto, proofDtos, email));
+    }
 }

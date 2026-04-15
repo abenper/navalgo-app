@@ -2,10 +2,11 @@ class User {
   final int id;
   final String name;
   final String email;
-  final String role; // Rol obtenido del backend
-  final String? token; // Token de autenticación
+  final String role;
+  final String? token;
   final bool mustChangePassword;
   final bool canEditWorkOrders;
+  final String? photoUrl;
 
   User({
     required this.id,
@@ -15,9 +16,9 @@ class User {
     this.token,
     this.mustChangePassword = false,
     this.canEditWorkOrders = false,
+    this.photoUrl,
   });
 
-  // Factory constructor para crear una instancia de User desde un mapa (JSON)
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'],
@@ -27,10 +28,10 @@ class User {
       token: json['token'],
       mustChangePassword: json['mustChangePassword'] ?? false,
       canEditWorkOrders: json['canEditWorkOrders'] ?? false,
+      photoUrl: json['photoUrl'] as String?,
     );
   }
 
-  // Método para convertir una instancia de User a un mapa (JSON)
   Map<String, dynamic> toJson() {
     return {
       'id': id,
@@ -40,6 +41,7 @@ class User {
       'token': token,
       'mustChangePassword': mustChangePassword,
       'canEditWorkOrders': canEditWorkOrders,
+      'photoUrl': photoUrl,
     };
   }
 }

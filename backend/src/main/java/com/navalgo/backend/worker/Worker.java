@@ -40,6 +40,9 @@ public class Worker {
     @Column(nullable = false)
     private LocalDate contractStartDate = LocalDate.now();
 
+    @Column(length = 1000)
+    private String photoUrl;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -69,4 +72,7 @@ public class Worker {
 
     public LocalDate getContractStartDate() { return contractStartDate; }
     public void setContractStartDate(LocalDate contractStartDate) { this.contractStartDate = contractStartDate; }
+
+    public String getPhotoUrl() { return photoUrl; }
+    public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
 }

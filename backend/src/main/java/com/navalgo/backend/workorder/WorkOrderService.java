@@ -246,8 +246,43 @@ public class WorkOrderService {
                 w.getEngineHourLogs().stream().map(e -> new EngineHourRequest(e.getEngineLabel(), e.getHours())).toList(),
                 w.getAttachments().stream().map(WorkOrderAttachment::getFileUrl).toList(),
                 w.getAttachments().stream().map(AttachmentInfoDto::from).toList(),
-                w.getCreatedAt()
+                w.getCreatedAt(),
+                w.getSignatureUrl(),
+                w.getSignedAt()
         );
+    }
+
+    @Transactional
+    public WorkOrderDto signWorkOrder(Long id,
+                                      UploadedAttachmentDto signature,
+                                      List<UploadedAttachmentDto> proofAttachments,
+                                      String signerEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker signer = requireWorkerByEmail(signerEmail);
+        if (!isAdmin(signer) && !isAssignedToWorkOrder(signer, workOrder)) {
+            throw new AccessDeniedException("Solo puedes firmar partes que tienes asignados");
+        }
+
+        workOrder.setSignatureUrl(signature.fileUrl());
+        workOrder.setSignedAt(java.time.Instant.now());
+
+        for (UploadedAttachmentDto proof : proofAttachments) {
+            WorkOrderAttachment att = new WorkOrderAttachment();
+            att.setWorkOrder(workOrder);
+            att.setFileUrl(proof.fileUrl());
+            att.setFileType(proof.fileType());
+            att.setOriginalFileName(proof.originalFileName());
+            att.setCapturedAt(proof.capturedAt());
+            att.setLatitude(proof.latitude());
+            att.setLongitude(proof.longitude());
+            att.setWatermarked(proof.watermarked());
+            att.setAudioRemoved(proof.audioRemoved());
+            workOrder.getAttachments().add(att);
+        }
+
+        return toDto(workOrderRepository.save(workOrder));
     }
 
     private WorkOrderAttachment mapAttachmentRequest(WorkOrder workOrder, AttachmentRequest item) {

@@ -131,6 +131,17 @@ public class WorkerService {
         return WorkerDto.from(workerRepository.save(worker));
     }
 
+    @Transactional
+    public WorkerDto updatePhoto(Long workerId, String photoUrl, boolean isAdmin, String requesterEmail) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        if (!isAdmin && !worker.getEmail().equalsIgnoreCase(requesterEmail)) {
+            throw new org.springframework.security.access.AccessDeniedException("Solo puedes actualizar tu propia foto");
+        }
+        worker.setPhotoUrl(photoUrl);
+        return WorkerDto.from(workerRepository.save(worker));
+    }
+
     private String generateTemporaryPassword(int length) {
         StringBuilder password = new StringBuilder(length);
         for (int i = 0; i < length; i++) {

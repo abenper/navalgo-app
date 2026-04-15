@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:signature/signature.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/owner.dart';
@@ -123,8 +125,30 @@ class _PartesScreenState extends State<PartesScreen> {
     );
   }
 
-  Future<void> _openAttachmentsDialog(WorkOrder parte) async {
-    if (parte.attachments.isEmpty && parte.attachmentUrls.isEmpty) {
+  Future<void> _openWorkerParteDialog(WorkOrder parte) async {
+    final session = context.read<SessionViewModel>();
+    final workOrdersVm = context.read<WorkOrdersViewModel>();
+
+    if (parte.signatureUrl != null) {
+      // Already signed: just show attachments
+      await _openAttachmentsDialog(parte);
+      return;
+    }
+
+    final signed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: false,
+      builder: (_) => _WorkerSignDialog(parte: parte),
+    );
+
+    if (signed == true && mounted) {
+      AppToast.success(context, 'Parte firmado correctamente.');
+      await workOrdersVm.loadWorkOrders(workerId: session.user?.id);
+    }
+  }
+
+  Future<void> _openAttachmentsDialog(WorkOrder parte) async {    if (parte.attachments.isEmpty && parte.attachmentUrls.isEmpty) {
       AppToast.info(context, 'Este parte no tiene adjuntos.');
       return;
     }
@@ -273,10 +297,13 @@ class _PartesScreenState extends State<PartesScreen> {
                           subtitle: Text(
                             'Cliente: ${parte.ownerName}\n'
                             'Asignado: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}\n'
-                            'Estado: ${parte.status} • Prioridad: ${parte.priority} • Adjuntos: ${parte.attachments.isNotEmpty ? parte.attachments.length : parte.attachmentUrls.length}',
+                            'Estado: ${parte.status} • Prioridad: ${parte.priority}'
+                            '${parte.signatureUrl != null ? ' • ✓ Firmado' : ''}',
                           ),
                           isThreeLine: true,
-                          onTap: () => _openAttachmentsDialog(parte),
+                          onTap: () => isAdmin
+                              ? _openAttachmentsDialog(parte)
+                              : _openWorkerParteDialog(parte),
                           trailing: PopupMenuButton<String>(
                             onSelected: (value) {
                               if (value == 'MARK_URGENT') {
@@ -805,4 +832,277 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
     final count = vessel.engineCount ?? 0;
     return List<String>.generate(count, (index) => 'Motor ${index + 1}');
   }
+}
+
+// ===================================================================
+// _WorkerSignDialog: firma digital + adjuntar fotos/videos desde cámara
+// ===================================================================
+class _WorkerSignDialog extends StatefulWidget {
+  const _WorkerSignDialog({required this.parte});
+
+  final WorkOrder parte;
+
+  @override
+  State<_WorkerSignDialog> createState() => _WorkerSignDialogState();
+}
+
+class _WorkerSignDialogState extends State<_WorkerSignDialog> {
+  late final SignatureController _sigController;
+  final List<_PickedProof> _proofFiles = [];
+  bool _signing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _sigController = SignatureController(
+      penStrokeWidth: 3,
+      penColor: Colors.black,
+      exportBackgroundColor: Colors.white,
+    );
+  }
+
+  @override
+  void dispose() {
+    _sigController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.92,
+      minChildSize: 0.5,
+      maxChildSize: 0.97,
+      builder: (context, scrollController) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade400,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Firmar Parte: ${widget.parte.title}',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Cliente: ${widget.parte.ownerName}',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Tu firma',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  height: 160,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Signature(
+                      controller: _sigController,
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: _sigController.clear,
+                    icon: const Icon(Icons.clear, size: 18),
+                    label: const Text('Borrar firma'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Text(
+                      'Fotos/Videos de evidencia',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _pickProof,
+                      icon: const Icon(Icons.add_a_photo, size: 18),
+                      label: const Text('Añadir'),
+                    ),
+                  ],
+                ),
+                if (_proofFiles.isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _proofFiles
+                        .map((proof) => Chip(
+                              avatar: Icon(
+                                proof.mimeType.startsWith('video/')
+                                    ? Icons.videocam
+                                    : Icons.image,
+                                size: 16,
+                              ),
+                              label: Text(
+                                proof.fileName,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              onDeleted: () {
+                                setState(() => _proofFiles.remove(proof));
+                              },
+                            ))
+                        .toList(),
+                  ),
+                const Spacer(),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _signing ? null : _submit,
+                    icon: _signing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white),
+                          )
+                        : const Icon(Icons.draw),
+                    label: Text(_signing ? 'Enviando...' : 'Firmar y enviar'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickProof() async {
+    if (kIsWeb) {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        withData: true,
+        type: FileType.custom,
+        allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'mp4', 'mov'],
+      );
+      if (result == null) return;
+      for (final file in result.files) {
+        if (file.bytes != null && file.bytes!.isNotEmpty) {
+          setState(() => _proofFiles.add(_PickedProof(
+                fileName: file.name,
+                bytes: file.bytes!,
+                mimeType: _guessMimeType(file.name),
+              )));
+        }
+      }
+    } else {
+      final picker = ImagePicker();
+      final picked = await picker.pickMedia();
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      final mime = picked.mimeType ?? _guessMimeType(picked.name);
+      setState(() => _proofFiles.add(_PickedProof(
+            fileName: picked.name,
+            bytes: bytes,
+            mimeType: mime,
+          )));
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_sigController.isNotEmpty) {
+      AppToast.warning(context, 'Dibuja tu firma antes de enviar.');
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) return;
+
+    setState(() => _signing = true);
+
+    final mediaService = context.read<WorkOrderMediaService>();
+
+    try {
+      final signatureBytes =
+          await _sigController.toPngBytes();
+      if (signatureBytes == null) throw Exception('No se pudo exportar la firma');
+
+      Position? position;
+      try {
+        if (await Geolocator.isLocationServiceEnabled()) {
+          position = await Geolocator.getCurrentPosition();
+        }
+      } catch (_) {}
+
+      await mediaService.signWorkOrder(
+        token,
+        workOrderId: widget.parte.id,
+        signatureFileName: 'firma_parte_${widget.parte.id}.png',
+        signatureBytes: signatureBytes,
+        signatureMimeType: 'image/png',
+        proofFiles: _proofFiles
+            .map((p) => ProofFile(
+                  fileName: p.fileName,
+                  bytes: p.bytes,
+                  mimeType: p.mimeType,
+                ))
+            .toList(),
+        latitude: position?.latitude,
+        longitude: position?.longitude,
+      );
+
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _signing = false);
+      AppToast.error(context, 'Error al firmar: $e');
+    }
+  }
+
+  String _guessMimeType(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'webp':
+        return 'image/webp';
+      case 'mov':
+        return 'video/quicktime';
+      default:
+        return 'video/mp4';
+    }
+  }
+}
+
+class _PickedProof {
+  const _PickedProof(
+      {required this.fileName,
+      required this.bytes,
+      required this.mimeType});
+
+  final String fileName;
+  final List<int> bytes;
+  final String mimeType;
 }

@@ -159,6 +159,16 @@ ALTER TABLE workers
 ALTER TABLE workers
     ADD COLUMN IF NOT EXISTS can_edit_work_orders BOOLEAN NOT NULL DEFAULT FALSE;
 
+-- v3: profile photo, work order digital signature
+ALTER TABLE workers
+    ADD COLUMN IF NOT EXISTS photo_url VARCHAR(1000);
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS signature_url VARCHAR(2000);
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP WITHOUT TIME ZONE;
+
 ALTER TABLE workers
     ADD COLUMN IF NOT EXISTS contract_start_date DATE NOT NULL DEFAULT CURRENT_DATE;
 

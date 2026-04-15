@@ -9,6 +9,7 @@ class WorkerProfile {
     required this.mustChangePassword,
     required this.canEditWorkOrders,
     required this.contractStartDate,
+    this.photoUrl,
   });
 
   final int id;
@@ -20,6 +21,7 @@ class WorkerProfile {
   final bool mustChangePassword;
   final bool canEditWorkOrders;
   final DateTime contractStartDate;
+  final String? photoUrl;
 
   factory WorkerProfile.fromJson(Map<String, dynamic> json) {
     return WorkerProfile(
@@ -34,6 +36,7 @@ class WorkerProfile {
       contractStartDate: DateTime.parse(
         (json['contractStartDate'] as String?) ?? DateTime.now().toIso8601String(),
       ),
+      photoUrl: json['photoUrl'] as String?,
     );
   }
 }
