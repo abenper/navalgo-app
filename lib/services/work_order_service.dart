@@ -79,6 +79,7 @@ class WorkOrderService {
     String? priority,
     String? status,
     bool? clearSignature,
+    List<Map<String, dynamic>>? engineHours,
     List<WorkOrderAttachmentItem>? attachments,
   }) async {
     final data = await _apiClient.patch(
@@ -93,6 +94,7 @@ class WorkOrderService {
         'priority': priority,
         'status': status,
         'clearSignature': clearSignature,
+        'engineHours': engineHours,
         'attachments': attachments?.map((item) => item.toJson()).toList(),
       },
     );
@@ -109,5 +111,12 @@ class WorkOrderService {
       headers: {'Authorization': 'Bearer $token'},
     );
     return WorkOrder.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteWorkOrder(String token, {required int workOrderId}) async {
+    await _apiClient.delete(
+      '/work-orders/$workOrderId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
   }
 }

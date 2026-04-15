@@ -30,10 +30,14 @@ import java.text.Normalizer;
 import java.util.Iterator;
 import java.util.Locale;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 @Transactional(readOnly = true)
 public class WorkOrderMediaService {
+
+    private static final Logger log = LoggerFactory.getLogger(WorkOrderMediaService.class);
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -129,7 +133,7 @@ public class WorkOrderMediaService {
                 if (!allowVideo) {
                     throw new IllegalArgumentException("Este tipo de archivo no esta permitido para este flujo");
                 }
-                String videoKey = buildObjectKey(keyPrefix, ".mp4");
+                String videoKey = buildObjectKey(keyPrefix, resolveVideoExtension(file));
                 return processAndUploadVideo(file, worker, latitude, longitude, capturedInstant, videoKey);
             }
         } catch (IOException e) {
@@ -187,6 +191,10 @@ public class WorkOrderMediaService {
                                                         String objectKey) throws IOException {
         Path inputFile = Files.createTempFile("navalgo-upload-", ".mp4");
         Path outputFile = Files.createTempFile("navalgo-upload-processed-", ".mp4");
+        byte[] originalBytes = file.getBytes();
+        String originalContentType = file.getContentType() == null || file.getContentType().isBlank()
+            ? "video/mp4"
+            : file.getContentType();
 
         try {
             file.transferTo(inputFile);
@@ -207,7 +215,18 @@ public class WorkOrderMediaService {
             int exit = waitFor(process);
 
             if (exit != 0) {
-                throw new IllegalStateException("Error al procesar video: " + ffmpegOutput);
+                log.warn("Fallo ffmpeg al procesar video, se sube el original. Salida: {}", ffmpegOutput);
+                uploadToSpaces(objectKey, originalBytes, originalContentType);
+                return new UploadedAttachmentDto(
+                        buildPublicUrl(objectKey),
+                        "VIDEO",
+                        file.getOriginalFilename(),
+                        capturedAt,
+                        latitude,
+                        longitude,
+                        false,
+                        false
+                );
             }
 
             byte[] bytes = Files.readAllBytes(outputFile);
@@ -281,6 +300,20 @@ public class WorkOrderMediaService {
 
     private String buildObjectKey(String keyPrefix, String extension) {
         return keyPrefix + "/" + UUID.randomUUID() + extension;
+    }
+
+    private String resolveVideoExtension(MultipartFile file) {
+        String originalName = file.getOriginalFilename();
+        if (originalName != null) {
+            int dotIndex = originalName.lastIndexOf('.');
+            if (dotIndex >= 0 && dotIndex < originalName.length() - 1) {
+                String ext = originalName.substring(dotIndex).toLowerCase(Locale.ROOT);
+                if (ext.matches("\\.(mp4|mov|avi|m4v|webm)")) {
+                    return ext;
+                }
+            }
+        }
+        return ".mp4";
     }
 
     private String buildWorkOrderBasePath(String ownerName, String vesselName, LocalDate workOrderDate) {
@@ -357,6 +390,10 @@ public class WorkOrderMediaService {
                 .bucket(mediaProperties.spacesBucket())
                 .key(key)
                 .build();
-        s3Client.deleteObject(request);
+        try {
+            s3Client.deleteObject(request);
+        } catch (Exception exception) {
+            log.warn("No se pudo borrar el objeto {} del almacenamiento: {}", key, exception.getMessage());
+        }
     }
 }

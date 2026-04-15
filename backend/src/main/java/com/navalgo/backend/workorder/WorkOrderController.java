@@ -70,12 +70,45 @@ public class WorkOrderController {
         return ResponseEntity.ok(service.updateWorkOrder(id, request, authentication.getName()));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> deleteWorkOrder(@PathVariable Long id,
+                                                Authentication authentication) {
+        service.deleteWorkOrder(id, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{id}/attachments/{attachmentId}")
     @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
     public ResponseEntity<WorkOrderDto> deleteAttachment(@PathVariable Long id,
                                                          @PathVariable Long attachmentId,
                                                          Authentication authentication) {
         return ResponseEntity.ok(service.deleteAttachment(id, attachmentId, authentication.getName()));
+    }
+
+    @PostMapping(value = "/{id}/attachments", consumes = "multipart/form-data")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkOrderDto> addAttachment(@PathVariable Long id,
+                                                      @RequestParam("file") MultipartFile file,
+                                                      @RequestParam(required = false) Double latitude,
+                                                      @RequestParam(required = false) Double longitude,
+                                                      @RequestParam(required = false) Instant capturedAt,
+                                                      Authentication authentication) {
+        String email = authentication.getName();
+        WorkOrderService.WorkOrderMediaContext context = service.getWorkOrderMediaContext(id, email);
+
+        UploadedAttachmentDto uploaded = mediaService.uploadWorkOrderAttachment(
+                file,
+                latitude,
+                longitude,
+                capturedAt,
+                email,
+                context.ownerName(),
+                context.vesselName(),
+                context.workOrderDate()
+        );
+
+        return ResponseEntity.ok(service.addAttachment(id, uploaded, email));
     }
 
     @PostMapping("/uploads")

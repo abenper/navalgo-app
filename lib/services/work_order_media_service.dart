@@ -61,6 +61,43 @@ class WorkOrderMediaService {
     return WorkOrderAttachmentItem.fromJson(decoded);
   }
 
+  Future<WorkOrder> attachToWorkOrder(
+    String token, {
+    required int workOrderId,
+    required String fileName,
+    required List<int> bytes,
+    required String mimeType,
+    double? latitude,
+    double? longitude,
+    DateTime? capturedAt,
+  }) async {
+    final uri = Uri.parse('${ApiConfig.baseUrl}/work-orders/$workOrderId/attachments');
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token';
+
+    if (latitude != null) request.fields['latitude'] = latitude.toString();
+    if (longitude != null) request.fields['longitude'] = longitude.toString();
+    if (capturedAt != null) {
+      request.fields['capturedAt'] = capturedAt.toUtc().toIso8601String();
+    }
+
+    request.files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: fileName,
+      contentType: _parseMediaType(mimeType),
+    ));
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw Exception('Error adjuntando multimedia (${response.statusCode}): ${response.body}');
+    }
+
+    return WorkOrder.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+  }
+
   /// Sign a work order: sends the drawn signature + optional proof attachments.
   /// Works from both web and mobile (no platform restriction).
   Future<WorkOrder> signWorkOrder(
