@@ -104,7 +104,7 @@ public class WorkOrderController {
         String email = authentication.getName();
         Instant now = Instant.now();
 
-        UploadedAttachmentDto signatureDto = mediaService.uploadMedia(
+        UploadedAttachmentDto signatureWithoutWatermark = mediaService.uploadSignature(
                 signatureFile, latitude, longitude, now, email);
 
         List<UploadedAttachmentDto> proofDtos = new java.util.ArrayList<>();
@@ -116,6 +116,6 @@ public class WorkOrderController {
             }
         }
 
-        return ResponseEntity.ok(service.signWorkOrder(id, signatureDto, proofDtos, email));
+        return ResponseEntity.ok(service.signWorkOrder(id, signatureWithoutWatermark, proofDtos, email));
     }
 }

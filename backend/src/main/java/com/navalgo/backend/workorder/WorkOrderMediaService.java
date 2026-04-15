@@ -50,6 +50,29 @@ public class WorkOrderMediaService {
                                              Double longitude,
                                              Instant capturedAt,
                                              String uploaderEmail) {
+        return uploadMedia(file, latitude, longitude, capturedAt, uploaderEmail, true, true);
+    }
+
+    public UploadedAttachmentDto uploadSignature(MultipartFile file,
+                                                 Double latitude,
+                                                 Double longitude,
+                                                 Instant capturedAt,
+                                                 String uploaderEmail) {
+        return uploadMedia(file, latitude, longitude, capturedAt, uploaderEmail, false, true);
+    }
+
+    public UploadedAttachmentDto uploadProfilePhoto(MultipartFile file,
+                                                    String uploaderEmail) {
+        return uploadMedia(file, null, null, null, uploaderEmail, false, false);
+    }
+
+    private UploadedAttachmentDto uploadMedia(MultipartFile file,
+                                              Double latitude,
+                                              Double longitude,
+                                              Instant capturedAt,
+                                              String uploaderEmail,
+                                              boolean applyWatermark,
+                                              boolean includeMetadata) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("El archivo es obligatorio");
         }
@@ -62,9 +85,12 @@ public class WorkOrderMediaService {
 
         try {
             if (contentType.startsWith("image/")) {
-                return processAndUploadImage(file, worker, latitude, longitude, capturedInstant);
+                return processAndUploadImage(file, worker, latitude, longitude, capturedInstant, applyWatermark, includeMetadata);
             }
             if (contentType.startsWith("video/")) {
+                if (!applyWatermark) {
+                    throw new IllegalArgumentException("Solo se permiten videos para evidencia multimedia");
+                }
                 return processAndUploadVideo(file, worker, latitude, longitude, capturedInstant);
             }
         } catch (IOException e) {
@@ -78,7 +104,9 @@ public class WorkOrderMediaService {
                                                         Worker worker,
                                                         Double latitude,
                                                         Double longitude,
-                                                        Instant capturedAt) throws IOException {
+                                                        Instant capturedAt,
+                                                        boolean applyWatermark,
+                                                        boolean includeMetadata) throws IOException {
         BufferedImage original = ImageIO.read(file.getInputStream());
         if (original == null) {
             throw new IllegalArgumentException("Formato de imagen no soportado");
@@ -88,8 +116,10 @@ public class WorkOrderMediaService {
         Graphics2D g2 = rgbImage.createGraphics();
         g2.drawImage(original, 0, 0, null);
 
-        String watermarkText = buildWatermarkText(worker.getFullName(), capturedAt, latitude, longitude);
-        drawWatermark(g2, rgbImage.getWidth(), rgbImage.getHeight(), watermarkText);
+        if (applyWatermark) {
+            String watermarkText = buildWatermarkText(worker.getFullName(), capturedAt, latitude, longitude);
+            drawWatermark(g2, rgbImage.getWidth(), rgbImage.getHeight(), watermarkText);
+        }
         g2.dispose();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
@@ -102,10 +132,10 @@ public class WorkOrderMediaService {
                 buildPublicUrl(key),
                 "IMAGE",
                 file.getOriginalFilename(),
-                capturedAt,
-                latitude,
-                longitude,
-                true,
+            includeMetadata ? capturedAt : null,
+            includeMetadata ? latitude : null,
+            includeMetadata ? longitude : null,
+            applyWatermark,
                 false
         );
     }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../services/auth_service.dart';
 import '../../utils/app_toast.dart';
 import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
@@ -188,14 +189,20 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
         PopupMenuButton<String>(
           offset: const Offset(0, 50),
           onSelected: (value) async {
-            if (value == 'salir') {
+            if (value == 'logout') {
               await context.read<SessionViewModel>().clearSession();
               if (!mounted) return;
               Navigator.of(this.context).pushReplacement(
                 MaterialPageRoute(builder: (_) => const LoginScreen()),
               );
-            } else if (value == 'foto') {
-              await _changeProfilePhoto();
+              return;
+            }
+            if (value == 'profile') {
+              await _showProfileDialog();
+              return;
+            }
+            if (value == 'password') {
+              await _showChangePasswordDialog();
             }
           },
           child: Padding(
@@ -221,18 +228,27 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
           ),
           itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
             const PopupMenuItem<String>(
-              value: 'foto',
+              value: 'profile',
               child: ListTile(
-                leading: Icon(Icons.photo_camera),
-                title: Text('Cambiar foto'),
+                leading: Icon(Icons.person_outline),
+                title: Text('Mi Perfil'),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
             const PopupMenuItem<String>(
-              value: 'salir',
+              value: 'password',
+              child: ListTile(
+                leading: Icon(Icons.lock_outline),
+                title: Text('Cambiar Contrasena'),
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
+            const PopupMenuDivider(),
+            const PopupMenuItem<String>(
+              value: 'logout',
               child: ListTile(
                 leading: Icon(Icons.logout, color: Colors.red),
-                title: Text('Cerrar Sesion', style: TextStyle(color: Colors.red)),
+                title: Text('Salir', style: TextStyle(color: Colors.red)),
                 contentPadding: EdgeInsets.zero,
               ),
             ),
@@ -289,6 +305,153 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       if (mounted) AppToast.success(context, 'Foto de perfil actualizada.');
     } catch (e) {
       if (mounted) AppToast.error(context, 'Error al subir foto: $e');
+    }
+  }
+
+  Future<void> _showProfileDialog() async {
+    final user = context.read<SessionViewModel>().user;
+    if (user == null) {
+      return;
+    }
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Mi Perfil'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Nombre: ${user.name}'),
+              const SizedBox(height: 6),
+              Text('Correo: ${user.email}'),
+              const SizedBox(height: 6),
+              Text('Rol: ${user.role}'),
+              const SizedBox(height: 6),
+              Text('Puede editar partes: ${user.canEditWorkOrders ? 'SI' : 'NO'}'),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await _changeProfilePhoto();
+                },
+                icon: const Icon(Icons.photo_camera),
+                label: const Text('Cambiar foto de perfil'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _showChangePasswordDialog() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null || token.isEmpty) {
+      AppToast.warning(context, 'No hay sesion activa.');
+      return;
+    }
+
+    final currentCtrl = TextEditingController();
+    final newCtrl = TextEditingController();
+    final confirmCtrl = TextEditingController();
+
+    try {
+      final changed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Cambiar Contrasena'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: currentCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Contrasena actual',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: newCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Nueva contrasena',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: confirmCtrl,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Confirmar nueva contrasena',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: () async {
+                  final current = currentCtrl.text.trim();
+                  final next = newCtrl.text.trim();
+                  final confirm = confirmCtrl.text.trim();
+
+                  if (current.isEmpty || next.isEmpty || confirm.isEmpty) {
+                    AppToast.warning(dialogContext, 'Completa todos los campos.');
+                    return;
+                  }
+                  if (next.length < 8) {
+                    AppToast.warning(dialogContext, 'La nueva contrasena debe tener al menos 8 caracteres.');
+                    return;
+                  }
+                  if (next != confirm) {
+                    AppToast.warning(dialogContext, 'Las contrasenas no coinciden.');
+                    return;
+                  }
+
+                  try {
+                    await context.read<AuthService>().changePassword(
+                          token,
+                          currentPassword: current,
+                          newPassword: next,
+                        );
+                    if (dialogContext.mounted) {
+                      Navigator.of(dialogContext).pop(true);
+                    }
+                  } catch (e) {
+                    if (dialogContext.mounted) {
+                      AppToast.error(dialogContext, 'No se pudo cambiar la contrasena: $e');
+                    }
+                  }
+                },
+                child: const Text('Guardar'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (changed == true && mounted) {
+        AppToast.success(context, 'Contrasena actualizada correctamente.');
+      }
+    } finally {
+      currentCtrl.dispose();
+      newCtrl.dispose();
+      confirmCtrl.dispose();
     }
   }
 
