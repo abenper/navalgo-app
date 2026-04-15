@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS workers (
     active BOOLEAN NOT NULL DEFAULT TRUE,
     must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     can_edit_work_orders BOOLEAN NOT NULL DEFAULT FALSE,
+    contract_start_date DATE NOT NULL DEFAULT CURRENT_DATE,
     CONSTRAINT ck_workers_role CHECK (role IN ('ADMIN', 'WORKER'))
 );
 
@@ -136,6 +137,9 @@ ALTER TABLE workers
 
 ALTER TABLE workers
     ADD COLUMN IF NOT EXISTS can_edit_work_orders BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE workers
+    ADD COLUMN IF NOT EXISTS contract_start_date DATE NOT NULL DEFAULT CURRENT_DATE;
 
 ALTER TABLE vessels
     ADD COLUMN IF NOT EXISTS engine_labels VARCHAR(1000);

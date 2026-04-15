@@ -38,6 +38,7 @@ class WorkerService {
     String? speciality,
     required String role,
     bool canEditWorkOrders = false,
+    DateTime? contractStartDate,
   }) async {
     final data = await _apiClient.post(
       '/workers',
@@ -49,6 +50,7 @@ class WorkerService {
         'speciality': speciality,
         'role': role,
         'canEditWorkOrders': canEditWorkOrders,
+        'contractStartDate': _asDate(contractStartDate ?? DateTime.now()),
       },
     );
 
@@ -56,6 +58,39 @@ class WorkerService {
     return CreateWorkerResult(
       worker: WorkerProfile.fromJson(map['worker'] as Map<String, dynamic>),
       temporaryPassword: map['temporaryPassword'] as String?,
+    );
+  }
+
+  Future<WorkerProfile> updateWorker(
+    String token, {
+    required int workerId,
+    required String fullName,
+    required String email,
+    String? speciality,
+    required String role,
+    required bool canEditWorkOrders,
+    required DateTime contractStartDate,
+  }) async {
+    final data = await _apiClient.put(
+      '/workers/$workerId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'fullName': fullName,
+        'email': email,
+        'speciality': speciality,
+        'role': role,
+        'canEditWorkOrders': canEditWorkOrders,
+        'contractStartDate': _asDate(contractStartDate),
+      },
+    );
+
+    return WorkerProfile.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteWorker(String token, {required int workerId}) async {
+    await _apiClient.delete(
+      '/workers/$workerId',
+      headers: {'Authorization': 'Bearer $token'},
     );
   }
 
@@ -92,5 +127,12 @@ class WorkerService {
     );
     final map = data as Map<String, dynamic>;
     return (map['temporaryPassword'] as String?) ?? '';
+  }
+
+  String _asDate(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
   }
 }

@@ -31,6 +31,14 @@ public class LeaveRequestController {
         return ResponseEntity.ok(service.list(scopedWorkerId));
     }
 
+    @GetMapping("/balance")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<LeaveBalanceDto> balance(@RequestParam(required = false) Long workerId,
+                                                   Authentication authentication) {
+        Long scopedWorkerId = resolveScopedWorkerId(workerId, authentication);
+        return ResponseEntity.ok(service.getBalance(scopedWorkerId));
+    }
+
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
     public ResponseEntity<LeaveRequestDto> create(@RequestBody @Valid CreateLeaveRequest request,
@@ -53,6 +61,12 @@ public class LeaveRequestController {
     public ResponseEntity<LeaveRequestDto> updateStatus(@PathVariable Long id,
                                                         @RequestBody @Valid UpdateLeaveStatusRequest request) {
         return ResponseEntity.ok(service.updateStatus(id, request));
+    }
+
+    @PostMapping("/admin-assign")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<LeaveRequestDto> adminAssign(@RequestBody @Valid AdminAssignLeaveRequest request) {
+        return ResponseEntity.ok(service.adminAssign(request));
     }
 
     private Long resolveScopedWorkerId(Long workerId, Authentication authentication) {

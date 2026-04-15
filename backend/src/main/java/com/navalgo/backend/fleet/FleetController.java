@@ -38,7 +38,49 @@ public class FleetController {
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ResponseEntity<OwnerDto> createOwner(@RequestBody @Valid CreateOwnerRequest request) {
-        Owner owner = new Owner();
+        return ResponseEntity.ok(OwnerDto.from(ownerRepository.save(buildOwnerFromRequest(new Owner(), request))));
+    }
+
+    @PutMapping("/owners/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<OwnerDto> updateOwner(@PathVariable Long id,
+                                                @RequestBody @Valid UpdateOwnerRequest request) {
+        Owner owner = ownerRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
+
+        owner.setType(request.type());
+        owner.setDisplayName(request.displayName());
+        owner.setDocumentId(request.documentId());
+        owner.setPhone(request.phone());
+        owner.setEmail(request.email());
+
+        if (request.companyId() != null) {
+            Company company = companyRepository.findById(request.companyId())
+                    .orElseThrow(() -> new EntityNotFoundException("Empresa no encontrada"));
+            owner.setCompany(company);
+        } else {
+            owner.setCompany(null);
+        }
+
+        return ResponseEntity.ok(OwnerDto.from(ownerRepository.save(owner)));
+    }
+
+    @DeleteMapping("/owners/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<Void> deleteOwner(@PathVariable Long id) {
+        if (!ownerRepository.existsById(id)) {
+            throw new EntityNotFoundException("Propietario no encontrado");
+        }
+        if (!vesselRepository.findByOwnerId(id).isEmpty()) {
+            throw new IllegalArgumentException("No se puede borrar un propietario con embarcaciones asociadas");
+        }
+        ownerRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    private Owner buildOwnerFromRequest(Owner owner, CreateOwnerRequest request) {
         owner.setType(request.type());
         owner.setDisplayName(request.displayName());
         owner.setDocumentId(request.documentId());
@@ -50,8 +92,7 @@ public class FleetController {
                     .orElseThrow(() -> new EntityNotFoundException("Empresa no encontrada"));
             owner.setCompany(company);
         }
-
-        return ResponseEntity.ok(OwnerDto.from(ownerRepository.save(owner)));
+        return owner;
     }
 
     @GetMapping("/vessels")
@@ -67,12 +108,21 @@ public class FleetController {
     @PreAuthorize("hasRole('ADMIN')")
     @Transactional
     public ResponseEntity<VesselDto> createVessel(@RequestBody @Valid CreateVesselRequest request) {
+        return ResponseEntity.ok(VesselDto.from(vesselRepository.save(buildVesselFromCreateRequest(new Vessel(), request))));
+    }
+
+    @PutMapping("/vessels/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<VesselDto> updateVessel(@PathVariable Long id,
+                                                  @RequestBody @Valid UpdateVesselRequest request) {
+        Vessel vessel = vesselRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+
         Owner owner = ownerRepository.findById(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
-
-        Vessel vessel = new Vessel();
         vessel.setName(request.name());
         vessel.setRegistrationNumber(request.registrationNumber());
         vessel.setModel(request.model());
@@ -82,6 +132,34 @@ public class FleetController {
         vessel.setOwner(owner);
 
         return ResponseEntity.ok(VesselDto.from(vesselRepository.save(vessel)));
+    }
+
+    @DeleteMapping("/vessels/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
+    public ResponseEntity<Void> deleteVessel(@PathVariable Long id) {
+        if (!vesselRepository.existsById(id)) {
+            throw new EntityNotFoundException("Embarcacion no encontrada");
+        }
+        vesselRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    private Vessel buildVesselFromCreateRequest(Vessel vessel, CreateVesselRequest request) {
+        Owner owner = ownerRepository.findById(request.ownerId())
+                .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
+
+        List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
+
+        vessel.setName(request.name());
+        vessel.setRegistrationNumber(request.registrationNumber());
+        vessel.setModel(request.model());
+        vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
+        vessel.setEngineLabels(engineLabels);
+        vessel.setLengthMeters(request.lengthMeters());
+        vessel.setOwner(owner);
+
+        return vessel;
     }
 
     private List<String> normalizeEngineLabels(List<String> engineLabels, Integer engineCount) {

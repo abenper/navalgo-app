@@ -3,11 +3,14 @@ package com.navalgo.backend.worker;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
+@Transactional(readOnly = true)
 public class WorkerService {
 
     private final WorkerRepository workerRepository;
@@ -47,11 +50,41 @@ public class WorkerService {
         worker.setActive(true);
         worker.setMustChangePassword(true);
         worker.setCanEditWorkOrders(request.canEditWorkOrders());
+        worker.setContractStartDate(request.contractStartDate() != null ? request.contractStartDate() : LocalDate.now());
 
         Worker saved = workerRepository.save(worker);
         return new CreateWorkerResponse(WorkerDto.from(saved), generatedPassword ? rawPassword : null);
     }
 
+    @Transactional
+    public WorkerDto update(Long workerId, UpdateWorkerRequest request) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+
+        workerRepository.findByEmailIgnoreCase(request.email()).ifPresent(existing -> {
+            if (!existing.getId().equals(workerId)) {
+                throw new IllegalArgumentException("Ya existe un trabajador con ese email");
+            }
+        });
+
+        worker.setFullName(request.fullName());
+        worker.setEmail(request.email());
+        worker.setSpeciality(request.speciality());
+        worker.setRole(request.role());
+        worker.setCanEditWorkOrders(request.canEditWorkOrders());
+        worker.setContractStartDate(request.contractStartDate());
+        return WorkerDto.from(workerRepository.save(worker));
+    }
+
+    @Transactional
+    public void delete(Long workerId) {
+        if (!workerRepository.existsById(workerId)) {
+            throw new EntityNotFoundException("Trabajador no encontrado");
+        }
+        workerRepository.deleteById(workerId);
+    }
+
+    @Transactional
     public ResetWorkerPasswordResponse resetPassword(Long workerId) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
@@ -64,6 +97,7 @@ public class WorkerService {
         return new ResetWorkerPasswordResponse(worker.getId(), worker.getEmail(), temporaryPassword);
     }
 
+    @Transactional
     public WorkerDto setWorkOrderEditPermission(Long workerId, boolean canEditWorkOrders) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
@@ -71,6 +105,7 @@ public class WorkerService {
         return WorkerDto.from(workerRepository.save(worker));
     }
 
+    @Transactional
     public void changeOwnPassword(String email, String currentPassword, String newPassword) {
         if (newPassword == null || newPassword.isBlank() || !isStrongPassword(newPassword)) {
             throw new IllegalArgumentException("La nueva contrasena debe tener minimo 12 caracteres e incluir mayuscula, minuscula, numero y simbolo");
@@ -88,6 +123,7 @@ public class WorkerService {
         workerRepository.save(worker);
     }
 
+    @Transactional
     public WorkerDto setActive(Long workerId, boolean active) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));

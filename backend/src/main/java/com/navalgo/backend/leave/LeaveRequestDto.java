@@ -1,6 +1,7 @@
 package com.navalgo.backend.leave;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 
 public record LeaveRequestDto(
         Long id,
@@ -9,6 +10,7 @@ public record LeaveRequestDto(
         String reason,
         LocalDate startDate,
         LocalDate endDate,
+        long requestedDays,
         LeaveStatus status
 ) {
     public static LeaveRequestDto from(LeaveRequestEntity entity) {
@@ -19,6 +21,7 @@ public record LeaveRequestDto(
                 entity.getReason(),
                 entity.getStartDate(),
                 entity.getEndDate(),
+                ChronoUnit.DAYS.between(entity.getStartDate(), entity.getEndDate()) + 1,
                 entity.getStatus()
         );
     }

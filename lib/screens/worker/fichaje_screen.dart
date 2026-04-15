@@ -43,10 +43,11 @@ class _FichajeScreenState extends State<FichajeScreen> {
     });
 
     try {
-      final entries = await context.read<TimeTrackingService>().getByWorker(
-            token,
-            workerId: workerId,
-          );
+      final timeTrackingService = context.read<TimeTrackingService>();
+      final entries = await timeTrackingService.getByWorker(
+        token,
+        workerId: workerId,
+      );
       if (!mounted) {
         return;
       }
@@ -74,6 +75,8 @@ class _FichajeScreenState extends State<FichajeScreen> {
     final session = context.read<SessionViewModel>();
     final token = session.token;
     final workerId = session.user?.id;
+    final messenger = ScaffoldMessenger.of(context);
+    final timeTrackingService = context.read<TimeTrackingService>();
 
     if (token == null || workerId == null) {
       return;
@@ -81,17 +84,18 @@ class _FichajeScreenState extends State<FichajeScreen> {
 
     try {
       if (_isPunchedIn) {
-        await context.read<TimeTrackingService>().clockOut(token, workerId: workerId);
+        await timeTrackingService.clockOut(token, workerId: workerId);
       } else {
-        await context.read<TimeTrackingService>().clockIn(token, workerId: workerId);
+        await timeTrackingService.clockIn(token, workerId: workerId);
       }
       await _loadEntries();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo fichar: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo fichar: $e')),
+      );
     }
   }
 
@@ -110,6 +114,12 @@ class _FichajeScreenState extends State<FichajeScreen> {
       );
     }
 
+    final todayEntries = _entries.where(_isToday).toList();
+    final totalToday = todayEntries.fold<Duration>(
+      Duration.zero,
+      (acc, item) => acc + _durationForEntry(item),
+    );
+
     return Scaffold(
       body: Center(
         child: Column(
@@ -125,12 +135,16 @@ class _FichajeScreenState extends State<FichajeScreen> {
               _isPunchedIn ? 'Estado: Trabajando' : 'Estado: Fuera de turno',
               style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 40),
+            const SizedBox(height: 16),
+            Text(
+              'Total hoy: ${_formatDuration(totalToday)}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 30),
             ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                backgroundColor:
-                    _isPunchedIn ? Colors.red.shade700 : Colors.green.shade700,
+                backgroundColor: _isPunchedIn ? Colors.red.shade700 : Colors.green.shade700,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -145,21 +159,24 @@ class _FichajeScreenState extends State<FichajeScreen> {
             const Text('Ultimos registros', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 10),
             SizedBox(
-              width: 420,
-              height: 180,
+              width: 520,
+              height: 220,
               child: ListView.builder(
-                itemCount: _entries.length > 4 ? 4 : _entries.length,
+                itemCount: _entries.length > 6 ? 6 : _entries.length,
                 itemBuilder: (context, index) {
                   final item = _entries[index];
+                  final duration = _durationForEntry(item);
                   return Card(
                     child: ListTile(
                       leading: Icon(
                         item.clockOut == null ? Icons.login : Icons.logout,
                         color: item.clockOut == null ? Colors.green : Colors.red,
                       ),
-                      title: Text(item.clockOut == null ? 'Entrada' : 'Jornada cerrada'),
-                      subtitle: Text('In: ${_fmt(item.clockIn)}'),
-                      trailing: Text(item.clockOut == null ? '--' : _fmt(item.clockOut!)),
+                      title: Text(_fmtDate(item.clockIn)),
+                      subtitle: Text(
+                        'Entrada: ${_fmtHour(item.clockIn)} - Salida: ${item.clockOut == null ? '--:--' : _fmtHour(item.clockOut!)}',
+                      ),
+                      trailing: Text(_formatDuration(duration)),
                     ),
                   );
                 },
@@ -171,11 +188,37 @@ class _FichajeScreenState extends State<FichajeScreen> {
     );
   }
 
-  String _fmt(DateTime d) {
-    final hh = d.hour.toString().padLeft(2, '0');
-    final mm = d.minute.toString().padLeft(2, '0');
-    final dd = d.day.toString().padLeft(2, '0');
-    final mo = d.month.toString().padLeft(2, '0');
-    return '$dd/$mo $hh:$mm';
+  bool _isToday(TimeEntry entry) {
+    final now = DateTime.now();
+    final inLocal = entry.clockIn.toLocal();
+    return inLocal.year == now.year && inLocal.month == now.month && inLocal.day == now.day;
+  }
+
+  Duration _durationForEntry(TimeEntry entry) {
+    final out = entry.clockOut?.toLocal() ?? DateTime.now();
+    return out.difference(entry.clockIn.toLocal());
+  }
+
+  String _fmtDate(DateTime d) {
+    final local = d.toLocal();
+    final dd = local.day.toString().padLeft(2, '0');
+    final mm = local.month.toString().padLeft(2, '0');
+    return '$dd/$mm';
+  }
+
+  String _fmtHour(DateTime d) {
+    final local = d.toLocal();
+    final hh = local.hour.toString().padLeft(2, '0');
+    final mm = local.minute.toString().padLeft(2, '0');
+    return '$hh:$mm';
+  }
+
+  String _formatDuration(Duration duration) {
+    if (duration.isNegative) {
+      return '0h 00m';
+    }
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    return '${hours}h ${minutes}m';
   }
 }

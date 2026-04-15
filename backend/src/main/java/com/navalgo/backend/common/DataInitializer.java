@@ -11,6 +11,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
+import java.time.LocalDate;
 
 @Component
 @Profile("dev")
@@ -51,6 +52,7 @@ public class DataInitializer implements CommandLineRunner {
         admin.setActive(true);
         admin.setMustChangePassword(true);
         admin.setCanEditWorkOrders(true);
+        admin.setContractStartDate(LocalDate.now().minusMonths(8));
         workerRepository.save(admin);
 
         Worker worker = new Worker();
@@ -62,6 +64,7 @@ public class DataInitializer implements CommandLineRunner {
         worker.setActive(true);
         worker.setMustChangePassword(true);
         worker.setCanEditWorkOrders(false);
+        worker.setContractStartDate(LocalDate.now().minusMonths(4));
         workerRepository.save(worker);
 
         Company company = new Company();

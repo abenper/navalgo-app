@@ -3,6 +3,8 @@ package com.navalgo.backend.worker;
 import com.navalgo.backend.common.Role;
 import jakarta.persistence.*;
 
+import java.time.LocalDate;
+
 @Entity
 @Table(name = "workers")
 public class Worker {
@@ -35,6 +37,9 @@ public class Worker {
     @Column(nullable = false)
     private boolean canEditWorkOrders = false;
 
+    @Column(nullable = false)
+    private LocalDate contractStartDate = LocalDate.now();
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -61,4 +66,7 @@ public class Worker {
 
     public boolean isCanEditWorkOrders() { return canEditWorkOrders; }
     public void setCanEditWorkOrders(boolean canEditWorkOrders) { this.canEditWorkOrders = canEditWorkOrders; }
+
+    public LocalDate getContractStartDate() { return contractStartDate; }
+    public void setContractStartDate(LocalDate contractStartDate) { this.contractStartDate = contractStartDate; }
 }

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/leave_request.dart';
+import '../../models/worker_profile.dart';
 import '../../services/leave_service.dart';
+import '../../services/worker_service.dart';
 import '../../viewmodels/session_view_model.dart';
 
 class AusenciasScreen extends StatefulWidget {
@@ -16,17 +18,21 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   bool _isLoading = true;
   String? _error;
   List<LeaveRequestModel> _requests = <LeaveRequestModel>[];
+  LeaveBalance? _balance;
+  List<WorkerProfile> _workers = <WorkerProfile>[];
 
   bool get _isAdmin => context.read<SessionViewModel>().user?.role == 'ADMIN';
 
   @override
   void initState() {
     super.initState();
-    _loadRequests();
+    _loadData();
   }
 
-  Future<void> _loadRequests() async {
+  Future<void> _loadData() async {
     final session = context.read<SessionViewModel>();
+    final isAdmin = _isAdmin;
+    final workerService = context.read<WorkerService>();
     final token = session.token;
     if (token == null || token.isEmpty) {
       setState(() {
@@ -45,19 +51,44 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
       final leaveService = context.read<LeaveService>();
       final requests = await leaveService.getLeaveRequests(
         token,
-        workerId: _isAdmin ? null : session.user?.id,
+        workerId: isAdmin ? null : session.user?.id,
       );
+
+      LeaveBalance? balance;
+      if (!isAdmin) {
+        balance = await leaveService.getLeaveBalance(
+          token,
+          workerId: session.user?.id,
+        );
+      }
+
+      List<WorkerProfile> workers = <WorkerProfile>[];
+      if (isAdmin) {
+        workers = await workerService.getWorkers(token);
+      }
+
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
         _requests = requests;
+        _balance = balance;
+        _workers = workers;
       });
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _error = e.toString();
       });
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -67,13 +98,14 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
       builder: (_) => const _FormularioAusenciaDialog(),
     );
 
-    if (result == null) {
+    if (!mounted || result == null) {
       return;
     }
 
     final session = context.read<SessionViewModel>();
     final token = session.token;
     final workerId = session.user?.id;
+    final messenger = ScaffoldMessenger.of(context);
 
     if (token == null || workerId == null) {
       return;
@@ -87,23 +119,71 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         startDate: result.range.start,
         endDate: result.range.end,
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Solicitud enviada')),
-        );
+      if (!mounted) {
+        return;
       }
-      await _loadRequests();
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Solicitud enviada')),
+      );
+      await _loadData();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo crear la solicitud: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo crear la solicitud: $e')),
+      );
+    }
+  }
+
+  Future<void> _adminAssignRequest() async {
+    if (_workers.isEmpty) {
+      return;
+    }
+
+    final result = await showDialog<_AdminAssignLeaveFormResult>(
+      context: context,
+      builder: (_) => _AdminAssignLeaveDialog(workers: _workers),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    final messenger = ScaffoldMessenger.of(context);
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await context.read<LeaveService>().adminAssignLeave(
+        token,
+        workerId: result.workerId,
+        reason: result.reason,
+        startDate: result.range.start,
+        endDate: result.range.end,
+      );
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Vacaciones asignadas y aceptadas correctamente')),
+      );
+      await _loadData();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo asignar la vacacion: $e')),
+      );
     }
   }
 
   Future<void> _updateStatus(int requestId, String status) async {
     final token = context.read<SessionViewModel>().token;
+    final messenger = ScaffoldMessenger.of(context);
     if (token == null) {
       return;
     }
@@ -114,13 +194,14 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         leaveRequestId: requestId,
         status: status,
       );
-      await _loadRequests();
+      await _loadData();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo actualizar la solicitud: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar la solicitud: $e')),
+      );
     }
   }
 
@@ -134,7 +215,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
       return Scaffold(
         body: Center(child: Text(_error!)),
         floatingActionButton: FloatingActionButton(
-          onPressed: _loadRequests,
+          onPressed: _loadData,
           child: const Icon(Icons.refresh),
         ),
       );
@@ -142,94 +223,136 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
 
     return Scaffold(
       body: RefreshIndicator(
-        onRefresh: _loadRequests,
-        child: ListView.builder(
+        onRefresh: _loadData,
+        child: ListView(
           padding: const EdgeInsets.all(16),
-          itemCount: _requests.length,
-          itemBuilder: (context, index) {
-            final req = _requests[index];
-            final color = _statusColor(req.status);
-            return Card(
-              margin: const EdgeInsets.only(bottom: 12),
-              child: ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.12),
-                  child: Icon(Icons.event_note, color: color),
-                ),
-                title: Text(
-                  '${_fmt(req.startDate)} - ${_fmt(req.endDate)}',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                subtitle: Text(
-                  _isAdmin
-                      ? 'Trabajador: ${req.workerName}\nMotivo: ${req.reason}'
-                      : 'Motivo: ${req.reason}',
-                ),
-                isThreeLine: _isAdmin,
-                trailing: _isAdmin && req.status == 'PENDING'
-                    ? Wrap(
-                        spacing: 6,
-                        children: [
-                          IconButton(
-                            tooltip: 'Aprobar',
-                            icon: const Icon(Icons.check_circle, color: Colors.green),
-                            onPressed: () => _updateStatus(req.id, 'APPROVED'),
-                          ),
-                          IconButton(
-                            tooltip: 'Rechazar',
-                            icon: const Icon(Icons.cancel, color: Colors.red),
-                            onPressed: () => _updateStatus(req.id, 'REJECTED'),
-                          ),
-                        ],
-                      )
-                    : Chip(
-                        label: Text(_statusLabel(req.status)),
-                        backgroundColor: color.withValues(alpha: 0.12),
-                        side: BorderSide.none,
+          children: [
+            if (_balance != null)
+              Card(
+                color: Colors.indigo.shade50,
+                margin: const EdgeInsets.only(bottom: 14),
+                child: Padding(
+                  padding: const EdgeInsets.all(14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _isAdmin
+                            ? 'Saldo global de ${_balance!.workerName}'
+                            : 'Tus dias de vacaciones',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Disponibles: ${_balance!.availableDays.toStringAsFixed(1)} dias',
+                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Devengados: ${_balance!.accruedDays.toStringAsFixed(1)} • Consumidos: ${_balance!.consumedDays}',
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            );
-          },
+            ..._requests.map((req) {
+              final color = _statusColor(req.status);
+              final statusLabel = _statusLabel(req.status);
+              final canModerate = _isAdmin && req.status == 'PENDING';
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: color.withValues(alpha: 0.12),
+                    child: Icon(Icons.event_note, color: color),
+                  ),
+                  title: Text(
+                    '${_fmt(req.startDate)} - ${_fmt(req.endDate)} (${req.requestedDays} dias)',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    _isAdmin
+                        ? 'Trabajador: ${req.workerName}\nMotivo: ${req.reason}\nEstado: $statusLabel'
+                        : 'Motivo: ${req.reason}\nEstado: $statusLabel',
+                  ),
+                  isThreeLine: true,
+                  trailing: canModerate
+                      ? Wrap(
+                          spacing: 6,
+                          children: [
+                            IconButton(
+                              tooltip: 'Aceptar',
+                              icon: const Icon(Icons.check_circle, color: Colors.green),
+                              onPressed: () => _updateStatus(req.id, 'APPROVED'),
+                            ),
+                            IconButton(
+                              tooltip: 'Rechazar',
+                              icon: const Icon(Icons.cancel, color: Colors.red),
+                              onPressed: () => _updateStatus(req.id, 'REJECTED'),
+                            ),
+                          ],
+                        )
+                      : Chip(
+                          label: Text(statusLabel),
+                          backgroundColor: color.withValues(alpha: 0.12),
+                          side: BorderSide.none,
+                        ),
+                ),
+              );
+            }),
+          ],
         ),
       ),
-      floatingActionButton: _isAdmin
-          ? null
-          : FloatingActionButton.extended(
-              onPressed: _createRequest,
-              icon: const Icon(Icons.add),
-              label: const Text('Solicitar Ausencia'),
-              backgroundColor: Colors.blue.shade900,
-              foregroundColor: Colors.white,
-            ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: _isAdmin
+              ? Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: _loadData,
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Actualizar'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _adminAssignRequest,
+                        icon: const Icon(Icons.event_available),
+                        label: const Text('Asignar Vacaciones'),
+                      ),
+                    ),
+                  ],
+                )
+              : FilledButton.icon(
+                  onPressed: _createRequest,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Solicitar Ausencia'),
+                ),
+        ),
+      ),
     );
   }
 
   String _fmt(DateTime d) {
-    const months = [
-      'Ene',
-      'Feb',
-      'Mar',
-      'Abr',
-      'May',
-      'Jun',
-      'Jul',
-      'Ago',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dic',
-    ];
-    return '${d.day} ${months[d.month - 1]}';
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    final yy = d.year.toString();
+    return '$dd/$mm/$yy';
   }
 
   String _statusLabel(String status) {
     switch (status) {
       case 'APPROVED':
-        return 'Aprobada';
+        return 'Aceptada';
       case 'REJECTED':
         return 'Rechazada';
       default:
-        return 'Pendiente';
+        return 'Pendiente (A la espera)';
     }
   }
 
@@ -248,6 +371,18 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
 class _LeaveFormResult {
   const _LeaveFormResult({required this.reason, required this.range});
 
+  final String reason;
+  final DateTimeRange range;
+}
+
+class _AdminAssignLeaveFormResult {
+  const _AdminAssignLeaveFormResult({
+    required this.workerId,
+    required this.reason,
+    required this.range,
+  });
+
+  final int workerId;
   final String reason;
   final DateTimeRange range;
 }
@@ -328,8 +463,7 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
               label: Text(
                 _fechas == null
                     ? 'Toca para seleccionar fechas'
-                    : '${_fechas!.start.day}/${_fechas!.start.month}/${_fechas!.start.year} - '
-                          '${_fechas!.end.day}/${_fechas!.end.month}/${_fechas!.end.year}',
+                    : '${_fechas!.start.day}/${_fechas!.start.month}/${_fechas!.start.year} - ${_fechas!.end.day}/${_fechas!.end.month}/${_fechas!.end.year}',
                 style: const TextStyle(fontSize: 16, color: Colors.black87),
               ),
               onPressed: _seleccionarFechas,
@@ -360,9 +494,118 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
               _LeaveFormResult(reason: _motivo, range: _fechas!),
             );
           },
-          child: const Text('Solicitar'),
+          child: const Text('Enviar Solicitud'),
         ),
       ],
     );
+  }
+}
+
+class _AdminAssignLeaveDialog extends StatefulWidget {
+  const _AdminAssignLeaveDialog({required this.workers});
+
+  final List<WorkerProfile> workers;
+
+  @override
+  State<_AdminAssignLeaveDialog> createState() => _AdminAssignLeaveDialogState();
+}
+
+class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
+  String _reason = 'Vacaciones';
+  DateTimeRange? _dates;
+  late int _workerId;
+
+  @override
+  void initState() {
+    super.initState();
+    _workerId = widget.workers.first.id;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Asignar Vacaciones (Aceptada)'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<int>(
+              initialValue: _workerId,
+              decoration: const InputDecoration(
+                labelText: 'Trabajador',
+                border: OutlineInputBorder(),
+              ),
+              items: widget.workers
+                  .map((worker) => DropdownMenuItem<int>(
+                        value: worker.id,
+                        child: Text(worker.fullName),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _workerId = value ?? _workerId),
+            ),
+            const SizedBox(height: 10),
+            TextFormField(
+              initialValue: _reason,
+              decoration: const InputDecoration(
+                labelText: 'Motivo',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) => _reason = value,
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: _pickDates,
+              icon: const Icon(Icons.calendar_month),
+              label: Text(
+                _dates == null
+                    ? 'Seleccionar fechas'
+                    : '${_dates!.start.day}/${_dates!.start.month}/${_dates!.start.year} - ${_dates!.end.day}/${_dates!.end.month}/${_dates!.end.year}',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_dates == null) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Selecciona un rango de fechas')),
+              );
+              return;
+            }
+            Navigator.pop(
+              context,
+              _AdminAssignLeaveFormResult(
+                workerId: _workerId,
+                reason: _reason.trim().isEmpty ? 'Vacaciones' : _reason.trim(),
+                range: _dates!,
+              ),
+            );
+          },
+          child: const Text('Asignar'),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _pickDates() async {
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
+      context: context,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365)),
+      initialDateRange: _dates,
+    );
+
+    if (picked != null) {
+      setState(() {
+        _dates = picked;
+      });
+    }
   }
 }

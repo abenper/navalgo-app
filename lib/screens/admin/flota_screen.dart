@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/owner.dart';
+import '../../models/vessel.dart';
 import '../../services/fleet_service.dart';
 import '../../viewmodels/fleet_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
@@ -21,12 +22,24 @@ class _FlotaScreenState extends State<FlotaScreen> {
     'Auxiliar',
   ];
 
+  final TextEditingController _ownerSearchCtrl = TextEditingController();
+  final TextEditingController _vesselSearchCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<FleetViewModel>().loadFleet();
     });
+    _ownerSearchCtrl.addListener(() => setState(() {}));
+    _vesselSearchCtrl.addListener(() => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _ownerSearchCtrl.dispose();
+    _vesselSearchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _createOwner() async {
@@ -37,7 +50,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
 
     final input = await showDialog<_OwnerInput>(
       context: context,
-      builder: (_) => const _CreateOwnerDialog(),
+      builder: (_) => const _OwnerDialog(),
     );
     if (!mounted || input == null) {
       return;
@@ -68,6 +81,104 @@ class _FlotaScreenState extends State<FlotaScreen> {
     }
   }
 
+  Future<void> _editOwner(Owner owner) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final session = context.read<SessionViewModel>();
+    final fleetService = context.read<FleetService>();
+    final fleetViewModel = context.read<FleetViewModel>();
+
+    final input = await showDialog<_OwnerInput>(
+      context: context,
+      builder: (_) => _OwnerDialog(initialOwner: owner),
+    );
+    if (!mounted || input == null) {
+      return;
+    }
+
+    final token = session.token;
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await fleetService.updateOwner(
+        token,
+        ownerId: owner.id,
+        type: input.type,
+        displayName: input.displayName,
+        documentId: input.documentId,
+        phone: input.phone,
+        email: input.email,
+      );
+      await fleetViewModel.loadFleet();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Propietario actualizado')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo editar el propietario: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteOwner(Owner owner) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar propietario'),
+        content: Text('Se eliminara a ${owner.displayName}.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirm != true) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final session = context.read<SessionViewModel>();
+    final fleetService = context.read<FleetService>();
+    final fleetViewModel = context.read<FleetViewModel>();
+
+    final token = session.token;
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await fleetService.deleteOwner(token, ownerId: owner.id);
+      await fleetViewModel.loadFleet();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Propietario eliminado')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar el propietario: $e')),
+      );
+    }
+  }
+
   Future<void> _createVessel(List<Owner> owners) async {
     final messenger = ScaffoldMessenger.of(context);
     final session = context.read<SessionViewModel>();
@@ -83,7 +194,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
 
     final input = await showDialog<_VesselInput>(
       context: context,
-      builder: (_) => _CreateVesselDialog(owners: owners),
+      builder: (_) => _VesselDialog(owners: owners),
     );
     if (!mounted || input == null) {
       return;
@@ -116,9 +227,128 @@ class _FlotaScreenState extends State<FlotaScreen> {
     }
   }
 
+  Future<void> _editVessel(Vessel vessel, List<Owner> owners) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final session = context.read<SessionViewModel>();
+    final fleetService = context.read<FleetService>();
+    final fleetViewModel = context.read<FleetViewModel>();
+
+    final input = await showDialog<_VesselInput>(
+      context: context,
+      builder: (_) => _VesselDialog(owners: owners, initialVessel: vessel),
+    );
+    if (!mounted || input == null) {
+      return;
+    }
+
+    final token = session.token;
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await fleetService.updateVessel(
+        token,
+        vesselId: vessel.id,
+        name: input.name,
+        registrationNumber: input.registrationNumber,
+        model: input.model,
+        engineCount: input.engineCount,
+        engineLabels: input.engineLabels,
+        lengthMeters: input.lengthMeters,
+        ownerId: input.ownerId,
+      );
+      await fleetViewModel.loadFleet();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Embarcacion actualizada')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo editar la embarcacion: $e')),
+      );
+    }
+  }
+
+  Future<void> _deleteVessel(Vessel vessel) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar embarcacion'),
+        content: Text('Se eliminara ${vessel.name} (${vessel.registrationNumber}).'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirm != true) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final session = context.read<SessionViewModel>();
+    final fleetService = context.read<FleetService>();
+    final fleetViewModel = context.read<FleetViewModel>();
+
+    final token = session.token;
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await fleetService.deleteVessel(token, vesselId: vessel.id);
+      await fleetViewModel.loadFleet();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Embarcacion eliminada')),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar la embarcacion: $e')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<FleetViewModel>();
+    final ownerQuery = _ownerSearchCtrl.text.trim().toLowerCase();
+    final vesselQuery = _vesselSearchCtrl.text.trim().toLowerCase();
+
+    final filteredOwners = vm.owners.where((owner) {
+      if (ownerQuery.isEmpty) {
+        return true;
+      }
+      return owner.displayName.toLowerCase().contains(ownerQuery) ||
+          owner.documentId.toLowerCase().contains(ownerQuery);
+    }).toList();
+
+    final filteredVessels = vm.vessels.where((vessel) {
+      if (vesselQuery.isEmpty) {
+        return true;
+      }
+      return vessel.name.toLowerCase().contains(vesselQuery) ||
+          vessel.ownerName.toLowerCase().contains(vesselQuery) ||
+          vessel.registrationNumber.toLowerCase().contains(vesselQuery);
+    }).toList();
 
     return Scaffold(
       body: vm.isLoading
@@ -135,20 +365,26 @@ class _FlotaScreenState extends State<FlotaScreen> {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 10),
-                      ...vm.owners.map((owner) {
+                      TextField(
+                        controller: _ownerSearchCtrl,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search),
+                          labelText: 'Filtrar por propietario',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...filteredOwners.map((owner) {
                         final esEmpresa = owner.type == 'COMPANY';
                         final vesselCount = vm.vessels.where((v) => v.ownerId == owner.id).length;
                         return Card(
                           margin: const EdgeInsets.only(bottom: 10),
                           child: ListTile(
                             leading: CircleAvatar(
-                              backgroundColor:
-                                  esEmpresa ? Colors.blue.shade50 : Colors.green.shade50,
+                              backgroundColor: esEmpresa ? Colors.blue.shade50 : Colors.green.shade50,
                               child: Icon(
                                 esEmpresa ? Icons.business : Icons.person,
-                                color: esEmpresa
-                                    ? Colors.blue.shade900
-                                    : Colors.green.shade900,
+                                color: esEmpresa ? Colors.blue.shade900 : Colors.green.shade900,
                               ),
                             ),
                             title: Text(
@@ -156,9 +392,27 @@ class _FlotaScreenState extends State<FlotaScreen> {
                               style: const TextStyle(fontWeight: FontWeight.bold),
                             ),
                             subtitle: Text(
-                              '${esEmpresa ? 'Empresa' : 'Particular'} • '
-                              '${owner.documentId} • '
-                              '$vesselCount embarcacion(es)',
+                              '${esEmpresa ? 'Empresa' : 'Particular'} • ${owner.documentId} • $vesselCount embarcacion(es)',
+                            ),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (value) {
+                                if (value == 'edit') {
+                                  _editOwner(owner);
+                                }
+                                if (value == 'delete') {
+                                  _deleteOwner(owner);
+                                }
+                              },
+                              itemBuilder: (context) => const [
+                                PopupMenuItem<String>(
+                                  value: 'edit',
+                                  child: Text('Editar'),
+                                ),
+                                PopupMenuItem<String>(
+                                  value: 'delete',
+                                  child: Text('Eliminar'),
+                                ),
+                              ],
                             ),
                           ),
                         );
@@ -169,7 +423,16 @@ class _FlotaScreenState extends State<FlotaScreen> {
                         style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 10),
-                      ...vm.vessels.map((vessel) => Card(
+                      TextField(
+                        controller: _vesselSearchCtrl,
+                        decoration: const InputDecoration(
+                          prefixIcon: Icon(Icons.search),
+                          labelText: 'Filtrar por embarcacion o propietario',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...filteredVessels.map((vessel) => Card(
                             margin: const EdgeInsets.only(bottom: 10),
                             child: ListTile(
                               leading: CircleAvatar(
@@ -189,6 +452,26 @@ class _FlotaScreenState extends State<FlotaScreen> {
                                 '${vessel.engineLabels.isEmpty ? 'Sin posiciones definidas' : vessel.engineLabels.join(', ')}',
                               ),
                               isThreeLine: true,
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _editVessel(vessel, vm.owners);
+                                  }
+                                  if (value == 'delete') {
+                                    _deleteVessel(vessel);
+                                  }
+                                },
+                                itemBuilder: (context) => const [
+                                  PopupMenuItem<String>(
+                                    value: 'edit',
+                                    child: Text('Editar'),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: 'delete',
+                                    child: Text('Eliminar'),
+                                  ),
+                                ],
+                              ),
                             ),
                           )),
                     ],
@@ -239,19 +522,32 @@ class _OwnerInput {
   final String? email;
 }
 
-class _CreateOwnerDialog extends StatefulWidget {
-  const _CreateOwnerDialog();
+class _OwnerDialog extends StatefulWidget {
+  const _OwnerDialog({this.initialOwner});
+
+  final Owner? initialOwner;
 
   @override
-  State<_CreateOwnerDialog> createState() => _CreateOwnerDialogState();
+  State<_OwnerDialog> createState() => _OwnerDialogState();
 }
 
-class _CreateOwnerDialogState extends State<_CreateOwnerDialog> {
-  final _nameCtrl = TextEditingController();
-  final _docCtrl = TextEditingController();
-  final _phoneCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  String _type = 'PERSON';
+class _OwnerDialogState extends State<_OwnerDialog> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _docCtrl;
+  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _emailCtrl;
+  late String _type;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initialOwner;
+    _nameCtrl = TextEditingController(text: initial?.displayName ?? '');
+    _docCtrl = TextEditingController(text: initial?.documentId ?? '');
+    _phoneCtrl = TextEditingController(text: initial?.phone ?? '');
+    _emailCtrl = TextEditingController(text: initial?.email ?? '');
+    _type = initial?.type ?? 'PERSON';
+  }
 
   @override
   void dispose() {
@@ -264,8 +560,10 @@ class _CreateOwnerDialogState extends State<_CreateOwnerDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.initialOwner != null;
+
     return AlertDialog(
-      title: const Text('Nuevo Propietario'),
+      title: Text(isEditing ? 'Editar Propietario' : 'Nuevo Propietario'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -332,7 +630,7 @@ class _CreateOwnerDialogState extends State<_CreateOwnerDialog> {
               ),
             );
           },
-          child: const Text('Guardar'),
+          child: Text(isEditing ? 'Guardar cambios' : 'Guardar'),
         ),
       ],
     );
@@ -359,30 +657,41 @@ class _VesselInput {
   final int ownerId;
 }
 
-class _CreateVesselDialog extends StatefulWidget {
-  const _CreateVesselDialog({required this.owners});
+class _VesselDialog extends StatefulWidget {
+  const _VesselDialog({required this.owners, this.initialVessel});
 
   final List<Owner> owners;
+  final Vessel? initialVessel;
 
   @override
-  State<_CreateVesselDialog> createState() => _CreateVesselDialogState();
+  State<_VesselDialog> createState() => _VesselDialogState();
 }
 
-class _CreateVesselDialogState extends State<_CreateVesselDialog> {
-  final _nameCtrl = TextEditingController();
-  final _regCtrl = TextEditingController();
-  final _modelCtrl = TextEditingController();
-  final _engineCtrl = TextEditingController();
-  final _lengthCtrl = TextEditingController();
+class _VesselDialogState extends State<_VesselDialog> {
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _regCtrl;
+  late final TextEditingController _modelCtrl;
+  late final TextEditingController _engineCtrl;
+  late final TextEditingController _lengthCtrl;
   late int _ownerId;
   List<String> _enginePositions = <String>[];
 
   @override
   void initState() {
     super.initState();
-    _ownerId = widget.owners.first.id;
-    _engineCtrl.text = '1';
-    _syncEnginePositions(1);
+    final initial = widget.initialVessel;
+    _nameCtrl = TextEditingController(text: initial?.name ?? '');
+    _regCtrl = TextEditingController(text: initial?.registrationNumber ?? '');
+    _modelCtrl = TextEditingController(text: initial?.model ?? '');
+    _engineCtrl = TextEditingController(text: (initial?.engineCount ?? 1).toString());
+    _lengthCtrl = TextEditingController(text: initial?.lengthMeters?.toString() ?? '');
+    _ownerId = initial?.ownerId ?? widget.owners.first.id;
+
+    final count = int.tryParse(_engineCtrl.text) ?? 1;
+    _syncEnginePositions(count);
+    if (initial != null && initial.engineLabels.isNotEmpty) {
+      _enginePositions = _extractBasePositions(initial.engineLabels, count);
+    }
   }
 
   @override
@@ -397,8 +706,10 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isEditing = widget.initialVessel != null;
+
     return AlertDialog(
-      title: const Text('Nueva Embarcacion'),
+      title: Text(isEditing ? 'Editar Embarcacion' : 'Nueva Embarcacion'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -434,9 +745,7 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-              onChanged: (value) {
-                _syncEnginePositions(int.tryParse(value) ?? 0);
-              },
+              onChanged: (value) => _syncEnginePositions(int.tryParse(value) ?? 0),
             ),
             if (_enginePositions.isNotEmpty) ...[
               const SizedBox(height: 10),
@@ -513,7 +822,7 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
               ),
             );
           },
-          child: const Text('Guardar'),
+          child: Text(isEditing ? 'Guardar cambios' : 'Guardar'),
         ),
       ],
     );
@@ -553,5 +862,20 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
       }
       return '$position ${counts[position]}';
     }).toList();
+  }
+
+  List<String> _extractBasePositions(List<String> labels, int count) {
+    final list = labels
+        .map((item) => item.replaceAll(RegExp(r'\s+\d+$'), '').trim())
+        .toList();
+
+    if (list.length >= count) {
+      return list.take(count).toList();
+    }
+
+    return <String>[
+      ...list,
+      ...List<String>.filled(count - list.length, 'Fuera borda'),
+    ];
   }
 }

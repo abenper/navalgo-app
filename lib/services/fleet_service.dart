@@ -61,6 +61,39 @@ class FleetService {
     return Owner.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<Owner> updateOwner(
+    String token, {
+    required int ownerId,
+    required String type,
+    required String displayName,
+    required String documentId,
+    String? phone,
+    String? email,
+    int? companyId,
+  }) async {
+    final data = await _apiClient.put(
+      '/fleet/owners/$ownerId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'type': type,
+        'displayName': displayName,
+        'documentId': documentId,
+        'phone': phone,
+        'email': email,
+        'companyId': companyId,
+      },
+    );
+
+    return Owner.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteOwner(String token, {required int ownerId}) async {
+    await _apiClient.delete(
+      '/fleet/owners/$ownerId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   Future<Vessel> createVessel(
     String token, {
     required String name,
@@ -86,5 +119,40 @@ class FleetService {
     );
 
     return Vessel.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Vessel> updateVessel(
+    String token, {
+    required int vesselId,
+    required String name,
+    required String registrationNumber,
+    String? model,
+    int? engineCount,
+    List<String>? engineLabels,
+    double? lengthMeters,
+    required int ownerId,
+  }) async {
+    final data = await _apiClient.put(
+      '/fleet/vessels/$vesselId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'name': name,
+        'registrationNumber': registrationNumber,
+        'model': model,
+        'engineCount': engineCount,
+        'engineLabels': engineLabels,
+        'lengthMeters': lengthMeters,
+        'ownerId': ownerId,
+      },
+    );
+
+    return Vessel.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteVessel(String token, {required int vesselId}) async {
+    await _apiClient.delete(
+      '/fleet/vessels/$vesselId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
   }
 }

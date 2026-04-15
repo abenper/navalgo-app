@@ -7,13 +7,12 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.LocalDate;
 
-public record CreateWorkerRequest(
+public record UpdateWorkerRequest(
         @NotBlank String fullName,
         @NotBlank @Email String email,
-        String password,
         String speciality,
         @NotNull Role role,
         boolean canEditWorkOrders,
-        LocalDate contractStartDate
+        @NotNull LocalDate contractStartDate
 ) {
 }

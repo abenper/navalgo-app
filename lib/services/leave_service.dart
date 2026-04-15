@@ -62,6 +62,40 @@ class LeaveService {
     return LeaveRequestModel.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<LeaveBalance> getLeaveBalance(
+    String token, {
+    int? workerId,
+  }) async {
+    final data = await _apiClient.get(
+      '/leave-requests/balance',
+      headers: {'Authorization': 'Bearer $token'},
+      queryParameters: workerId != null ? {'workerId': workerId} : null,
+    );
+
+    return LeaveBalance.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<LeaveRequestModel> adminAssignLeave(
+    String token, {
+    required int workerId,
+    required String reason,
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    final data = await _apiClient.post(
+      '/leave-requests/admin-assign',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'workerId': workerId,
+        'reason': reason,
+        'startDate': _asDate(startDate),
+        'endDate': _asDate(endDate),
+      },
+    );
+
+    return LeaveRequestModel.fromJson(data as Map<String, dynamic>);
+  }
+
   String _asDate(DateTime date) {
     final y = date.year.toString().padLeft(4, '0');
     final m = date.month.toString().padLeft(2, '0');

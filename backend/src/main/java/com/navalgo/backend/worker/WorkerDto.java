@@ -2,6 +2,8 @@ package com.navalgo.backend.worker;
 
 import com.navalgo.backend.common.Role;
 
+import java.time.LocalDate;
+
 public record WorkerDto(
         Long id,
         String fullName,
@@ -10,7 +12,8 @@ public record WorkerDto(
         Role role,
     boolean active,
     boolean mustChangePassword,
-    boolean canEditWorkOrders
+    boolean canEditWorkOrders,
+    LocalDate contractStartDate
 ) {
     public static WorkerDto from(Worker worker) {
         return new WorkerDto(
@@ -21,7 +24,8 @@ public record WorkerDto(
                 worker.getRole(),
                 worker.isActive(),
                 worker.isMustChangePassword(),
-                worker.isCanEditWorkOrders()
+                worker.isCanEditWorkOrders(),
+                worker.getContractStartDate()
         );
     }
 }

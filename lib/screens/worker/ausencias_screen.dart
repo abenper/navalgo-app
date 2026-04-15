@@ -46,14 +46,14 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
             margin: const EdgeInsets.only(bottom: 12),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: (req['color'] as Color).withOpacity(0.1),
+                backgroundColor: (req['color'] as Color).withValues(alpha: 0.1),
                 child: Icon(Icons.event_note, color: req['color'] as Color),
               ),
               title: Text('Fechas: ${req['fecha']}', style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text('Motivo: ${req['motivo']}'),
               trailing: Chip(
                 label: Text(req['estado'] as String),
-                backgroundColor: (req['color'] as Color).withOpacity(0.1),
+                backgroundColor: (req['color'] as Color).withValues(alpha: 0.1),
                 labelStyle: TextStyle(color: req['color'] as Color, fontWeight: FontWeight.bold),
                 side: BorderSide.none,
               ),
@@ -139,7 +139,7 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
           const Text('Motivo', style: TextStyle(fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
-            value: _motivo,
+            initialValue: _motivo,
             decoration: InputDecoration(
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

@@ -80,6 +80,52 @@ class ApiClient {
     return _decodeResponse(response);
   }
 
+  Future<dynamic> put(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+
+    late final http.Response response;
+    try {
+      response = await _httpClient
+          .put(
+            uri,
+            headers: _buildHeaders(headers),
+            body: jsonEncode(body ?? <String, dynamic>{}),
+          )
+          .timeout(const Duration(seconds: 12));
+    } on Exception catch (e) {
+      throw ApiException('No se pudo conectar con el servidor', details: '$e');
+    }
+
+    return _decodeResponse(response);
+  }
+
+  Future<dynamic> delete(
+    String path, {
+    Map<String, dynamic>? body,
+    Map<String, String>? headers,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+
+    late final http.Response response;
+    try {
+      response = await _httpClient
+          .delete(
+            uri,
+            headers: _buildHeaders(headers),
+            body: body == null ? null : jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 12));
+    } on Exception catch (e) {
+      throw ApiException('No se pudo conectar con el servidor', details: '$e');
+    }
+
+    return _decodeResponse(response);
+  }
+
   Map<String, String> _buildHeaders(Map<String, String>? headers) {
     return {
       'Content-Type': 'application/json',

@@ -29,6 +29,20 @@ public class WorkerController {
         return ResponseEntity.ok(workerService.create(request));
     }
 
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkerDto> update(@PathVariable Long id,
+                                            @RequestBody @Valid UpdateWorkerRequest request) {
+        return ResponseEntity.ok(workerService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        workerService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @PatchMapping("/{id}/active")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WorkerDto> updateStatus(@PathVariable Long id,
