@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS vessels (
     registration_number VARCHAR(255) NOT NULL UNIQUE,
     model VARCHAR(255),
     engine_count INTEGER,
+    engine_labels VARCHAR(1000),
     length_meters DOUBLE PRECISION,
     owner_id BIGINT NOT NULL,
     CONSTRAINT fk_vessels_owner FOREIGN KEY (owner_id) REFERENCES owners(id)
@@ -135,5 +136,8 @@ ALTER TABLE workers
 
 ALTER TABLE workers
     ADD COLUMN IF NOT EXISTS can_edit_work_orders BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS engine_labels VARCHAR(1000);
 
 COMMIT;

@@ -6,6 +6,7 @@ public record VesselDto(
         String registrationNumber,
         String model,
         Integer engineCount,
+    java.util.List<String> engineLabels,
         Double lengthMeters,
         Long ownerId,
         String ownerName
@@ -17,6 +18,7 @@ public record VesselDto(
                 vessel.getRegistrationNumber(),
                 vessel.getModel(),
                 vessel.getEngineCount(),
+                vessel.getEngineLabels(),
                 vessel.getLengthMeters(),
                 vessel.getOwner().getId(),
                 vessel.getOwner().getDisplayName()

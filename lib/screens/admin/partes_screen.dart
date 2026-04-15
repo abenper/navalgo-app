@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/owner.dart';
+import '../../models/vessel.dart';
 import '../../models/worker_profile.dart';
 import '../../models/work_order.dart';
 import '../../services/work_order_service.dart';
@@ -23,14 +24,19 @@ class _PartesScreenState extends State<PartesScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final session = context.read<SessionViewModel>();
+      final fleetViewModel = context.read<FleetViewModel>();
+      final workersViewModel = context.read<WorkersViewModel>();
+      final workOrdersViewModel = context.read<WorkOrdersViewModel>();
       final user = session.user;
       if (user == null) {
         return;
       }
 
-      await context.read<FleetViewModel>().loadFleet();
-      await context.read<WorkersViewModel>().loadWorkers();
-      await context.read<WorkOrdersViewModel>().loadWorkOrders(
+      await fleetViewModel.loadFleet();
+      if (user.role == 'ADMIN') {
+        await workersViewModel.loadWorkers();
+      }
+      await workOrdersViewModel.loadWorkOrders(
         workerId: user.role == 'ADMIN' ? null : user.id,
       );
     });
@@ -40,53 +46,69 @@ class _PartesScreenState extends State<PartesScreen> {
     final fleetVm = context.read<FleetViewModel>();
     final workersVm = context.read<WorkersViewModel>();
     final session = context.read<SessionViewModel>();
+    final workOrderService = context.read<WorkOrderService>();
+    final workOrdersViewModel = context.read<WorkOrdersViewModel>();
+    final messenger = ScaffoldMessenger.of(context);
     final token = session.token;
     if (token == null) {
       return;
     }
 
     if (fleetVm.owners.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Crea un propietario antes de crear partes')),
       );
       return;
     }
 
-    final input = await showDialog<_CreatePartInput>(
+    final input = await showModalBottomSheet<_CreatePartInput>(
       context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
       builder: (_) => _CreatePartDialog(
         owners: fleetVm.owners,
+        vessels: fleetVm.vessels,
         workers: workersVm.workers,
       ),
     );
 
-    if (input == null) {
+    if (!mounted || input == null) {
       return;
     }
 
     try {
-      await context.read<WorkOrderService>().createWorkOrder(
+      await workOrderService.createWorkOrder(
         token,
         title: input.title,
         description: input.description,
         ownerId: input.ownerId,
         vesselId: input.vesselId,
         workerIds: input.workerIds,
+        engineHours: input.engineHours
+            .map((item) => <String, dynamic>{
+                  'engineLabel': item.engineLabel,
+                  'hours': item.hours,
+                })
+            .toList(),
         priority: input.priority,
       );
 
-      await context.read<WorkOrdersViewModel>().loadWorkOrders();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Parte creado correctamente')),
-        );
+      await workOrdersViewModel.loadWorkOrders(
+        workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
+      );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Parte creado correctamente')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo crear el parte: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo crear el parte: $e')),
+      );
     }
   }
 
@@ -161,13 +183,17 @@ class _PartesScreenState extends State<PartesScreen> {
                     },
                   ),
                 ),
-      floatingActionButton: isAdmin
-          ? FloatingActionButton.extended(
-              onPressed: _openCreateDialog,
-              icon: const Icon(Icons.add),
-              label: const Text('Nuevo Parte'),
-              backgroundColor: Colors.blue.shade900,
-              foregroundColor: Colors.white,
+      bottomNavigationBar: isAdmin
+          ? SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: FilledButton.icon(
+                  onPressed: _openCreateDialog,
+                  icon: const Icon(Icons.assignment_add),
+                  label: const Text('Nuevo Parte'),
+                ),
+              ),
             )
           : null,
     );
@@ -194,6 +220,7 @@ class _CreatePartInput {
     required this.ownerId,
     required this.vesselId,
     required this.workerIds,
+    required this.engineHours,
     required this.priority,
   });
 
@@ -202,13 +229,19 @@ class _CreatePartInput {
   final int ownerId;
   final int? vesselId;
   final List<int> workerIds;
+  final List<EngineHourLog> engineHours;
   final String priority;
 }
 
 class _CreatePartDialog extends StatefulWidget {
-  const _CreatePartDialog({required this.owners, required this.workers});
+  const _CreatePartDialog({
+    required this.owners,
+    required this.vessels,
+    required this.workers,
+  });
 
   final List<Owner> owners;
+  final List<Vessel> vessels;
   final List<WorkerProfile> workers;
 
   @override
@@ -219,124 +252,293 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   final _titleCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
   late int _ownerId;
+  int? _vesselId;
   String _priority = 'NORMAL';
   final Set<int> _selectedWorkers = <int>{};
+  final Map<String, TextEditingController> _engineHoursControllers =
+      <String, TextEditingController>{};
+  String? _validationError;
 
   @override
   void initState() {
     super.initState();
     _ownerId = widget.owners.first.id;
+    _syncVesselSelectionForOwner();
   }
 
   @override
   void dispose() {
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
+    for (final controller in _engineHoursControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Nuevo Parte'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _titleCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Titulo',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _descriptionCtrl,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Descripcion',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<int>(
-              initialValue: _ownerId,
-              decoration: const InputDecoration(
-                labelText: 'Propietario',
-                border: OutlineInputBorder(),
-              ),
-              items: widget.owners
-                  .map((o) => DropdownMenuItem(value: o.id, child: Text(o.displayName)))
-                  .toList(),
-              onChanged: (v) => setState(() => _ownerId = v ?? _ownerId),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _priority,
-              decoration: const InputDecoration(
-                labelText: 'Prioridad',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'LOW', child: Text('LOW')),
-                DropdownMenuItem(value: 'NORMAL', child: Text('NORMAL')),
-                DropdownMenuItem(value: 'HIGH', child: Text('HIGH')),
-                DropdownMenuItem(value: 'URGENT', child: Text('URGENT')),
+    final availableVessels = widget.vessels
+        .where((vessel) => vessel.ownerId == _ownerId)
+        .toList();
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Nuevo Parte',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _titleCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Titulo',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _descriptionCtrl,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    labelText: 'Descripcion',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<int>(
+                  initialValue: _ownerId,
+                  decoration: const InputDecoration(
+                    labelText: 'Propietario',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: widget.owners
+                      .map((o) => DropdownMenuItem(value: o.id, child: Text(o.displayName)))
+                      .toList(),
+                  onChanged: (v) {
+                    setState(() {
+                      _ownerId = v ?? _ownerId;
+                    });
+                    _syncVesselSelectionForOwner();
+                  },
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<int?>(
+                  initialValue: _vesselId,
+                  decoration: const InputDecoration(
+                    labelText: 'Embarcacion',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(
+                      value: null,
+                      child: Text('Sin embarcacion'),
+                    ),
+                    ...availableVessels.map(
+                      (vessel) => DropdownMenuItem<int?>(
+                        value: vessel.id,
+                        child: Text(vessel.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _vesselId = value;
+                    });
+                    _syncEngineHoursForSelectedVessel();
+                  },
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  initialValue: _priority,
+                  decoration: const InputDecoration(
+                    labelText: 'Prioridad',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'LOW', child: Text('LOW')),
+                    DropdownMenuItem(value: 'NORMAL', child: Text('NORMAL')),
+                    DropdownMenuItem(value: 'HIGH', child: Text('HIGH')),
+                    DropdownMenuItem(value: 'URGENT', child: Text('URGENT')),
+                  ],
+                  onChanged: (v) => setState(() => _priority = v ?? 'NORMAL'),
+                ),
+                if (_engineHoursControllers.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Horas de motor',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  ..._engineHoursControllers.entries.map((entry) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: TextField(
+                        controller: entry.value,
+                        keyboardType: TextInputType.number,
+                        decoration: InputDecoration(
+                          labelText: entry.key,
+                          hintText: 'Horas',
+                          border: const OutlineInputBorder(),
+                        ),
+                      ),
+                    );
+                  }),
+                ],
+                const SizedBox(height: 10),
+                const Text(
+                  'Asignar trabajadores',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 4),
+                SizedBox(
+                  height: 180,
+                  child: ListView(
+                    children: widget.workers.map((worker) {
+                      final selected = _selectedWorkers.contains(worker.id);
+                      return CheckboxListTile(
+                        value: selected,
+                        title: Text(worker.fullName),
+                        subtitle: Text(worker.role),
+                        onChanged: (v) {
+                          setState(() {
+                            if (v == true) {
+                              _selectedWorkers.add(worker.id);
+                            } else {
+                              _selectedWorkers.remove(worker.id);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ),
+                if (_validationError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    _validationError!,
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Cancelar'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _submit,
+                        child: const Text('Crear'),
+                      ),
+                    ),
+                  ],
+                ),
               ],
-              onChanged: (v) => setState(() => _priority = v ?? 'NORMAL'),
             ),
-            const SizedBox(height: 10),
-            const Align(
-              alignment: Alignment.centerLeft,
-              child: Text('Asignar trabajadores', style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 180,
-              child: ListView(
-                children: widget.workers.map((worker) {
-                  final selected = _selectedWorkers.contains(worker.id);
-                  return CheckboxListTile(
-                    value: selected,
-                    title: Text(worker.fullName),
-                    subtitle: Text(worker.role),
-                    onChanged: (v) {
-                      setState(() {
-                        if (v == true) {
-                          _selectedWorkers.add(worker.id);
-                        } else {
-                          _selectedWorkers.remove(worker.id);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(
-              context,
-              _CreatePartInput(
-                title: _titleCtrl.text.trim(),
-                description: _descriptionCtrl.text.trim(),
-                ownerId: _ownerId,
-                vesselId: null,
-                workerIds: _selectedWorkers.toList(),
-                priority: _priority,
-              ),
-            );
-          },
-          child: const Text('Crear'),
-        ),
-      ],
     );
+  }
+
+  void _submit() {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      setState(() {
+        _validationError = 'El titulo es obligatorio.';
+      });
+      return;
+    }
+
+    final engineHours = <EngineHourLog>[];
+    for (final entry in _engineHoursControllers.entries) {
+      final hours = int.tryParse(entry.value.text.trim());
+      if (hours == null) {
+        setState(() {
+          _validationError = 'Rellena las horas de todos los motores con numeros enteros.';
+        });
+        return;
+      }
+      engineHours.add(EngineHourLog(engineLabel: entry.key, hours: hours));
+    }
+
+    Navigator.pop(
+      context,
+      _CreatePartInput(
+        title: title,
+        description: _descriptionCtrl.text.trim(),
+        ownerId: _ownerId,
+        vesselId: _vesselId,
+        workerIds: _selectedWorkers.toList(),
+        engineHours: engineHours,
+        priority: _priority,
+      ),
+    );
+  }
+
+  void _syncVesselSelectionForOwner() {
+    final vessels = widget.vessels.where((vessel) => vessel.ownerId == _ownerId).toList();
+    if (vessels.isEmpty) {
+      _vesselId = null;
+    } else if (_vesselId == null || !vessels.any((vessel) => vessel.id == _vesselId)) {
+      _vesselId = vessels.first.id;
+    }
+    _syncEngineHoursForSelectedVessel();
+  }
+
+  void _syncEngineHoursForSelectedVessel() {
+    final vessel = widget.vessels.where((item) => item.id == _vesselId).cast<Vessel?>().firstOrNull;
+    final labels = vessel == null ? <String>[] : _resolveEngineLabels(vessel);
+
+    final existingValues = <String, String>{
+      for (final entry in _engineHoursControllers.entries) entry.key: entry.value.text,
+    };
+
+    for (final controller in _engineHoursControllers.values) {
+      controller.dispose();
+    }
+    _engineHoursControllers
+      ..clear()
+      ..addEntries(
+        labels.map(
+          (label) => MapEntry(
+            label,
+            TextEditingController(text: existingValues[label] ?? ''),
+          ),
+        ),
+      );
+
+    if (mounted) {
+      setState(() {
+        _validationError = null;
+      });
+    }
+  }
+
+  List<String> _resolveEngineLabels(Vessel vessel) {
+    if (vessel.engineLabels.isNotEmpty) {
+      return vessel.engineLabels;
+    }
+
+    final count = vessel.engineCount ?? 0;
+    return List<String>.generate(count, (index) => 'Motor ${index + 1}');
   }
 }

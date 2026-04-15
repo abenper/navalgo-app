@@ -1,4 +1,5 @@
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 import '../models/user.dart'; // Tu modelo de usuario
 import '../config/api_config.dart';
 import 'network/api_client.dart';
@@ -25,7 +26,7 @@ class AuthService {
       final Map<String, dynamic> mapped = _mapLoginResponse(data);
       return User.fromJson(mapped);
     } on ApiException catch (e) {
-      throw Exception('Fallo al iniciar sesion: ${e.message}');
+      throw Exception(_mapLoginError(e));
     } on FormatException {
       throw Exception('La respuesta del servidor no tiene el formato esperado.');
     }
@@ -92,5 +93,40 @@ class AuthService {
     }
 
     throw Exception('Usuario no encontrado en modo mock.');
+  }
+
+  String _mapLoginError(ApiException exception) {
+    final serverMessage = _extractServerMessage(exception.details);
+
+    if (exception.statusCode == 400) {
+      if (serverMessage == 'Credenciales invalidas') {
+        return 'Correo o contrasena incorrectos.';
+      }
+      if (serverMessage == 'Usuario inactivo') {
+        return 'Tu cuenta esta desactivada. Contacta con el administrador.';
+      }
+    }
+
+    return serverMessage ?? 'No se pudo iniciar sesion en este momento.';
+  }
+
+  String? _extractServerMessage(String? rawDetails) {
+    if (rawDetails == null || rawDetails.isEmpty) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(rawDetails);
+      if (decoded is Map<String, dynamic>) {
+        final value = decoded['message'];
+        if (value is String && value.isNotEmpty) {
+          return value;
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return null;
   }
 }

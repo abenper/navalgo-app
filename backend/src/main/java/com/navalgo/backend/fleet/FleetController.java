@@ -70,14 +70,34 @@ public class FleetController {
         Owner owner = ownerRepository.findById(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
+        List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
+
         Vessel vessel = new Vessel();
         vessel.setName(request.name());
         vessel.setRegistrationNumber(request.registrationNumber());
         vessel.setModel(request.model());
-        vessel.setEngineCount(request.engineCount());
+        vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
+        vessel.setEngineLabels(engineLabels);
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
         return ResponseEntity.ok(VesselDto.from(vesselRepository.save(vessel)));
+    }
+
+    private List<String> normalizeEngineLabels(List<String> engineLabels, Integer engineCount) {
+        if (engineLabels == null || engineLabels.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> normalized = engineLabels.stream()
+                .map(label -> label == null ? "" : label.trim())
+                .filter(label -> !label.isEmpty())
+                .toList();
+
+        if (engineCount != null && engineCount > 0 && normalized.size() != engineCount) {
+            throw new IllegalArgumentException("La cantidad de motores no coincide con las posiciones indicadas");
+        }
+
+        return normalized;
     }
 }

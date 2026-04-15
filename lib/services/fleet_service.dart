@@ -67,6 +67,7 @@ class FleetService {
     required String registrationNumber,
     String? model,
     int? engineCount,
+    List<String>? engineLabels,
     double? lengthMeters,
     required int ownerId,
   }) async {
@@ -78,6 +79,7 @@ class FleetService {
         'registrationNumber': registrationNumber,
         'model': model,
         'engineCount': engineCount,
+        'engineLabels': engineLabels,
         'lengthMeters': lengthMeters,
         'ownerId': ownerId,
       },

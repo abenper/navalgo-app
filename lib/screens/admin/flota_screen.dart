@@ -14,6 +14,13 @@ class FlotaScreen extends StatefulWidget {
 }
 
 class _FlotaScreenState extends State<FlotaScreen> {
+  static const List<String> _enginePositionOptions = <String>[
+    'Fuera borda',
+    'Babor',
+    'Estribor',
+    'Auxiliar',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -23,21 +30,26 @@ class _FlotaScreenState extends State<FlotaScreen> {
   }
 
   Future<void> _createOwner() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final session = context.read<SessionViewModel>();
+    final fleetService = context.read<FleetService>();
+    final fleetViewModel = context.read<FleetViewModel>();
+
     final input = await showDialog<_OwnerInput>(
       context: context,
       builder: (_) => const _CreateOwnerDialog(),
     );
-    if (input == null) {
+    if (!mounted || input == null) {
       return;
     }
 
-    final token = context.read<SessionViewModel>().token;
+    final token = session.token;
     if (token == null) {
       return;
     }
 
     try {
-      await context.read<FleetService>().createOwner(
+      await fleetService.createOwner(
         token,
         type: input.type,
         displayName: input.displayName,
@@ -45,19 +57,25 @@ class _FlotaScreenState extends State<FlotaScreen> {
         phone: input.phone,
         email: input.email,
       );
-      await context.read<FleetViewModel>().loadFleet();
+      await fleetViewModel.loadFleet();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo crear el propietario: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo crear el propietario: $e')),
+      );
     }
   }
 
   Future<void> _createVessel(List<Owner> owners) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final session = context.read<SessionViewModel>();
+    final fleetService = context.read<FleetService>();
+    final fleetViewModel = context.read<FleetViewModel>();
+
     if (owners.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(content: Text('Primero crea un propietario')),
       );
       return;
@@ -67,32 +85,34 @@ class _FlotaScreenState extends State<FlotaScreen> {
       context: context,
       builder: (_) => _CreateVesselDialog(owners: owners),
     );
-    if (input == null) {
+    if (!mounted || input == null) {
       return;
     }
 
-    final token = context.read<SessionViewModel>().token;
+    final token = session.token;
     if (token == null) {
       return;
     }
 
     try {
-      await context.read<FleetService>().createVessel(
+      await fleetService.createVessel(
         token,
         name: input.name,
         registrationNumber: input.registrationNumber,
         model: input.model,
         engineCount: input.engineCount,
+        engineLabels: input.engineLabels,
         lengthMeters: input.lengthMeters,
         ownerId: input.ownerId,
       );
-      await context.read<FleetViewModel>().loadFleet();
+      await fleetViewModel.loadFleet();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo crear la embarcacion: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo crear la embarcacion: $e')),
+      );
     }
   }
 
@@ -165,7 +185,8 @@ class _FlotaScreenState extends State<FlotaScreen> {
                               ),
                               subtitle: Text(
                                 '${vessel.registrationNumber} • ${vessel.ownerName}\n'
-                                'Modelo: ${vessel.model ?? 'N/D'} • Motores: ${vessel.engineCount ?? 0}',
+                                'Modelo: ${vessel.model ?? 'N/D'} • Motores: ${vessel.engineCount ?? 0}\n'
+                                '${vessel.engineLabels.isEmpty ? 'Sin posiciones definidas' : vessel.engineLabels.join(', ')}',
                               ),
                               isThreeLine: true,
                             ),
@@ -173,28 +194,30 @@ class _FlotaScreenState extends State<FlotaScreen> {
                     ],
                   ),
                 ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          FloatingActionButton.extended(
-            heroTag: 'fab-owner',
-            onPressed: _createOwner,
-            icon: const Icon(Icons.person_add),
-            label: const Text('Nuevo Propietario'),
-            backgroundColor: Colors.blue.shade900,
-            foregroundColor: Colors.white,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _createOwner,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Nuevo Propietario'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => _createVessel(vm.owners),
+                  icon: const Icon(Icons.directions_boat),
+                  label: const Text('Nueva Embarcacion'),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 10),
-          FloatingActionButton.extended(
-            heroTag: 'fab-vessel',
-            onPressed: () => _createVessel(vm.owners),
-            icon: const Icon(Icons.add),
-            label: const Text('Nueva Embarcacion'),
-            backgroundColor: Colors.orange.shade800,
-            foregroundColor: Colors.white,
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -322,6 +345,7 @@ class _VesselInput {
     required this.registrationNumber,
     this.model,
     this.engineCount,
+    required this.engineLabels,
     this.lengthMeters,
     required this.ownerId,
   });
@@ -330,6 +354,7 @@ class _VesselInput {
   final String registrationNumber;
   final String? model;
   final int? engineCount;
+  final List<String> engineLabels;
   final double? lengthMeters;
   final int ownerId;
 }
@@ -350,11 +375,14 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
   final _engineCtrl = TextEditingController();
   final _lengthCtrl = TextEditingController();
   late int _ownerId;
+  List<String> _enginePositions = <String>[];
 
   @override
   void initState() {
     super.initState();
     _ownerId = widget.owners.first.id;
+    _engineCtrl.text = '1';
+    _syncEnginePositions(1);
   }
 
   @override
@@ -406,7 +434,44 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
+              onChanged: (value) {
+                _syncEnginePositions(int.tryParse(value) ?? 0);
+              },
             ),
+            if (_enginePositions.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Posicion de cada motor',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...List<Widget>.generate(_enginePositions.length, (index) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: DropdownButtonFormField<String>(
+                    initialValue: _enginePositions[index],
+                    decoration: InputDecoration(
+                      labelText: 'Motor ${index + 1}',
+                      border: const OutlineInputBorder(),
+                    ),
+                    items: _FlotaScreenState._enginePositionOptions
+                        .map((position) => DropdownMenuItem(
+                              value: position,
+                              child: Text(position),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _enginePositions[index] = value ?? 'Fuera borda';
+                      });
+                    },
+                  ),
+                );
+              }),
+            ],
             const SizedBox(height: 10),
             TextField(
               controller: _lengthCtrl,
@@ -442,6 +507,7 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
                 registrationNumber: _regCtrl.text.trim(),
                 model: _modelCtrl.text.trim(),
                 engineCount: int.tryParse(_engineCtrl.text.trim()),
+                engineLabels: _buildEngineLabels(_enginePositions),
                 lengthMeters: double.tryParse(_lengthCtrl.text.trim()),
                 ownerId: _ownerId,
               ),
@@ -451,5 +517,41 @@ class _CreateVesselDialogState extends State<_CreateVesselDialog> {
         ),
       ],
     );
+  }
+
+  void _syncEnginePositions(int count) {
+    final safeCount = count < 0 ? 0 : count;
+    setState(() {
+      if (safeCount == 0) {
+        _enginePositions = <String>[];
+        return;
+      }
+
+      if (_enginePositions.length < safeCount) {
+        _enginePositions = <String>[
+          ..._enginePositions,
+          ...List<String>.filled(safeCount - _enginePositions.length, 'Fuera borda'),
+        ];
+      } else {
+        _enginePositions = _enginePositions.take(safeCount).toList();
+      }
+    });
+  }
+
+  List<String> _buildEngineLabels(List<String> positions) {
+    final counts = <String, int>{};
+    final totals = <String, int>{};
+
+    for (final position in positions) {
+      totals[position] = (totals[position] ?? 0) + 1;
+    }
+
+    return positions.map((position) {
+      counts[position] = (counts[position] ?? 0) + 1;
+      if ((totals[position] ?? 0) == 1) {
+        return position;
+      }
+      return '$position ${counts[position]}';
+    }).toList();
   }
 }

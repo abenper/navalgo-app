@@ -45,6 +45,7 @@ class WorkOrderService {
     required int ownerId,
     int? vesselId,
     List<int>? workerIds,
+    List<Map<String, dynamic>>? engineHours,
     String priority = 'NORMAL',
   }) async {
     final data = await _apiClient.post(
@@ -56,6 +57,7 @@ class WorkOrderService {
         'ownerId': ownerId,
         'vesselId': vesselId,
         'workerIds': workerIds,
+        'engineHours': engineHours,
         'priority': priority,
       },
     );

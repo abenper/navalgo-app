@@ -23,21 +23,26 @@ class _EquipoScreenState extends State<EquipoScreen> {
   }
 
   Future<void> _openCreateWorkerDialog() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final session = context.read<SessionViewModel>();
+    final workerService = context.read<WorkerService>();
+    final workersViewModel = context.read<WorkersViewModel>();
+
     final result = await showDialog<_CreateWorkerInput>(
       context: context,
       builder: (_) => const _CreateWorkerDialog(),
     );
-    if (result == null) {
+    if (!mounted || result == null) {
       return;
     }
 
-    final token = context.read<SessionViewModel>().token;
+    final token = session.token;
     if (token == null) {
       return;
     }
 
     try {
-      final response = await context.read<WorkerService>().createWorker(
+      final response = await workerService.createWorker(
         token,
         fullName: result.fullName,
         email: result.email,
@@ -46,100 +51,115 @@ class _EquipoScreenState extends State<EquipoScreen> {
         canEditWorkOrders: result.canEditWorkOrders,
       );
 
-      await context.read<WorkersViewModel>().loadWorkers();
+      await workersViewModel.loadWorkers();
 
-      if (mounted) {
-        final tempPwd = response.temporaryPassword;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              tempPwd == null || tempPwd.isEmpty
-                  ? 'Trabajador creado'
-                  : 'Trabajador creado. Password temporal: $tempPwd',
-            ),
-            duration: const Duration(seconds: 8),
+      if (!mounted) {
+        return;
+      }
+      final tempPwd = response.temporaryPassword;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            tempPwd == null || tempPwd.isEmpty
+                ? 'Trabajador creado'
+                : 'Trabajador creado. Password temporal: $tempPwd',
           ),
-        );
-      }
+          duration: const Duration(seconds: 8),
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo crear el trabajador: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo crear el trabajador: $e')),
+      );
     }
   }
 
   Future<void> _toggleActive(WorkerProfile worker, bool active) async {
     final token = context.read<SessionViewModel>().token;
+    final workerService = context.read<WorkerService>();
+    final workersViewModel = context.read<WorkersViewModel>();
+    final messenger = ScaffoldMessenger.of(context);
     if (token == null) {
       return;
     }
 
     try {
-      await context.read<WorkerService>().updateActive(
+      await workerService.updateActive(
         token,
         workerId: worker.id,
         active: active,
       );
-      await context.read<WorkersViewModel>().loadWorkers();
+      await workersViewModel.loadWorkers();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo actualizar estado: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar estado: $e')),
+      );
     }
   }
 
   Future<void> _toggleEditPermission(WorkerProfile worker, bool enabled) async {
     final token = context.read<SessionViewModel>().token;
+    final workerService = context.read<WorkerService>();
+    final workersViewModel = context.read<WorkersViewModel>();
+    final messenger = ScaffoldMessenger.of(context);
     if (token == null) {
       return;
     }
 
     try {
-      await context.read<WorkerService>().updateWorkOrderPermission(
+      await workerService.updateWorkOrderPermission(
         token,
         workerId: worker.id,
         canEditWorkOrders: enabled,
       );
-      await context.read<WorkersViewModel>().loadWorkers();
+      await workersViewModel.loadWorkers();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo actualizar permiso: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar permiso: $e')),
+      );
     }
   }
 
   Future<void> _resetPassword(WorkerProfile worker) async {
     final token = context.read<SessionViewModel>().token;
+    final workerService = context.read<WorkerService>();
+    final workersViewModel = context.read<WorkersViewModel>();
+    final messenger = ScaffoldMessenger.of(context);
     if (token == null) {
       return;
     }
 
     try {
-      final temporaryPassword = await context.read<WorkerService>().resetPassword(
+      final temporaryPassword = await workerService.resetPassword(
         token,
         workerId: worker.id,
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Nueva password temporal para ${worker.email}: $temporaryPassword'),
-            duration: const Duration(seconds: 10),
-          ),
-        );
+      if (!mounted) {
+        return;
       }
-      await context.read<WorkersViewModel>().loadWorkers();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Nueva password temporal para ${worker.email}: $temporaryPassword'),
+          duration: const Duration(seconds: 10),
+        ),
+      );
+      await workersViewModel.loadWorkers();
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No se pudo resetear la password: $e')),
-        );
+      if (!mounted) {
+        return;
       }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo resetear la password: $e')),
+      );
     }
   }
 
@@ -212,12 +232,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
                     },
                   ),
                 ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateWorkerDialog,
-        icon: const Icon(Icons.add),
-        label: const Text('Crear Trabajador'),
-        backgroundColor: Colors.blue.shade900,
-        foregroundColor: Colors.white,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: FilledButton.icon(
+            onPressed: _openCreateWorkerDialog,
+            icon: const Icon(Icons.person_add),
+            label: const Text('Crear Trabajador'),
+          ),
+        ),
       ),
     );
   }

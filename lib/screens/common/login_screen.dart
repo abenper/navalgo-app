@@ -144,6 +144,44 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  void _showLoginFeedback(String message) {
+    final theme = Theme.of(context);
+    final isCredentialsError = message.contains('incorrectos') || message.contains('desactivada');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        backgroundColor: isCredentialsError
+            ? const Color(0xFF8C2F39)
+            : theme.colorScheme.errorContainer,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        content: Row(
+          children: [
+            Icon(
+              isCredentialsError ? Icons.lock_person : Icons.error_outline,
+              color: isCredentialsError
+                  ? Colors.white
+                  : theme.colorScheme.onErrorContainer,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: isCredentialsError
+                      ? Colors.white
+                      : theme.colorScheme.onErrorContainer,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Usamos context.watch para que la UI se reconstruya cuando cambie el ViewModel
@@ -305,8 +343,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                             _openShellForRole(currentUser.role);
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(loginViewModel.errorMessage ?? 'Error desconocido')),
+                            _showLoginFeedback(
+                              loginViewModel.errorMessage ?? 'No se pudo iniciar sesion.',
                             );
                           }
                         },
