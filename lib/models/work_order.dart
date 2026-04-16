@@ -42,6 +42,21 @@ class WorkOrderAttachmentItem {
   final bool audioRemoved;
 
   factory WorkOrderAttachmentItem.fromJson(Map<String, dynamic> json) {
+    double? parseDouble(dynamic value) {
+      if (value is num) {
+        return value.toDouble();
+      }
+      return double.tryParse(value?.toString() ?? '');
+    }
+
+    bool parseBool(dynamic value) {
+      if (value is bool) {
+        return value;
+      }
+      final raw = value?.toString().toLowerCase().trim();
+      return raw == 'true' || raw == '1' || raw == 'yes';
+    }
+
     final rawId = json['id'];
     final rawCapturedAt = json['capturedAt'];
     final DateTime? capturedAt = rawCapturedAt is String
@@ -60,12 +75,12 @@ class WorkOrderAttachmentItem {
       id: rawId is num ? rawId.toInt() : int.tryParse(rawId?.toString() ?? ''),
       fileUrl: rawFileUrl,
       fileType: normalizedFileType,
-      originalFileName: json['originalFileName'] as String?,
+      originalFileName: json['originalFileName']?.toString(),
       capturedAt: capturedAt,
-      latitude: (json['latitude'] as num?)?.toDouble(),
-      longitude: (json['longitude'] as num?)?.toDouble(),
-      watermarked: json['watermarked'] as bool? ?? false,
-      audioRemoved: json['audioRemoved'] as bool? ?? false,
+      latitude: parseDouble(json['latitude']),
+      longitude: parseDouble(json['longitude']),
+      watermarked: parseBool(json['watermarked']),
+      audioRemoved: parseBool(json['audioRemoved']),
     );
   }
 
@@ -128,6 +143,14 @@ class WorkOrder {
   final String? signedByWorkerName;
 
   factory WorkOrder.fromJson(Map<String, dynamic> json) {
+    String? asNullableString(dynamic value) {
+      if (value == null) {
+        return null;
+      }
+      final str = value.toString();
+      return str.trim().isEmpty ? null : str;
+    }
+
     final rawCreatedAt = json['createdAt'];
     final DateTime createdAt = rawCreatedAt is String
       ? DateTime.parse(rawCreatedAt)
@@ -188,25 +211,25 @@ class WorkOrder {
       title: (json['title'] as String?)?.trim().isNotEmpty == true
         ? (json['title'] as String).trim()
         : 'Parte sin titulo',
-      description: json['description'] as String?,
-      status: (json['status'] as String?) ?? 'OPEN',
-      priority: (json['priority'] as String?) ?? 'NORMAL',
+      description: asNullableString(json['description']),
+      status: asNullableString(json['status']) ?? 'OPEN',
+      priority: asNullableString(json['priority']) ?? 'NORMAL',
       ownerId: rawOwnerId is num ? rawOwnerId.toInt() : 0,
       ownerName: (json['ownerName'] as String?)?.trim().isNotEmpty == true
         ? (json['ownerName'] as String).trim()
         : 'Propietario sin nombre',
       vesselId: rawVesselId is num ? rawVesselId.toInt() : null,
-      vesselName: json['vesselName'] as String?,
+      vesselName: asNullableString(json['vesselName']),
       workerIds: workerIds,
       workerNames: workerNames,
       engineHours: engineHours,
       attachmentUrls: attachmentUrls,
       attachments: attachments,
       createdAt: createdAt,
-      signatureUrl: json['signatureUrl'] as String?,
+      signatureUrl: asNullableString(json['signatureUrl']),
       signedAt: signedAt,
       signedByWorkerId: rawSignedByWorkerId is num ? rawSignedByWorkerId.toInt() : null,
-      signedByWorkerName: json['signedByWorkerName'] as String?,
+      signedByWorkerName: asNullableString(json['signedByWorkerName']),
     );
   }
 }
