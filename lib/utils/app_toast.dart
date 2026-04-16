@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../theme/navalgo_theme.dart';
+
 class AppToast {
   static void info(BuildContext context, String message) {
     _show(
       context,
       message,
-      backgroundColor: const Color(0xFF0B57D0),
+      backgroundColor: NavalgoColors.deepSea,
       icon: Icons.info_outline,
     );
   }
@@ -14,7 +16,7 @@ class AppToast {
     _show(
       context,
       message,
-      backgroundColor: const Color(0xFF1B8F3A),
+      backgroundColor: NavalgoColors.kelp,
       icon: Icons.check_circle_outline,
     );
   }
@@ -23,7 +25,7 @@ class AppToast {
     _show(
       context,
       message,
-      backgroundColor: const Color(0xFFB26A00),
+      backgroundColor: NavalgoColors.sand,
       icon: Icons.warning_amber_rounded,
     );
   }
@@ -32,7 +34,7 @@ class AppToast {
     _show(
       context,
       message,
-      backgroundColor: const Color(0xFF8C2F39),
+      backgroundColor: NavalgoColors.alert,
       icon: Icons.error_outline,
     );
   }
@@ -56,7 +58,12 @@ class AppToast {
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                style: TextStyle(
+                  color: backgroundColor == NavalgoColors.sand
+                      ? NavalgoColors.ink
+                      : Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ],

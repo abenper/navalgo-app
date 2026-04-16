@@ -1,5 +1,6 @@
 package com.navalgo.backend.workorder;
 
+import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.fleet.Owner;
 import com.navalgo.backend.fleet.OwnerRepository;
 import com.navalgo.backend.fleet.Vessel;
@@ -26,19 +27,22 @@ public class WorkOrderService {
     private final WorkerRepository workerRepository;
     private final NotificationService notificationService;
     private final WorkOrderMediaService workOrderMediaService;
+    private final InputSanitizer inputSanitizer;
 
     public WorkOrderService(WorkOrderRepository workOrderRepository,
                             OwnerRepository ownerRepository,
                             VesselRepository vesselRepository,
                             WorkerRepository workerRepository,
                             NotificationService notificationService,
-                            WorkOrderMediaService workOrderMediaService) {
+                            WorkOrderMediaService workOrderMediaService,
+                            InputSanitizer inputSanitizer) {
         this.workOrderRepository = workOrderRepository;
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.workerRepository = workerRepository;
         this.notificationService = notificationService;
         this.workOrderMediaService = workOrderMediaService;
+        this.inputSanitizer = inputSanitizer;
     }
 
     public List<WorkOrderDto> findAll() {
@@ -103,8 +107,8 @@ public class WorkOrderService {
         }
 
         WorkOrder workOrder = new WorkOrder();
-        workOrder.setTitle(request.title());
-        workOrder.setDescription(request.description());
+        workOrder.setTitle(inputSanitizer.requiredText(request.title(), "El titulo", 255));
+        workOrder.setDescription(inputSanitizer.optionalText(request.description(), 3000));
         workOrder.setOwner(owner);
         workOrder.setVessel(vessel);
         workOrder.setPriority(request.priority() == null ? WorkOrderPriority.NORMAL : request.priority());
@@ -118,7 +122,7 @@ public class WorkOrderService {
             for (EngineHourRequest engineReq : request.engineHours()) {
                 EngineHourLog log = new EngineHourLog();
                 log.setWorkOrder(workOrder);
-                log.setEngineLabel(engineReq.engineLabel());
+                log.setEngineLabel(inputSanitizer.requiredText(engineReq.engineLabel(), "La etiqueta de motor", 255));
                 log.setHours(engineReq.hours());
                 workOrder.getEngineHourLogs().add(log);
             }
@@ -133,7 +137,7 @@ public class WorkOrderService {
             for (String url : request.attachmentUrls()) {
                 WorkOrderAttachment att = new WorkOrderAttachment();
                 att.setWorkOrder(workOrder);
-                att.setFileUrl(url);
+                att.setFileUrl(inputSanitizer.optionalUrl(url, 2000));
                 att.setFileType(inferType(url));
                 workOrder.getAttachments().add(att);
             }
@@ -190,10 +194,10 @@ public class WorkOrderService {
         }
 
         if (request.title() != null && !request.title().isBlank()) {
-            workOrder.setTitle(request.title().trim());
+            workOrder.setTitle(inputSanitizer.requiredText(request.title(), "El titulo", 255));
         }
         if (request.description() != null) {
-            workOrder.setDescription(request.description());
+            workOrder.setDescription(inputSanitizer.optionalText(request.description(), 3000));
         }
         if (request.priority() != null) {
             workOrder.setPriority(request.priority());
@@ -236,7 +240,7 @@ public class WorkOrderService {
             for (EngineHourRequest engineReq : request.engineHours()) {
                 EngineHourLog log = new EngineHourLog();
                 log.setWorkOrder(workOrder);
-                log.setEngineLabel(engineReq.engineLabel());
+                log.setEngineLabel(inputSanitizer.requiredText(engineReq.engineLabel(), "La etiqueta de motor", 255));
                 log.setHours(engineReq.hours());
                 workOrder.getEngineHourLogs().add(log);
             }
@@ -250,7 +254,7 @@ public class WorkOrderService {
             for (String url : request.attachmentUrls()) {
                 WorkOrderAttachment att = new WorkOrderAttachment();
                 att.setWorkOrder(workOrder);
-                att.setFileUrl(url);
+                att.setFileUrl(inputSanitizer.optionalUrl(url, 2000));
                 att.setFileType(inferType(url));
                 workOrder.getAttachments().add(att);
             }
@@ -477,9 +481,9 @@ public class WorkOrderService {
     private WorkOrderAttachment mapAttachmentRequest(WorkOrder workOrder, AttachmentRequest item) {
         WorkOrderAttachment att = new WorkOrderAttachment();
         att.setWorkOrder(workOrder);
-        att.setFileUrl(item.fileUrl());
-        att.setFileType(item.fileType());
-        att.setOriginalFileName(item.originalFileName());
+        att.setFileUrl(inputSanitizer.optionalUrl(item.fileUrl(), 2000));
+        att.setFileType(inputSanitizer.requiredText(item.fileType(), "El tipo de archivo", 255));
+        att.setOriginalFileName(inputSanitizer.optionalText(item.originalFileName(), 255));
         att.setCapturedAt(item.capturedAt());
         att.setLatitude(item.latitude());
         att.setLongitude(item.longitude());

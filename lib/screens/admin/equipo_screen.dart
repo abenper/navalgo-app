@@ -3,8 +3,10 @@ import 'package:provider/provider.dart';
 
 import '../../models/worker_profile.dart';
 import '../../services/worker_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/workers_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
 
 class EquipoScreen extends StatefulWidget {
   const EquipoScreen({super.key});
@@ -72,7 +74,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           content: Text(
             tempPwd == null || tempPwd.isEmpty
                 ? 'Trabajador creado'
-                : 'Trabajador creado. Password temporal: $tempPwd',
+                : 'Trabajador creado. Contraseña temporal: $tempPwd',
           ),
           duration: const Duration(seconds: 8),
         ),
@@ -139,7 +141,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Eliminar trabajador'),
-        content: Text('Se eliminara a ${worker.fullName}. Esta accion no se puede deshacer.'),
+        content: Text(
+          'Se eliminará a ${worker.fullName}. Esta acción no se puede deshacer.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -256,7 +260,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Nueva password temporal para ${worker.email}: $temporaryPassword'),
+          content: Text(
+            'Nueva contraseña temporal para ${worker.email}: $temporaryPassword',
+          ),
           duration: const Duration(seconds: 10),
         ),
       );
@@ -266,7 +272,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         return;
       }
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo resetear la password: $e')),
+        SnackBar(content: Text('No se pudo restablecer la contraseña: $e')),
       );
     }
   }
@@ -288,97 +294,123 @@ class _EquipoScreenState extends State<EquipoScreen> {
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : vm.error != null
-              ? Center(child: Text(vm.error!))
-              : RefreshIndicator(
-                  onRefresh: vm.loadWorkers,
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      TextField(
-                        controller: _searchCtrl,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          labelText: 'Buscar trabajador',
-                          border: OutlineInputBorder(),
+          ? Center(child: Text(vm.error!))
+          : RefreshIndicator(
+              onRefresh: vm.loadWorkers,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const NavalgoPageIntro(
+                    eyebrow: 'EQUIPO TÉCNICO',
+                    title:
+                        'Administra trabajadores, permisos y datos de acceso del equipo.',
+                    subtitle:
+                        'Consulta la plantilla, actualiza perfiles y revisa permisos, especialidades y estado contractual.',
+                  ),
+                  const SizedBox(height: 18),
+                  const NavalgoSectionHeader(
+                    title: 'Plantilla activa',
+                    subtitle:
+                        'Busca perfiles, revisa permisos y actúa sobre cada trabajador.',
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _searchCtrl,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'Buscar trabajador',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ...filteredWorkers.map((worker) {
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: NavalgoColors.mist,
+                          child: const Icon(
+                            Icons.person,
+                            color: NavalgoColors.tide,
+                          ),
+                        ),
+                        title: Text(
+                          worker.fullName,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${worker.email}\n'
+                          '${worker.role} • ${worker.speciality ?? 'Sin especialidad'}\n'
+                          'Fecha de contratación: ${_fmtDate(worker.contractStartDate)} • '
+                          'Editar partes: ${worker.canEditWorkOrders ? 'Sí' : 'No'}',
+                        ),
+                        isThreeLine: true,
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _openEditWorkerDialog(worker);
+                            }
+                            if (value == 'delete') {
+                              _deleteWorker(worker);
+                            }
+                            if (value == 'reset') {
+                              _resetPassword(worker);
+                            }
+                            if (value == 'toggle_active') {
+                              _toggleActive(worker, !worker.active);
+                            }
+                            if (value == 'toggle_edit') {
+                              _toggleEditPermission(
+                                worker,
+                                !worker.canEditWorkOrders,
+                              );
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem<String>(
+                              value: 'edit',
+                              child: Text('Editar trabajador'),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Eliminar trabajador'),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'toggle_active',
+                              child: Text(
+                                worker.active ? 'Desactivar' : 'Activar',
+                              ),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'toggle_edit',
+                              child: Text(
+                                worker.canEditWorkOrders
+                                    ? 'Quitar permiso editar partes'
+                                    : 'Dar permiso editar partes',
+                              ),
+                            ),
+                            const PopupMenuItem<String>(
+                              value: 'reset',
+                              child: Text('Restablecer contraseña'),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 14),
-                      ...filteredWorkers.map((worker) {
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.blue.shade50,
-                              child: Icon(Icons.person, color: Colors.blue.shade900),
-                            ),
-                            title: Text(
-                              worker.fullName,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              '${worker.email}\n'
-                              '${worker.role} • ${worker.speciality ?? 'Sin especialidad'}\n'
-                              'Alta contrato: ${_fmtDate(worker.contractStartDate)} • '
-                              'Editar partes: ${worker.canEditWorkOrders ? 'SI' : 'NO'}',
-                            ),
-                            isThreeLine: true,
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _openEditWorkerDialog(worker);
-                                }
-                                if (value == 'delete') {
-                                  _deleteWorker(worker);
-                                }
-                                if (value == 'reset') {
-                                  _resetPassword(worker);
-                                }
-                                if (value == 'toggle_active') {
-                                  _toggleActive(worker, !worker.active);
-                                }
-                                if (value == 'toggle_edit') {
-                                  _toggleEditPermission(worker, !worker.canEditWorkOrders);
-                                }
-                              },
-                              itemBuilder: (context) => [
-                                const PopupMenuItem<String>(
-                                  value: 'edit',
-                                  child: Text('Editar trabajador'),
-                                ),
-                                const PopupMenuItem<String>(
-                                  value: 'delete',
-                                  child: Text('Eliminar trabajador'),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'toggle_active',
-                                  child: Text(worker.active ? 'Desactivar' : 'Activar'),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'toggle_edit',
-                                  child: Text(worker.canEditWorkOrders
-                                      ? 'Quitar permiso editar partes'
-                                      : 'Dar permiso editar partes'),
-                                ),
-                                const PopupMenuItem<String>(
-                                  value: 'reset',
-                                  child: Text('Resetear password'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
+                    );
+                  }),
+                ],
+              ),
+            ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: FilledButton.icon(
-            onPressed: _openCreateWorkerDialog,
-            icon: const Icon(Icons.person_add),
-            label: const Text('Crear Trabajador'),
+          child: NavalgoPanel(
+            padding: const EdgeInsets.all(12),
+            child: FilledButton.icon(
+              onPressed: _openCreateWorkerDialog,
+              icon: const Icon(Icons.person_add),
+              label: const Text('Crear trabajador'),
+            ),
           ),
         ),
       ),
@@ -456,7 +488,7 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Crear Trabajador'),
+      title: const Text('Crear trabajador'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -472,7 +504,7 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
             TextField(
               controller: _emailCtrl,
               decoration: const InputDecoration(
-                labelText: 'Email',
+                labelText: 'Correo electrónico',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -508,7 +540,7 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.calendar_today),
-              title: const Text('Fecha de alta de contrato'),
+              title: const Text('Fecha de contratación'),
               subtitle: Text(_formatDate(_contractStartDate)),
               onTap: _pickDate,
             ),
@@ -585,7 +617,9 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.worker.fullName);
     _emailCtrl = TextEditingController(text: widget.worker.email);
-    _specialityCtrl = TextEditingController(text: widget.worker.speciality ?? '');
+    _specialityCtrl = TextEditingController(
+      text: widget.worker.speciality ?? '',
+    );
     _role = widget.worker.role;
     _canEditWorkOrders = widget.worker.canEditWorkOrders;
     _contractStartDate = widget.worker.contractStartDate;
@@ -603,7 +637,7 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Editar Trabajador'),
+      title: const Text('Editar trabajador'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -619,7 +653,7 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
             TextField(
               controller: _emailCtrl,
               decoration: const InputDecoration(
-                labelText: 'Email',
+                labelText: 'Correo electrónico',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -655,7 +689,7 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.calendar_today),
-              title: const Text('Fecha de alta de contrato'),
+              title: const Text('Fecha de contratación'),
               subtitle: Text(_formatDate(_contractStartDate)),
               onTap: _pickDate,
             ),

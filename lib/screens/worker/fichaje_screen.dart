@@ -3,7 +3,26 @@ import 'package:provider/provider.dart';
 
 import '../../models/time_entry.dart';
 import '../../services/time_tracking_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
+
+const List<_ClockWorkSiteOption> _clockWorkSiteOptions = [
+  _ClockWorkSiteOption(
+    value: 'WORKSHOP',
+    title: 'Taller',
+    subtitle: 'Jornada en taller, base o instalaciones propias.',
+    icon: Icons.home_repair_service_rounded,
+    accent: NavalgoColors.tide,
+  ),
+  _ClockWorkSiteOption(
+    value: 'TRAVEL',
+    title: 'Viaje',
+    subtitle: 'Jornada en desplazamiento o servicio fuera del taller.',
+    icon: Icons.route_rounded,
+    accent: NavalgoColors.harbor,
+  ),
+];
 
 class FichajeScreen extends StatefulWidget {
   const FichajeScreen({super.key});
@@ -32,7 +51,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
     if (token == null || workerId == null) {
       setState(() {
         _isLoading = false;
-        _error = 'Sesion no valida';
+        _error = 'Sesión no válida';
       });
       return;
     }
@@ -86,16 +105,22 @@ class _FichajeScreenState extends State<FichajeScreen> {
       if (_isPunchedIn) {
         await timeTrackingService.clockOut(token, workerId: workerId);
       } else {
-        await timeTrackingService.clockIn(token, workerId: workerId);
+        final workSite = await _selectWorkSite();
+        if (!mounted || workSite == null) {
+          return;
+        }
+        await timeTrackingService.clockIn(
+          token,
+          workerId: workerId,
+          workSite: workSite,
+        );
       }
       await _loadEntries();
     } catch (e) {
       if (!mounted) {
         return;
       }
-      messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo fichar: $e')),
-      );
+      messenger.showSnackBar(SnackBar(content: Text('No se pudo fichar: $e')));
     }
   }
 
@@ -119,71 +144,111 @@ class _FichajeScreenState extends State<FichajeScreen> {
       Duration.zero,
       (acc, item) => acc + _durationForEntry(item),
     );
+    final activeEntry = _entries.cast<TimeEntry?>().firstWhere(
+      (item) => item?.clockOut == null,
+      orElse: () => null,
+    );
 
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _isPunchedIn ? Icons.timer : Icons.timer_off,
-              size: 100,
-              color: _isPunchedIn ? Colors.green : Colors.grey,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _isPunchedIn ? 'Estado: Trabajando' : 'Estado: Fuera de turno',
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Total hoy: ${_formatDuration(totalToday)}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 30),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                backgroundColor: _isPunchedIn ? Colors.red.shade700 : Colors.green.shade700,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              onPressed: _toggleClock,
-              icon: Icon(_isPunchedIn ? Icons.stop : Icons.play_arrow),
-              label: Text(
-                _isPunchedIn ? 'Finalizar Turno' : 'Iniciar Turno',
-                style: const TextStyle(fontSize: 18),
-              ),
-            ),
-            const SizedBox(height: 28),
-            const Text('Ultimos registros', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: 520,
-              height: 220,
-              child: ListView.builder(
-                itemCount: _entries.length > 6 ? 6 : _entries.length,
-                itemBuilder: (context, index) {
-                  final item = _entries[index];
-                  final duration = _durationForEntry(item);
-                  return Card(
-                    child: ListTile(
-                      leading: Icon(
-                        item.clockOut == null ? Icons.login : Icons.logout,
-                        color: item.clockOut == null ? Colors.green : Colors.red,
-                      ),
-                      title: Text(_fmtDate(item.clockIn)),
-                      subtitle: Text(
-                        'Entrada: ${_fmtHour(item.clockIn)} - Salida: ${item.clockOut == null ? '--:--' : _fmtHour(item.clockOut!)}',
-                      ),
-                      trailing: Text(_formatDuration(duration)),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const NavalgoPageIntro(
+            eyebrow: 'CONTROL HORARIO',
+            title: 'Registra tu jornada y el tipo de servicio de forma clara.',
+            subtitle:
+                'Indica si trabajas en taller o en viaje, revisa el tiempo acumulado y consulta los últimos movimientos del día.',
+          ),
+          const SizedBox(height: 18),
+          NavalgoPanel(
+            child: Column(
+              children: [
+                Icon(
+                  _isPunchedIn ? Icons.timer : Icons.timer_off,
+                  size: 92,
+                  color: _isPunchedIn
+                      ? NavalgoColors.kelp
+                      : NavalgoColors.storm,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  _isPunchedIn
+                      ? 'Estado: Trabajando'
+                      : 'Estado: Fuera de turno',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Total hoy: ${_formatDuration(totalToday)}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                if (activeEntry != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Ubicación actual: ${_workSiteLabel(activeEntry.workSite)}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _isPunchedIn
+                          ? NavalgoColors.coral
+                          : NavalgoColors.kelp,
                     ),
-                  );
-                },
-              ),
+                    onPressed: _toggleClock,
+                    icon: Icon(_isPunchedIn ? Icons.stop : Icons.play_arrow),
+                    label: Text(
+                      _isPunchedIn ? 'Finalizar Turno' : 'Iniciar Turno',
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 18),
+          const NavalgoSectionHeader(
+            title: 'Últimos registros',
+            subtitle: 'Entradas y salidas recientes de la jornada.',
+          ),
+          const SizedBox(height: 12),
+          ..._entries.take(6).map((item) {
+            final duration = _durationForEntry(item);
+            final active = item.clockOut == null;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: NavalgoPanel(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: (active ? NavalgoColors.kelp : NavalgoColors.coral)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      active ? Icons.login : Icons.logout,
+                      color: active ? NavalgoColors.kelp : NavalgoColors.coral,
+                    ),
+                  ),
+                  title: Text(_fmtDate(item.clockIn)),
+                  subtitle: Text(
+                    '${_workSiteLabel(item.workSite)} • Entrada: ${_fmtHour(item.clockIn)} - Salida: ${item.clockOut == null ? '--:--' : _fmtHour(item.clockOut!)}',
+                  ),
+                  trailing: Text(
+                    _formatDuration(duration),
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
@@ -191,12 +256,136 @@ class _FichajeScreenState extends State<FichajeScreen> {
   bool _isToday(TimeEntry entry) {
     final now = DateTime.now();
     final inLocal = entry.clockIn.toLocal();
-    return inLocal.year == now.year && inLocal.month == now.month && inLocal.day == now.day;
+    return inLocal.year == now.year &&
+        inLocal.month == now.month &&
+        inLocal.day == now.day;
   }
 
   Duration _durationForEntry(TimeEntry entry) {
     final out = entry.clockOut?.toLocal() ?? DateTime.now();
     return out.difference(entry.clockIn.toLocal());
+  }
+
+  Future<String?> _selectWorkSite() async {
+    return showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    gradient: NavalgoColors.heroGradient,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '¿Dónde comienza la jornada?',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Selecciona si el fichaje de hoy corresponde a taller o a viaje.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.82),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ..._clockWorkSiteOptions.map(
+                  (option) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _buildWorkSiteAction(
+                      context: sheetContext,
+                      option: option,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildWorkSiteAction({
+    required BuildContext context,
+    required _ClockWorkSiteOption option,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () => Navigator.of(context).pop(option.value),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: option.accent.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: option.accent.withValues(alpha: 0.14)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: option.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(option.icon, color: option.accent),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      option.title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      option.subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 16,
+                color: option.accent,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _workSiteLabel(String workSite) {
+    switch (workSite) {
+      case 'TRAVEL':
+        return 'Viaje';
+      default:
+        return 'Taller';
+    }
   }
 
   String _fmtDate(DateTime d) {
@@ -221,4 +410,20 @@ class _FichajeScreenState extends State<FichajeScreen> {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     return '${hours}h ${minutes}m';
   }
+}
+
+class _ClockWorkSiteOption {
+  const _ClockWorkSiteOption({
+    required this.value,
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.accent,
+  });
+
+  final String value;
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color accent;
 }

@@ -1,18 +1,31 @@
 # Navalgo Backend (Spring Boot)
 
-Backend completo para NavalGO con modulos de:
-- Autenticacion JWT
-- Trabajadores
-- Empresas
-- Propietarios y embarcaciones (flota)
-- Partes de trabajo
-- Fichajes (clock in/out)
-- Ausencias y vacaciones
+Backend de NavalGO con estos dominios:
+- autenticacion y autorizacion
+- trabajadores
+- empresas
+- propietarios y embarcaciones
+- partes de trabajo
+- fichajes
+- ausencias y vacaciones
+- notificaciones
+- media adjunta y firma digital
 
-## 1) Requisitos
+## 1) Stack y estado actual
 
 - Java 21
 - Maven 3.9+
+- Spring Boot 3.3.5
+- Spring Security + JWT access token
+- Refresh token opaco persistido en base de datos
+- PostgreSQL en produccion, H2 para entorno local rapido
+
+La base segura actual mantiene las funcionalidades existentes y añade:
+- `access token` corto en respuesta JSON
+- `refresh token` rotatorio en cookie `HttpOnly`
+- errores API estructurados con `requestId`
+- limitacion basica de intentos de login
+- validacion de uploads y saneado de texto de entrada
 
 ## 2) Arranque
 
@@ -21,46 +34,45 @@ cd backend
 mvn spring-boot:run
 ```
 
-Si no tienes Maven, instala Maven o ejecuta el proyecto desde IntelliJ/STS usando el `pom.xml`.
+### Arranque con PostgreSQL
 
-### Arranque con PostgreSQL (recomendado)
-
-1. Crea la base de datos vacia (ejemplo):
+1. Crear base de datos:
 
 ```sql
 CREATE DATABASE navalgo;
 ```
 
-2. Importa el esquema nuevo alineado con backend:
+2. Aplicar esquema:
 
 ```bash
 psql -h localhost -U postgres -d navalgo -f navalgo_backend_postgres.sql
 ```
 
-3. Ajusta credenciales en `src/main/resources/application-postgres.yml`.
+3. Definir variables de entorno principales:
 
-4. Arranca Spring con perfil postgres:
+```bash
+APP_JWT_SECRET=un_secreto_de_al_menos_32_bytes
+APP_JWT_EXPIRATION_MS=3600000
+APP_JWT_REFRESH_EXPIRATION_MS=604800000
+SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/navalgo
+SPRING_DATASOURCE_USERNAME=navalgo
+SPRING_DATASOURCE_PASSWORD=cambia_esto
+```
+
+4. Arrancar con perfil `postgres`:
 
 ```bash
 mvn spring-boot:run -Dspring-boot.run.profiles=postgres
 ```
 
-## 3) Swagger
+## 3) Auth y sesion
 
-- http://localhost:8080/swagger-ui/index.html
+### Login
 
-## 4) Credenciales semilla
+`POST /api/auth/login`
 
-Se cargan automaticamente en arranque (`DataInitializer`):
-- admin@navalgo.com / 1234 (ADMIN)
-- worker@navalgo.com / 1234 (WORKER)
+Request:
 
-## 5) Endpoints principales
-
-### Auth
-- `POST /api/auth/login`
-
-Body:
 ```json
 {
   "email": "admin@navalgo.com",
@@ -68,22 +80,54 @@ Body:
 }
 ```
 
-Respuesta:
+Response:
+
 ```json
 {
   "user": {
     "id": 1,
     "name": "Admin Navalgo",
     "email": "admin@navalgo.com",
-    "role": "ADMIN"
+    "role": "ADMIN",
+    "mustChangePassword": false,
+    "canEditWorkOrders": true
   },
-  "token": "..."
+  "token": "...",
+  "tokenType": "Bearer",
+  "expiresAt": "2026-04-16T18:00:00Z"
 }
 ```
+
+Además, el backend devuelve una cookie `HttpOnly` con el refresh token.
+
+### Refresh
+
+`POST /api/auth/refresh`
+
+- requiere la cookie de refresh
+- invalida el refresh token previo y emite uno nuevo
+- devuelve un nuevo access token JSON
+
+### Logout
+
+`POST /api/auth/logout`
+
+- revoca el refresh token actual
+- limpia la cookie
+
+### Cambio de password
+
+`POST /api/auth/change-password`
+
+- exige usuario autenticado
+- revoca sesiones activas tras el cambio
+
+## 4) Endpoints principales
 
 ### Trabajadores
 - `GET /api/workers`
 - `POST /api/workers`
+- `PUT /api/workers/{id}`
 - `PATCH /api/workers/{id}/active`
 
 ### Empresas
@@ -94,76 +138,101 @@ Respuesta:
 ### Flota
 - `GET /api/fleet/owners`
 - `POST /api/fleet/owners`
+- `PUT /api/fleet/owners/{id}`
 - `GET /api/fleet/vessels?ownerId=`
 - `POST /api/fleet/vessels`
+- `PUT /api/fleet/vessels/{id}`
 
 ### Partes de trabajo
 - `GET /api/work-orders`
 - `POST /api/work-orders`
+- `PUT /api/work-orders/{id}`
 - `PATCH /api/work-orders/{id}/status`
+- `POST /api/work-orders/{id}/sign`
+- `DELETE /api/work-orders/{workOrderId}/attachments/{attachmentId}`
 
 ### Fichajes
 - `POST /api/time-entries/clock-in`
 - `POST /api/time-entries/clock-out`
 - `GET /api/time-entries/worker/{workerId}`
+- `GET /api/time-entries/today-summary`
 
 ### Ausencias / Vacaciones
 - `GET /api/leave-requests?workerId=`
 - `POST /api/leave-requests`
 - `PATCH /api/leave-requests/{id}/status`
 
-## 6) Conectar Flutter
+## 5) Flutter Web y Flutter móvil
 
-Ejecuta Flutter asi para usar API real:
+### Access token
+
+El frontend debe seguir enviando el access token en el header `Authorization: Bearer ...`.
+
+### Refresh token en Flutter Web
+
+Para que Chrome acepte y reenvie la cookie de refresh en peticiones `fetch` o `http`, el backend debe estar publicado por HTTPS y con:
+- `APP_SECURITY_COOKIE_SAME_SITE=None`
+- `APP_SECURITY_COOKIE_SECURE=true`
+- `credentials: include` en el cliente
+- `CORS` limitado al dominio real del frontend
+
+Si el backend sigue sirviendose por `http://IP:8080`, los navegadores modernos pueden bloquear la cookie de refresh aunque el login funcione. En ese escenario, el access token seguira funcionando, pero la renovacion automatica por cookie no sera fiable.
+
+### Ejemplo Flutter
+
+Web local contra backend local:
 
 ```bash
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://localhost:8080/api
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080/api
 ```
 
-En Android emulador normalmente debes usar:
+Android emulador:
 
 ```bash
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
 ```
 
-## 7) Produccion
+Web contra produccion:
 
-- Cambia `app.jwt.secret` por un secreto largo y seguro.
-- Usa PostgreSQL con el perfil `postgres` y `ddl-auto: validate`.
-- Activa migraciones (Flyway recomendado).
-- Mueve adjuntos a S3/MinIO (ahora se guarda URL).
+```bash
+flutter run -d chrome --dart-define=API_BASE_URL=https://api.tu-dominio.com/api
+```
 
-## 8) Hardening (VPS DigitalOcean)
+## 6) Configuracion relevante
 
-Checklist recomendado para un despliegue seguro:
+Propiedades nuevas o endurecidas:
+- `APP_JWT_SECRET`
+- `APP_JWT_EXPIRATION_MS`
+- `APP_JWT_REFRESH_EXPIRATION_MS`
+- `APP_SECURITY_CORS_ALLOWED_ORIGINS`
+- `APP_SECURITY_COOKIE_REFRESH_NAME`
+- `APP_SECURITY_COOKIE_SAME_SITE`
+- `APP_SECURITY_COOKIE_SECURE`
+- `APP_SECURITY_COOKIE_PATH`
+- `APP_MEDIA_MAX_IMAGE_SIZE_BYTES`
+- `APP_MEDIA_MAX_VIDEO_SIZE_BYTES`
+- `APP_MEDIA_MAX_SIGNATURE_SIZE_BYTES`
+- `APP_MEDIA_MAX_PROFILE_PHOTO_SIZE_BYTES`
 
-1. Sistema y acceso
-- Actualiza paquetes: `sudo apt update; sudo apt upgrade -y`
-- Crea usuario admin sin usar `root` para operar.
-- Desactiva login por password y usa solo claves SSH en `sshd_config`.
-- Cambia el puerto SSH si tu politica lo permite y activa `fail2ban`.
+## 7) Swagger
 
-2. Firewall
-- Permite solo puertos necesarios: `22`, `80`, `443`.
-- No expongas `5432` (PostgreSQL) a Internet.
-- Si usas UFW: `sudo ufw allow OpenSSH; sudo ufw allow 80; sudo ufw allow 443; sudo ufw enable`
+- http://localhost:8080/swagger-ui/index.html
 
-3. Docker/Compose
-- Define secretos con variables de entorno fuertes (minimo 32 bytes para JWT).
-- Mantén contenedores con `restart: unless-stopped`.
-- Evita privilegios extras (`no-new-privileges`, filesystem read-only en backend).
+## 8) Credenciales semilla
 
-4. TLS y reverse proxy
-- Publica el backend detras de Nginx o Traefik.
-- Emite certificados con Let's Encrypt.
-- Redirige HTTP -> HTTPS y aplica HSTS.
+Se cargan automaticamente en arranque (`DataInitializer`):
+- admin@navalgo.com / 1234
+- worker@navalgo.com / 1234
 
-5. Seguridad de app
-- Limita CORS a dominios reales de frontend en `SecurityConfig`.
-- Reduce `APP_JWT_EXPIRATION_MS` (por defecto ya 1h).
-- Rota el secreto JWT y credenciales de DB periodicamente.
+Estas credenciales deben existir solo en desarrollo o demo controlada.
 
-6. Observabilidad y respaldo
-- Activa logs centralizados (Loki/ELK o similar).
-- Backups diarios de PostgreSQL (`pg_dump`) y pruebas de restauracion.
-- Monitoriza `actuator/health` y alerta caidas.
+## 9) Checklist DevSecOps
+
+- `APP_JWT_SECRET` definido con longitud suficiente
+- PostgreSQL no expuesto publicamente
+- backend publicado detras de Nginx o proxy TLS
+- `APP_SECURITY_CORS_ALLOWED_ORIGINS` restringido a dominios reales
+- cookie de refresh solo con HTTPS en produccion
+- backups de PostgreSQL y prueba de restauracion
+- logs y monitorizacion de `actuator/health`
+- rotacion de secretos y credenciales operativas

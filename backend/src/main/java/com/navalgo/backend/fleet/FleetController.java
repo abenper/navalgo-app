@@ -1,5 +1,6 @@
 package com.navalgo.backend.fleet;
 
+import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.company.Company;
 import com.navalgo.backend.company.CompanyRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -19,13 +20,16 @@ public class FleetController {
     private final OwnerRepository ownerRepository;
     private final VesselRepository vesselRepository;
     private final CompanyRepository companyRepository;
+    private final InputSanitizer inputSanitizer;
 
     public FleetController(OwnerRepository ownerRepository,
                            VesselRepository vesselRepository,
-                           CompanyRepository companyRepository) {
+                           CompanyRepository companyRepository,
+                           InputSanitizer inputSanitizer) {
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.companyRepository = companyRepository;
+        this.inputSanitizer = inputSanitizer;
     }
 
     @GetMapping("/owners")
@@ -50,10 +54,10 @@ public class FleetController {
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         owner.setType(request.type());
-        owner.setDisplayName(request.displayName());
-        owner.setDocumentId(request.documentId());
-        owner.setPhone(request.phone());
-        owner.setEmail(request.email());
+        owner.setDisplayName(inputSanitizer.requiredText(request.displayName(), "El nombre del propietario", 255));
+        owner.setDocumentId(inputSanitizer.requiredText(request.documentId(), "El documento", 255));
+        owner.setPhone(inputSanitizer.optionalText(request.phone(), 255));
+        owner.setEmail(request.email() == null ? null : inputSanitizer.email(request.email()));
 
         if (request.companyId() != null) {
             Company company = companyRepository.findById(request.companyId())
@@ -82,10 +86,10 @@ public class FleetController {
 
     private Owner buildOwnerFromRequest(Owner owner, CreateOwnerRequest request) {
         owner.setType(request.type());
-        owner.setDisplayName(request.displayName());
-        owner.setDocumentId(request.documentId());
-        owner.setPhone(request.phone());
-        owner.setEmail(request.email());
+        owner.setDisplayName(inputSanitizer.requiredText(request.displayName(), "El nombre del propietario", 255));
+        owner.setDocumentId(inputSanitizer.requiredText(request.documentId(), "El documento", 255));
+        owner.setPhone(inputSanitizer.optionalText(request.phone(), 255));
+        owner.setEmail(request.email() == null ? null : inputSanitizer.email(request.email()));
 
         if (request.companyId() != null) {
             Company company = companyRepository.findById(request.companyId())
@@ -123,9 +127,9 @@ public class FleetController {
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
-        vessel.setName(request.name());
-        vessel.setRegistrationNumber(request.registrationNumber());
-        vessel.setModel(request.model());
+        vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
+        vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
+        vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
         vessel.setLengthMeters(request.lengthMeters());
@@ -151,9 +155,9 @@ public class FleetController {
 
         List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
 
-        vessel.setName(request.name());
-        vessel.setRegistrationNumber(request.registrationNumber());
-        vessel.setModel(request.model());
+        vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
+        vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
+        vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
         vessel.setLengthMeters(request.lengthMeters());
@@ -168,7 +172,8 @@ public class FleetController {
         }
 
         List<String> normalized = engineLabels.stream()
-                .map(label -> label == null ? "" : label.trim())
+            .map(label -> label == null ? "" : inputSanitizer.optionalText(label, 255))
+            .map(label -> label == null ? "" : label.trim())
                 .filter(label -> !label.isEmpty())
                 .toList();
 

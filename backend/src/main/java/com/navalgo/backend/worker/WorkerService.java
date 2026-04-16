@@ -1,5 +1,7 @@
 package com.navalgo.backend.worker;
 
+import com.navalgo.backend.auth.RefreshTokenService;
+import com.navalgo.backend.common.InputSanitizer;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -15,12 +17,19 @@ public class WorkerService {
 
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
+    private final InputSanitizer inputSanitizer;
     private final SecureRandom secureRandom = new SecureRandom();
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
 
-    public WorkerService(WorkerRepository workerRepository, PasswordEncoder passwordEncoder) {
+    public WorkerService(WorkerRepository workerRepository,
+                         PasswordEncoder passwordEncoder,
+                         RefreshTokenService refreshTokenService,
+                         InputSanitizer inputSanitizer) {
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
+        this.refreshTokenService = refreshTokenService;
+        this.inputSanitizer = inputSanitizer;
     }
 
     public List<WorkerDto> findAll() {
@@ -42,10 +51,10 @@ public class WorkerService {
         boolean generatedPassword = request.password() == null || request.password().isBlank();
 
         Worker worker = new Worker();
-        worker.setFullName(request.fullName());
-        worker.setEmail(request.email());
+        worker.setFullName(inputSanitizer.requiredText(request.fullName(), "El nombre", 255));
+        worker.setEmail(inputSanitizer.email(request.email()));
         worker.setPasswordHash(passwordEncoder.encode(rawPassword));
-        worker.setSpeciality(request.speciality());
+        worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
         worker.setRole(request.role());
         worker.setActive(true);
         worker.setMustChangePassword(true);
@@ -67,9 +76,9 @@ public class WorkerService {
             }
         });
 
-        worker.setFullName(request.fullName());
-        worker.setEmail(request.email());
-        worker.setSpeciality(request.speciality());
+        worker.setFullName(inputSanitizer.requiredText(request.fullName(), "El nombre", 255));
+        worker.setEmail(inputSanitizer.email(request.email()));
+        worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
         worker.setRole(request.role());
         worker.setCanEditWorkOrders(request.canEditWorkOrders());
         worker.setContractStartDate(request.contractStartDate());
@@ -81,6 +90,7 @@ public class WorkerService {
         if (!workerRepository.existsById(workerId)) {
             throw new EntityNotFoundException("Trabajador no encontrado");
         }
+        refreshTokenService.revokeAllForWorker(workerId);
         workerRepository.deleteById(workerId);
     }
 
@@ -92,6 +102,7 @@ public class WorkerService {
         String temporaryPassword = generateTemporaryPassword(12);
         worker.setPasswordHash(passwordEncoder.encode(temporaryPassword));
         worker.setMustChangePassword(true);
+        refreshTokenService.revokeAllForWorker(workerId);
         workerRepository.save(worker);
 
         return new ResetWorkerPasswordResponse(worker.getId(), worker.getEmail(), temporaryPassword);
@@ -120,6 +131,7 @@ public class WorkerService {
 
         worker.setPasswordHash(passwordEncoder.encode(newPassword));
         worker.setMustChangePassword(false);
+        refreshTokenService.revokeAllForWorker(worker.getId());
         workerRepository.save(worker);
     }
 
@@ -128,6 +140,9 @@ public class WorkerService {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
         worker.setActive(active);
+        if (!active) {
+            refreshTokenService.revokeAllForWorker(workerId);
+        }
         return WorkerDto.from(workerRepository.save(worker));
     }
 

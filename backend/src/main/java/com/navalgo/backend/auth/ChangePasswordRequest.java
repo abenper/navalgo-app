@@ -1,9 +1,10 @@
 package com.navalgo.backend.auth;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 public record ChangePasswordRequest(
         @NotBlank String currentPassword,
-        @NotBlank String newPassword
+        @NotBlank @Size(min = 12, max = 128) String newPassword
 ) {
 }

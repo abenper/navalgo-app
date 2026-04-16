@@ -21,6 +21,10 @@ public class TimeEntry {
 
     private Instant clockOut;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private TimeEntryWorkSite workSite = TimeEntryWorkSite.WORKSHOP;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -32,4 +36,7 @@ public class TimeEntry {
 
     public Instant getClockOut() { return clockOut; }
     public void setClockOut(Instant clockOut) { this.clockOut = clockOut; }
+
+    public TimeEntryWorkSite getWorkSite() { return workSite; }
+    public void setWorkSite(TimeEntryWorkSite workSite) { this.workSite = workSite; }
 }

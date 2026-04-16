@@ -5,7 +5,17 @@ import '../../models/leave_request.dart';
 import '../../models/worker_profile.dart';
 import '../../services/leave_service.dart';
 import '../../services/worker_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
+
+const List<String> _leaveReasons = [
+  'Vacaciones',
+  'Médico',
+  'Maternidad/Paternidad',
+  'Asuntos Propios',
+  'Otro',
+];
 
 class AusenciasScreen extends StatefulWidget {
   const AusenciasScreen({super.key});
@@ -36,7 +46,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     final token = session.token;
     if (token == null || token.isEmpty) {
       setState(() {
-        _error = 'No hay sesion activa';
+        _error = 'No hay sesión activa';
         _isLoading = false;
       });
       return;
@@ -143,7 +153,10 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         title: 'Editar Solicitud',
         submitLabel: 'Guardar cambios',
         initialReason: request.reason,
-        initialRange: DateTimeRange(start: request.startDate, end: request.endDate),
+        initialRange: DateTimeRange(
+          start: request.startDate,
+          end: request.endDate,
+        ),
       ),
     );
 
@@ -170,7 +183,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         return;
       }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Solicitud editada. Estado: pendiente de confirmacion')),
+        const SnackBar(
+          content: Text('Solicitud editada. Estado: pendiente de confirmación'),
+        ),
       );
       await _loadData();
     } catch (e) {
@@ -188,7 +203,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Cancelar vacaciones'),
-        content: const Text('Esta accion cancelara la solicitud actual. ¿Deseas continuar?'),
+        content: const Text(
+          'Esta acción cancelará la solicitud actual. ¿Deseas continuar?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -196,7 +213,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Si, cancelar'),
+            child: const Text('Sí, cancelar'),
           ),
         ],
       ),
@@ -221,7 +238,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         return;
       }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Vacaciones canceladas.')),
+        const SnackBar(content: Text('Solicitud cancelada.')),
       );
       await _loadData();
     } catch (e) {
@@ -266,7 +283,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         return;
       }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Vacaciones asignadas y aceptadas correctamente')),
+        const SnackBar(
+          content: Text('Ausencia asignada y aceptada correctamente'),
+        ),
       );
       await _loadData();
     } catch (e) {
@@ -274,7 +293,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         return;
       }
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo asignar la vacacion: $e')),
+        SnackBar(content: Text('No se pudo asignar la vacación: $e')),
       );
     }
   }
@@ -325,38 +344,55 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            NavalgoPageIntro(
+              eyebrow: _isAdmin ? 'PLANIFICACIÓN DE AUSENCIAS' : 'MI DESCANSO',
+              title: _isAdmin
+                  ? 'Supervisa y asigna ausencias con una lectura inmediata.'
+                  : 'Consulta tus días naturales disponibles y gestiona tus ausencias.',
+              subtitle: _isAdmin
+                  ? 'Una vista unificada para validar solicitudes, asignar descansos y detectar estados al instante.'
+                  : 'Tu saldo disponible, las solicitudes enviadas y su estado quedan reunidos en una sola pantalla.',
+            ),
+            const SizedBox(height: 18),
             if (_balance != null)
-              Card(
-                color: Colors.indigo.shade50,
-                margin: const EdgeInsets.only(bottom: 14),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _isAdmin
-                            ? 'Saldo global de ${_balance!.workerName}'
-                            : 'Tus dias de vacaciones',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Disponibles: ${_balance!.availableDays.toStringAsFixed(1)} dias',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Devengados: ${_balance!.accruedDays.toStringAsFixed(1)} • Consumidos: ${_balance!.consumedDays}',
-                      ),
-                    ],
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: NavalgoPanel(
+                  tint: NavalgoColors.mist,
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _isAdmin
+                              ? 'Saldo global de ${_balance!.workerName}'
+                              : 'Tus días naturales disponibles',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Disponibles: ${_balance!.availableDays} días naturales',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: NavalgoColors.deepSea,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Base: ${_balance!.accruedDays} • Extra por viaje: ${_balance!.bonusDays} • Reservados: ${_balance!.consumedDays}',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ..._requests.map((req) {
               final color = _statusColor(req.status);
               final statusLabel = _statusLabel(req.status);
-              final workerCanEditOrCancel = !_isAdmin && req.status == 'APPROVED';
+              final workerCanEditOrCancel =
+                  !_isAdmin && req.status == 'APPROVED';
               final adminCanChangeStatus = _isAdmin;
 
               return Card(
@@ -376,10 +412,13 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${_fmt(req.startDate)} - ${_fmt(req.endDate)} (${req.requestedDays} dias)',
+                              '${_fmt(req.startDate)} - ${_fmt(req.endDate)} (${req.requestedDays} días)',
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             if (_isAdmin) ...[
                               const SizedBox(height: 6),
@@ -403,11 +442,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                         crossAxisAlignment: CrossAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Chip(
-                            label: Text(statusLabel),
-                            backgroundColor: color.withValues(alpha: 0.12),
-                            side: BorderSide.none,
-                          ),
+                          NavalgoStatusChip(label: statusLabel, color: color),
                           if (workerCanEditOrCancel || adminCanChangeStatus)
                             PopupMenuButton<String>(
                               tooltip: 'Acciones',
@@ -428,28 +463,50 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                                   items.add(
                                     const PopupMenuItem(
                                       value: 'EDIT',
-                                      child: Text('Editar (volver a pendiente)'),
+                                      child: Text(
+                                        'Editar (volver a pendiente)',
+                                      ),
                                     ),
                                   );
                                   items.add(
                                     const PopupMenuItem(
                                       value: 'CANCEL',
-                                      child: Text('Cancelar vacaciones'),
+                                      child: Text('Cancelar solicitud'),
                                     ),
                                   );
                                 }
                                 if (adminCanChangeStatus) {
                                   if (req.status != 'PENDING') {
-                                    items.add(const PopupMenuItem(value: 'PENDING', child: Text('Marcar pendiente')));
+                                    items.add(
+                                      const PopupMenuItem(
+                                        value: 'PENDING',
+                                        child: Text('Marcar pendiente'),
+                                      ),
+                                    );
                                   }
                                   if (req.status != 'APPROVED') {
-                                    items.add(const PopupMenuItem(value: 'APPROVED', child: Text('Marcar aceptada')));
+                                    items.add(
+                                      const PopupMenuItem(
+                                        value: 'APPROVED',
+                                        child: Text('Marcar aceptada'),
+                                      ),
+                                    );
                                   }
                                   if (req.status != 'REJECTED') {
-                                    items.add(const PopupMenuItem(value: 'REJECTED', child: Text('Marcar rechazada')));
+                                    items.add(
+                                      const PopupMenuItem(
+                                        value: 'REJECTED',
+                                        child: Text('Marcar rechazada'),
+                                      ),
+                                    );
                                   }
                                   if (req.status != 'CANCELLED') {
-                                    items.add(const PopupMenuItem(value: 'CANCELLED', child: Text('Marcar cancelada')));
+                                    items.add(
+                                      const PopupMenuItem(
+                                        value: 'CANCELLED',
+                                        child: Text('Marcar cancelada'),
+                                      ),
+                                    );
                                   }
                                 }
                                 return items;
@@ -470,31 +527,34 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: _isAdmin
-              ? Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _loadData,
-                        icon: const Icon(Icons.refresh),
-                        label: const Text('Actualizar'),
+          child: NavalgoPanel(
+            padding: const EdgeInsets.all(12),
+            child: _isAdmin
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _loadData,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Actualizar'),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _adminAssignRequest,
-                        icon: const Icon(Icons.event_available),
-                        label: const Text('Asignar Vacaciones'),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _adminAssignRequest,
+                          icon: const Icon(Icons.event_available),
+                          label: const Text('Asignar ausencia'),
+                        ),
                       ),
-                    ),
-                  ],
-                )
-              : FilledButton.icon(
-                  onPressed: _createRequest,
-                  icon: const Icon(Icons.add),
-                  label: const Text('Solicitar Ausencia'),
-                ),
+                    ],
+                  )
+                : FilledButton.icon(
+                    onPressed: _createRequest,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Solicitar ausencia'),
+                  ),
+          ),
         ),
       ),
     );
@@ -523,13 +583,13 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   Color _statusColor(String status) {
     switch (status) {
       case 'APPROVED':
-        return Colors.green;
+        return NavalgoColors.kelp;
       case 'REJECTED':
-        return Colors.red;
+        return NavalgoColors.coral;
       case 'CANCELLED':
-        return Colors.grey;
+        return NavalgoColors.storm;
       default:
-        return Colors.orange;
+        return NavalgoColors.sand;
     }
   }
 }
@@ -567,20 +627,24 @@ class _FormularioAusenciaDialog extends StatefulWidget {
   final DateTimeRange? initialRange;
 
   @override
-  State<_FormularioAusenciaDialog> createState() => _FormularioAusenciaDialogState();
+  State<_FormularioAusenciaDialog> createState() =>
+      _FormularioAusenciaDialogState();
 }
 
 class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
   String _motivo = 'Vacaciones';
   DateTimeRange? _fechas;
 
-  final List<String> _motivos = [
-    'Vacaciones',
-    'Medico',
-    'Maternidad/Paternidad',
-    'Asuntos Propios',
-    'Otro',
-  ];
+  List<String> get _motivosDisponibles {
+    final initialReason = widget.initialReason?.trim();
+    if (initialReason == null || initialReason.isEmpty) {
+      return _leaveReasons;
+    }
+    if (_leaveReasons.contains(initialReason)) {
+      return _leaveReasons;
+    }
+    return <String>[..._leaveReasons, initialReason];
+  }
 
   @override
   void initState() {
@@ -615,20 +679,33 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(widget.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      title: Text(
+        widget.title,
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Motivo', style: TextStyle(fontWeight: FontWeight.bold)),
+          const Text(
+            'Tipo de ausencia',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             initialValue: _motivo,
             decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 12,
+                vertical: 12,
+              ),
             ),
-            items: _motivos.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+            items: _motivosDisponibles
+                .map((m) => DropdownMenuItem(value: m, child: Text(m)))
+                .toList(),
             onChanged: (val) => setState(() => _motivo = val!),
           ),
           const SizedBox(height: 20),
@@ -638,8 +715,13 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
             width: double.maxFinite,
             child: OutlinedButton.icon(
               style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 16,
+                  horizontal: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 alignment: Alignment.centerLeft,
               ),
               icon: const Icon(Icons.calendar_today),
@@ -663,7 +745,9 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.blue.shade900,
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
           ),
           onPressed: () {
             if (_fechas == null) {
@@ -690,7 +774,8 @@ class _AdminAssignLeaveDialog extends StatefulWidget {
   final List<WorkerProfile> workers;
 
   @override
-  State<_AdminAssignLeaveDialog> createState() => _AdminAssignLeaveDialogState();
+  State<_AdminAssignLeaveDialog> createState() =>
+      _AdminAssignLeaveDialogState();
 }
 
 class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
@@ -707,7 +792,7 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Asignar Vacaciones (Aceptada)'),
+      title: const Text('Asignar ausencia (aceptada)'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -719,21 +804,30 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
                 border: OutlineInputBorder(),
               ),
               items: widget.workers
-                  .map((worker) => DropdownMenuItem<int>(
-                        value: worker.id,
-                        child: Text(worker.fullName),
-                      ))
+                  .map(
+                    (worker) => DropdownMenuItem<int>(
+                      value: worker.id,
+                      child: Text(worker.fullName),
+                    ),
+                  )
                   .toList(),
-              onChanged: (value) => setState(() => _workerId = value ?? _workerId),
+              onChanged: (value) =>
+                  setState(() => _workerId = value ?? _workerId),
             ),
             const SizedBox(height: 10),
-            TextFormField(
+            DropdownButtonFormField<String>(
               initialValue: _reason,
               decoration: const InputDecoration(
-                labelText: 'Motivo',
+                labelText: 'Tipo de ausencia',
                 border: OutlineInputBorder(),
               ),
-              onChanged: (value) => _reason = value,
+              items: _leaveReasons
+                  .map(
+                    (reason) =>
+                        DropdownMenuItem(value: reason, child: Text(reason)),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _reason = value ?? _reason),
             ),
             const SizedBox(height: 10),
             OutlinedButton.icon(

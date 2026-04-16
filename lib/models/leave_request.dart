@@ -38,23 +38,26 @@ class LeaveBalance {
     required this.workerId,
     required this.workerName,
     required this.accruedDays,
+    required this.bonusDays,
     required this.consumedDays,
     required this.availableDays,
   });
 
   final int workerId;
   final String workerName;
-  final double accruedDays;
+  final int accruedDays;
+  final int bonusDays;
   final int consumedDays;
-  final double availableDays;
+  final int availableDays;
 
   factory LeaveBalance.fromJson(Map<String, dynamic> json) {
     return LeaveBalance(
       workerId: json['workerId'] as int,
       workerName: json['workerName'] as String,
-      accruedDays: (json['accruedDays'] as num?)?.toDouble() ?? 0,
+      accruedDays: json['accruedDays'] as int? ?? 0,
+      bonusDays: json['bonusDays'] as int? ?? 0,
       consumedDays: json['consumedDays'] as int? ?? 0,
-      availableDays: (json['availableDays'] as num?)?.toDouble() ?? 0,
+      availableDays: json['availableDays'] as int? ?? 0,
     );
   }
 }

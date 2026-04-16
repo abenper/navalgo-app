@@ -8,6 +8,7 @@ import 'package:navalgo/services/worker_service.dart';
 import 'package:navalgo/services/work_order_media_service.dart';
 import 'package:navalgo/services/work_order_service.dart';
 import 'package:navalgo/services/worker_photo_service.dart';
+import 'package:navalgo/theme/navalgo_theme.dart';
 import 'package:navalgo/viewmodels/fleet_view_model.dart';
 import 'package:navalgo/viewmodels/login_view_model.dart';
 import 'package:navalgo/viewmodels/notifications_view_model.dart';
@@ -36,11 +37,10 @@ Future<void> main() async {
         Provider<WorkOrderMediaService>(create: (_) => WorkOrderMediaService()),
         Provider<WorkerPhotoService>(create: (_) => WorkerPhotoService()),
         ChangeNotifierProvider(
-          create: (context) =>
-              LoginViewModel(
-                authService: context.read<AuthService>(),
-                session: context.read<SessionViewModel>(),
-              ),
+          create: (context) => LoginViewModel(
+            authService: context.read<AuthService>(),
+            session: context.read<SessionViewModel>(),
+          ),
         ),
         ChangeNotifierProvider(
           create: (context) => WorkersViewModel(
@@ -81,23 +81,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'NavalGO',
       debugShowCheckedModeBanner: false, // Oculta la etiqueta roja de "DEBUG"
-      theme: ThemeData(
-        useMaterial3: true, // Activa el diseño moderno de Android/Flutter
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue.shade900, // Azul marino de base
-        ),
-        cardTheme: CardThemeData(
-          elevation: 2.0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16.0), // Bordes más suaves
-          ),
-          clipBehavior: Clip.antiAlias, // Evita que el contenido se salga de los bordes
-        ),
-        snackBarTheme: const SnackBarThemeData(
-          behavior: SnackBarBehavior.floating,
-          elevation: 3,
-        ),
-      ),
+      theme: buildNavalgoTheme(),
       home: const _RootScreen(),
     );
   }
@@ -111,9 +95,7 @@ class _RootScreen extends StatelessWidget {
     final session = context.watch<SessionViewModel>();
 
     if (!session.isReady) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // Always show LoginScreen — it handles routing for both

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/leave_service.dart';
+import '../../services/time_tracking_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/work_orders_view_model.dart';
-import '../../viewmodels/workers_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -18,8 +20,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   String? _error;
   int _pendingWorkOrders = 0;
   int _urgentWorkOrders = 0;
-  int _activeWorkers = 0;
-  int _totalWorkers = 0;
+  int _workersClockedToday = 0;
+  List<String> _workersClockedTodayNames = <String>[];
   int _pendingLeaves = 0;
   int _approvedLeavesToday = 0;
 
@@ -35,7 +37,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     if (token == null || token.isEmpty) {
       setState(() {
         _isLoading = false;
-        _error = 'No hay sesion activa';
+        _error = 'No hay sesión activa';
       });
       return;
     }
@@ -47,12 +49,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
     try {
       final workOrdersVm = context.read<WorkOrdersViewModel>();
-      final workersVm = context.read<WorkersViewModel>();
       final leaveService = context.read<LeaveService>();
+      final timeTrackingService = context.read<TimeTrackingService>();
 
       await workOrdersVm.loadWorkOrders();
-      await workersVm.loadWorkers();
       final leaves = await leaveService.getLeaveRequests(token);
+      final todaySummary = await timeTrackingService.getTodaySummary(token);
 
       final now = DateTime.now();
       final approvedToday = leaves.where((item) {
@@ -70,14 +72,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
       setState(() {
         _pendingWorkOrders = workOrdersVm.workOrders
-            .where((item) => item.status == 'NEW' || item.status == 'IN_PROGRESS')
+            .where(
+              (item) => item.status == 'NEW' || item.status == 'IN_PROGRESS',
+            )
             .length;
         _urgentWorkOrders = workOrdersVm.workOrders
             .where((item) => item.priority == 'URGENT')
             .length;
-        _activeWorkers = workersVm.workers.where((item) => item.active).length;
-        _totalWorkers = workersVm.workers.length;
-        _pendingLeaves = leaves.where((item) => item.status == 'PENDING').length;
+        _workersClockedToday = todaySummary.clockedWorkersCount;
+        _workersClockedTodayNames = todaySummary.workerNames;
+        _pendingLeaves = leaves
+            .where((item) => item.status == 'PENDING')
+            .length;
         _approvedLeavesToday = approvedToday;
       });
     } catch (e) {
@@ -104,20 +110,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('Resumen General', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
+            const NavalgoPageIntro(
+              eyebrow: 'RESUMEN OPERATIVO',
+              title:
+                  'Supervisa carga de trabajo, equipo y avisos desde un mismo panel.',
+              subtitle:
+                  'Consulta partes pendientes, fichajes del día y ausencias por revisar al inicio de la jornada.',
+            ),
+            const SizedBox(height: 18),
             if (_isLoading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (_error != null)
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('No se pudo cargar dashboard: $_error'),
-                ),
-              )
+              NavalgoPanel(child: Text('No se pudo cargar el panel: $_error'))
             else
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -133,22 +140,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     children: [
-                      _buildStatCard('Partes Pendientes', '$_pendingWorkOrders', Icons.assignment, Colors.orange),
-                      _buildStatCard('Partes Urgentes', '$_urgentWorkOrders', Icons.warning, Colors.red),
-                      _buildStatCard('Mecanicos Activos', '$_activeWorkers/$_totalWorkers', Icons.engineering, Colors.blue),
-                      _buildStatCard('Ausencias Pendientes', '$_pendingLeaves', Icons.event_busy, Colors.purple),
+                      _buildStatCard(
+                        'Partes Pendientes',
+                        '$_pendingWorkOrders',
+                        Icons.assignment_outlined,
+                        NavalgoColors.sand,
+                      ),
+                      _buildStatCard(
+                        'Partes Urgentes',
+                        '$_urgentWorkOrders',
+                        Icons.warning_amber_rounded,
+                        NavalgoColors.coral,
+                      ),
+                      _buildStatCard(
+                        'Mecánicos activos hoy',
+                        '$_workersClockedToday',
+                        Icons.engineering,
+                        NavalgoColors.tide,
+                        note: _workersClockedTodayNames.isEmpty
+                            ? 'Sin fichajes registrados hoy.'
+                            : _workersClockedTodayNames.join(', '),
+                      ),
+                      _buildStatCard(
+                        'Ausencias Pendientes',
+                        '$_pendingLeaves',
+                        Icons.event_busy,
+                        NavalgoColors.harbor,
+                      ),
                     ],
                   );
                 },
               ),
             const SizedBox(height: 18),
-            Card(
+            NavalgoPanel(
               child: ListTile(
-                leading: const Icon(Icons.event_available, color: Colors.green),
+                contentPadding: EdgeInsets.zero,
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: NavalgoColors.foam,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(
+                    Icons.event_available,
+                    color: NavalgoColors.kelp,
+                  ),
+                ),
                 title: const Text('Ausencias aprobadas hoy'),
+                subtitle: const Text(
+                  'Visión rápida de asignaciones ya confirmadas.',
+                ),
                 trailing: Text(
                   '$_approvedLeavesToday',
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -158,45 +206,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String count, IconData icon, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxHeight < 140;
-            return Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, size: compact ? 30 : 40, color: color),
-                SizedBox(height: compact ? 8 : 12),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Text(
-                    count,
-                    style: TextStyle(
-                      fontSize: compact ? 24 : 32,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.grey.shade700,
-                    fontWeight: FontWeight.bold,
-                    fontSize: compact ? 13 : 14,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+  Widget _buildStatCard(
+    String title,
+    String count,
+    IconData icon,
+    Color color, {
+    String? note,
+  }) {
+    return NavalgoMetricCard(
+      label: title,
+      value: count,
+      icon: icon,
+      accent: color,
+      note: note,
     );
   }
 }

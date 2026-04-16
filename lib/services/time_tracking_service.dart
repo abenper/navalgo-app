@@ -8,11 +8,15 @@ class TimeTrackingService {
 
   final ApiClient _apiClient;
 
-  Future<TimeEntry> clockIn(String token, {required int workerId}) async {
+  Future<TimeEntry> clockIn(
+    String token, {
+    required int workerId,
+    required String workSite,
+  }) async {
     final data = await _apiClient.post(
       '/time-entries/clock-in',
       headers: {'Authorization': 'Bearer $token'},
-      body: {'workerId': workerId},
+      body: {'workerId': workerId, 'workSite': workSite},
     );
     return TimeEntry.fromJson(data as Map<String, dynamic>);
   }
@@ -26,7 +30,10 @@ class TimeTrackingService {
     return TimeEntry.fromJson(data as Map<String, dynamic>);
   }
 
-  Future<List<TimeEntry>> getByWorker(String token, {required int workerId}) async {
+  Future<List<TimeEntry>> getByWorker(
+    String token, {
+    required int workerId,
+  }) async {
     final data = await _apiClient.get(
       '/time-entries/worker/$workerId',
       headers: {'Authorization': 'Bearer $token'},
@@ -37,5 +44,13 @@ class TimeTrackingService {
     return data
         .map((e) => TimeEntry.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<TodayClockedWorkersSummary> getTodaySummary(String token) async {
+    final data = await _apiClient.get(
+      '/time-entries/today-summary',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    return TodayClockedWorkersSummary.fromJson(data as Map<String, dynamic>);
   }
 }

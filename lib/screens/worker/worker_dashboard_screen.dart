@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../models/leave_request.dart';
 import '../../services/leave_service.dart';
 import '../../services/time_tracking_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/work_orders_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
   const WorkerDashboardScreen({super.key});
@@ -36,7 +38,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     if (token == null || workerId == null) {
       setState(() {
         _isLoading = false;
-        _error = 'Sesion no valida';
+        _error = 'Sesión no válida';
       });
       return;
     }
@@ -51,7 +53,10 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       final workOrdersVm = context.read<WorkOrdersViewModel>();
       final timeService = context.read<TimeTrackingService>();
 
-      final balance = await leaveService.getLeaveBalance(token, workerId: workerId);
+      final balance = await leaveService.getLeaveBalance(
+        token,
+        workerId: workerId,
+      );
       await workOrdersVm.loadWorkOrders(workerId: workerId);
       final myWorkOrders = workOrdersVm.workOrders;
 
@@ -64,7 +69,10 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       final totalToday = todayEntries.fold<Duration>(
         Duration.zero,
         (acc, entry) =>
-            acc + ((entry.clockOut?.toLocal() ?? now).difference(entry.clockIn.toLocal())),
+            acc +
+            ((entry.clockOut?.toLocal() ?? now).difference(
+              entry.clockIn.toLocal(),
+            )),
       );
 
       if (!mounted) return;
@@ -72,9 +80,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       setState(() {
         _balance = balance;
         _myTasks = myWorkOrders
-            .where((item) => item.status == 'NEW' || item.status == 'IN_PROGRESS')
+            .where(
+              (item) => item.status == 'NEW' || item.status == 'IN_PROGRESS',
+            )
             .length;
-        _urgentTasks = myWorkOrders.where((item) => item.priority == 'URGENT').length;
+        _urgentTasks = myWorkOrders
+            .where((item) => item.priority == 'URGENT')
+            .length;
         _hoursToday = _formatDuration(totalToday);
       });
     } catch (e) {
@@ -97,26 +109,11 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               sliver: SliverToBoxAdapter(
-                child: Text(
-                  'Hola, $workerName',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 4)),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
-              sliver: SliverToBoxAdapter(
-                child: Text(
-                  'Tu jornada de hoy',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodyMedium
-                      ?.copyWith(color: Colors.grey),
+                child: NavalgoPageIntro(
+                  eyebrow: 'PANEL PERSONAL',
+                  title: 'Hola, $workerName',
+                  subtitle:
+                      'Consulta tus partes, tus horas de hoy y tus días disponibles desde un mismo panel.',
                 ),
               ),
             ),
@@ -129,11 +126,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               SliverPadding(
                 padding: const EdgeInsets.all(16),
                 sliver: SliverToBoxAdapter(
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text('No se pudo cargar dashboard: $_error'),
-                    ),
+                  child: NavalgoPanel(
+                    child: Text('No se pudo cargar el resumen: $_error'),
                   ),
                 ),
               )
@@ -153,22 +147,22 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         childAspectRatio: 1.05,
                         children: [
                           _buildStatCard(
-                            'Mis Tareas',
+                            'Mis partes',
                             '$_myTasks',
                             Icons.assignment_ind,
-                            Colors.blue,
+                            NavalgoColors.tide,
                           ),
                           _buildStatCard(
                             'Urgentes',
                             '$_urgentTasks',
                             Icons.warning_amber_rounded,
-                            Colors.red,
+                            NavalgoColors.coral,
                           ),
                           _buildStatCard(
-                            'Horas Hoy',
+                            'Horas de hoy',
                             _hoursToday,
                             Icons.timer_outlined,
-                            Colors.green,
+                            NavalgoColors.kelp,
                           ),
                           _buildVacCard(_balance),
                         ],
@@ -185,96 +179,41 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 34, color: color),
-            const SizedBox(height: 8),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                value,
-                style: const TextStyle(
-                    fontSize: 28, fontWeight: FontWeight.bold),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              overflow: TextOverflow.ellipsis,
-              maxLines: 2,
-              style: const TextStyle(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 12),
-            ),
-          ],
-        ),
-      ),
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    String? note,
+  }) {
+    return NavalgoMetricCard(
+      label: title,
+      value: value,
+      icon: icon,
+      accent: color,
+      note: note,
     );
   }
 
   Widget _buildVacCard(LeaveBalance? balance) {
-    final available = balance?.availableDays.round() ?? 0;
-    final accrued = balance?.accruedDays.round() ?? 0;
-    final consumed = balance?.consumedDays ?? 0;
+    final available = balance?.availableDays ?? 0;
+    final bonus = balance?.bonusDays ?? 0;
 
-    return Card(
-      color: Colors.purple.shade50,
-      child: Padding(
-        padding: const EdgeInsets.all(10),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(Icons.beach_access_rounded,
-                size: 28, color: Colors.purple.shade700),
-            const SizedBox(height: 6),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                '$available d',
-                style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.purple.shade900),
-              ),
-            ),
-            const SizedBox(height: 2),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                '+$accrued  −$consumed',
-                style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.purple.shade600),
-              ),
-            ),
-            const SizedBox(height: 2),
-            const Text(
-              'Vacaciones',
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
+    return _buildStatCard(
+      'Vacaciones',
+      '$available d',
+      Icons.beach_access_rounded,
+      NavalgoColors.harbor,
+      note: bonus > 0
+          ? 'Días naturales · +$bonus extra por viaje'
+          : 'Días naturales disponibles',
     );
   }
 
   String _formatDuration(Duration duration) {
     if (duration.isNegative) return '0h 00m';
     final hours = duration.inHours;
-    final minutes =
-        duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     return '${hours}h ${minutes}m';
   }
 }

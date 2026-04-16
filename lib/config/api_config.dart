@@ -3,7 +3,7 @@ class ApiConfig {
 
   static const String baseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://104.248.22.99:8080/api',
+    defaultValue: 'https://api.naval-go.com/api',
   );
 
   static const bool useMockApi = bool.fromEnvironment(

@@ -70,7 +70,9 @@ class _PartesScreenState extends State<PartesScreen> {
 
     if (fleetVm.owners.isEmpty) {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Crea un propietario antes de crear partes')),
+        const SnackBar(
+          content: Text('Crea un propietario antes de crear partes'),
+        ),
       );
       return;
     }
@@ -99,10 +101,12 @@ class _PartesScreenState extends State<PartesScreen> {
         vesselId: input.vesselId,
         workerIds: input.workerIds,
         engineHours: input.engineHours
-            .map((item) => <String, dynamic>{
-                  'engineLabel': item.engineLabel,
-                  'hours': item.hours,
-                })
+            .map(
+              (item) => <String, dynamic>{
+                'engineLabel': item.engineLabel,
+                'hours': item.hours,
+              },
+            )
             .toList(),
         attachmentUrls: input.attachments.map((item) => item.fileUrl).toList(),
         attachments: input.attachments,
@@ -138,8 +142,8 @@ class _PartesScreenState extends State<PartesScreen> {
 
     final session = context.read<SessionViewModel>();
     await context.read<WorkOrdersViewModel>().loadWorkOrders(
-          workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
-        );
+      workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
+    );
   }
 
   Future<void> _deleteWorkOrderFromList(WorkOrder parte) async {
@@ -159,7 +163,10 @@ class _PartesScreenState extends State<PartesScreen> {
           '¿Seguro que quieres borrar "${parte.title}"? Se eliminarán también firma y adjuntos.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
             onPressed: () => Navigator.pop(context, true),
@@ -176,8 +183,8 @@ class _PartesScreenState extends State<PartesScreen> {
     try {
       await workOrderService.deleteWorkOrder(token, workOrderId: parte.id);
       await workOrdersViewModel.loadWorkOrders(
-            workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
-          );
+        workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
+      );
       if (!mounted) {
         return;
       }
@@ -195,273 +202,346 @@ class _PartesScreenState extends State<PartesScreen> {
     final vm = context.watch<WorkOrdersViewModel>();
     final isAdmin = context.watch<SessionViewModel>().user?.role == 'ADMIN';
     final workOrders = vm.workOrders;
-    final signedCount = vm.workOrders.where((item) => item.signatureUrl?.isNotEmpty ?? false).length;
-    final pendingSignatureCount = vm.workOrders.where((item) => item.signatureUrl?.isEmpty ?? true).length;
-    final highPriorityCount = vm.workOrders.where((item) => _isHighPriority(item.priority)).length;
+    final signedCount = vm.workOrders
+        .where((item) => item.signatureUrl?.isNotEmpty ?? false)
+        .length;
+    final pendingSignatureCount = vm.workOrders
+        .where((item) => item.signatureUrl?.isEmpty ?? true)
+        .length;
+    final highPriorityCount = vm.workOrders
+        .where((item) => _isHighPriority(item.priority))
+        .length;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7FA),
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : vm.error != null
-              ? Center(child: Text(vm.error!))
-              : RefreshIndicator(
-                  onRefresh: () async {
-                    final session = context.read<SessionViewModel>();
-                    await vm.loadWorkOrders(
-                      workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
-                    );
-                  },
-                  child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
-                    itemCount: workOrders.isEmpty ? 1 : workOrders.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1240),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(28),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(28),
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFF0B2D3A), Color(0xFF124B61), Color(0xFF1F6A7D)],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF0B2D3A).withValues(alpha: 0.22),
-                                      blurRadius: 32,
-                                      offset: const Offset(0, 16),
-                                    ),
+          ? Center(child: Text(vm.error!))
+          : RefreshIndicator(
+              onRefresh: () async {
+                final session = context.read<SessionViewModel>();
+                await vm.loadWorkOrders(
+                  workerId: session.user?.role == 'ADMIN'
+                      ? null
+                      : session.user?.id,
+                );
+              },
+              child: ListView.builder(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
+                itemCount: workOrders.isEmpty ? 1 : workOrders.length + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 1240),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(28),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(28),
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF0B2D3A),
+                                    Color(0xFF124B61),
+                                    Color(0xFF1F6A7D),
                                   ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Cuaderno de Taller Naval',
-                                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800,
-                                        letterSpacing: -0.8,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Gestiona partes, firmas y evidencias con una vista más clara para operaciones de muelle y mantenimiento.',
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: Colors.white.withValues(alpha: 0.84),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 18),
-                                    Wrap(
-                                      spacing: 14,
-                                      runSpacing: 14,
-                                      children: [
-                                        _FleetMetricCard(
-                                          label: 'Firmados',
-                                          value: '$signedCount',
-                                          tone: const Color(0xFF3BAA6E),
-                                        ),
-                                        _FleetMetricCard(
-                                          label: 'Pendientes de firma',
-                                          value: '$pendingSignatureCount',
-                                          tone: const Color(0xFFD55A4E),
-                                        ),
-                                        _FleetMetricCard(
-                                          label: 'Prioridad alta',
-                                          value: '$highPriorityCount',
-                                          tone: const Color(0xFFD5A021),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: 26),
-                              Text(
-                                'Partes activos',
-                                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                  color: const Color(0xFF102B36),
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Verde para firmados, rojo para pendientes de firma y etiqueta amarilla para prioridad alta.',
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: const Color(0xFF5A707A),
-                                ),
-                              ),
-                              const SizedBox(height: 18),
-                              if (workOrders.isEmpty)
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.all(20),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(18),
-                                    border: Border.all(color: const Color(0xFFDAE5EA)),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF0B2D3A,
+                                    ).withValues(alpha: 0.22),
+                                    blurRadius: 32,
+                                    offset: const Offset(0, 16),
                                   ),
-                                  child: const Text(
-                                    'No hay partes para mostrar. Crea un nuevo parte para comenzar.',
-                                    style: TextStyle(
-                                      color: Color(0xFF48626D),
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Cuaderno de Taller Naval',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: -0.8,
+                                        ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }
-
-                      final parte = workOrders[index - 1];
-                      final bool isSigned = parte.signatureUrl?.isNotEmpty ?? false;
-                      final bool isHighPriority = _isHighPriority(parte.priority);
-                      final Color accentColor = isSigned
-                          ? const Color(0xFF3BAA6E)
-                          : const Color(0xFFD55A4E);
-                      final Color surfaceColor = isSigned
-                          ? const Color(0xFFF2FBF6)
-                          : const Color(0xFFFFF4F3);
-
-                      return Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1240),
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(24),
-                                onTap: () => _openPartDetails(parte),
-                                child: Ink(
-                                  decoration: BoxDecoration(
-                                    color: surfaceColor,
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(color: accentColor.withValues(alpha: 0.28)),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: accentColor.withValues(alpha: 0.08),
-                                        blurRadius: 24,
-                                        offset: const Offset(0, 12),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Gestiona partes, firmas y evidencias con una vista más clara para operaciones de muelle y mantenimiento.',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.84,
+                                          ),
+                                        ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Wrap(
+                                    spacing: 14,
+                                    runSpacing: 14,
+                                    children: [
+                                      _FleetMetricCard(
+                                        label: 'Firmados',
+                                        value: '$signedCount',
+                                        tone: const Color(0xFF3BAA6E),
+                                      ),
+                                      _FleetMetricCard(
+                                        label: 'Pendientes de firma',
+                                        value: '$pendingSignatureCount',
+                                        tone: const Color(0xFFD55A4E),
+                                      ),
+                                      _FleetMetricCard(
+                                        label: 'Prioridad alta',
+                                        value: '$highPriorityCount',
+                                        tone: const Color(0xFFD5A021),
                                       ),
                                     ],
                                   ),
-                                  child: Row(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Container(
-                                        width: 8,
-                                        decoration: BoxDecoration(
-                                          color: accentColor,
-                                          borderRadius: const BorderRadius.horizontal(left: Radius.circular(24)),
-                                        ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 26),
+                            Text(
+                              'Partes activos',
+                              style: Theme.of(context).textTheme.headlineSmall
+                                  ?.copyWith(
+                                    color: const Color(0xFF102B36),
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Verde para firmados, rojo para pendientes de firma y etiqueta amarilla para prioridad alta.',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(color: const Color(0xFF5A707A)),
+                            ),
+                            const SizedBox(height: 18),
+                            if (workOrders.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(18),
+                                  border: Border.all(
+                                    color: const Color(0xFFDAE5EA),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'No hay partes para mostrar. Crea un nuevo parte para comenzar.',
+                                  style: TextStyle(
+                                    color: Color(0xFF48626D),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  final parte = workOrders[index - 1];
+                  final bool isSigned = parte.signatureUrl?.isNotEmpty ?? false;
+                  final bool isHighPriority = _isHighPriority(parte.priority);
+                  final Color accentColor = isSigned
+                      ? const Color(0xFF3BAA6E)
+                      : const Color(0xFFD55A4E);
+                  final Color surfaceColor = isSigned
+                      ? const Color(0xFFF2FBF6)
+                      : const Color(0xFFFFF4F3);
+
+                  return Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 1240),
+                      child: Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24),
+                            onTap: () => _openPartDetails(parte),
+                            child: Ink(
+                              decoration: BoxDecoration(
+                                color: surfaceColor,
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: accentColor.withValues(alpha: 0.28),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accentColor.withValues(alpha: 0.08),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 12),
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      width: 8,
+                                      decoration: BoxDecoration(
+                                        color: accentColor,
+                                        borderRadius:
+                                            const BorderRadius.horizontal(
+                                              left: Radius.circular(24),
+                                            ),
                                       ),
-                                      Expanded(
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        22,
+                                        20,
+                                        22,
+                                        20,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              Row(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        Text(
-                                                          parte.title,
-                                                          style: const TextStyle(
-                                                            fontSize: 20,
-                                                            fontWeight: FontWeight.w800,
-                                                            color: Color(0xFF0F2530),
-                                                          ),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      parte.title,
+                                                      style: const TextStyle(
+                                                        fontSize: 20,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        color: Color(
+                                                          0xFF0F2530,
                                                         ),
-                                                        const SizedBox(height: 6),
-                                                        Text(
-                                                          parte.ownerName,
-                                                          style: const TextStyle(
-                                                            fontSize: 15,
-                                                            fontWeight: FontWeight.w600,
-                                                            color: Color(0xFF40606C),
-                                                          ),
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Text(
+                                                      parte.ownerName,
+                                                      style: const TextStyle(
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Color(
+                                                          0xFF40606C,
                                                         ),
-                                                      ],
+                                                      ),
                                                     ),
-                                                  ),
-                                                  if (isAdmin)
-                                                    IconButton(
-                                                      tooltip: 'Borrar parte',
-                                                      onPressed: () => _deleteWorkOrderFromList(parte),
-                                                      icon: const Icon(Icons.delete_outline),
-                                                      color: const Color(0xFF9B2C20),
-                                                    ),
-                                                  const SizedBox(width: 8),
-                                                  const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFF64808B)),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                children: [
-                                                  _PartBadge(
-                                                    label: isSigned ? 'Firmado' : 'Pendiente de firma',
-                                                    textColor: accentColor,
-                                                    backgroundColor: accentColor.withValues(alpha: 0.12),
-                                                  ),
-                                                  if (isHighPriority)
-                                                    const _PartBadge(
-                                                      label: 'Prioridad alta',
-                                                      textColor: Color(0xFF8A6200),
-                                                      backgroundColor: Color(0xFFFFF2CC),
-                                                    ),
-                                                  if (parte.vesselName != null && parte.vesselName!.trim().isNotEmpty)
-                                                    _PartBadge(
-                                                      label: parte.vesselName!,
-                                                      textColor: const Color(0xFF1E5166),
-                                                      backgroundColor: const Color(0xFFDDF0F6),
-                                                    ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 14),
-                                              Text(
-                                                'Mecánicos: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF4F6771),
-                                                  fontWeight: FontWeight.w500,
+                                                  ],
                                                 ),
                                               ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                'Creado: ${_formatDateTime(parte.createdAt)}',
-                                                style: const TextStyle(color: Color(0xFF738892)),
+                                              if (isAdmin)
+                                                IconButton(
+                                                  tooltip: 'Borrar parte',
+                                                  onPressed: () =>
+                                                      _deleteWorkOrderFromList(
+                                                        parte,
+                                                      ),
+                                                  icon: const Icon(
+                                                    Icons.delete_outline,
+                                                  ),
+                                                  color: const Color(
+                                                    0xFF9B2C20,
+                                                  ),
+                                                ),
+                                              const SizedBox(width: 8),
+                                              const Icon(
+                                                Icons.arrow_forward_ios,
+                                                size: 16,
+                                                color: Color(0xFF64808B),
                                               ),
                                             ],
                                           ),
-                                        ),
+                                          const SizedBox(height: 16),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              _PartBadge(
+                                                label: isSigned
+                                                    ? 'Firmado'
+                                                    : 'Pendiente de firma',
+                                                textColor: accentColor,
+                                                backgroundColor: accentColor
+                                                    .withValues(alpha: 0.12),
+                                              ),
+                                              if (isHighPriority)
+                                                const _PartBadge(
+                                                  label: 'Prioridad alta',
+                                                  textColor: Color(0xFF8A6200),
+                                                  backgroundColor: Color(
+                                                    0xFFFFF2CC,
+                                                  ),
+                                                ),
+                                              if (parte.vesselName != null &&
+                                                  parte.vesselName!
+                                                      .trim()
+                                                      .isNotEmpty)
+                                                _PartBadge(
+                                                  label: parte.vesselName!,
+                                                  textColor: const Color(
+                                                    0xFF1E5166,
+                                                  ),
+                                                  backgroundColor: const Color(
+                                                    0xFFDDF0F6,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 14),
+                                          Text(
+                                            'Mecánicos: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF4F6771),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Creado: ${_formatDateTime(parte.createdAt)}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF738892),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
       bottomNavigationBar: isAdmin
           ? SafeArea(
               top: false,
@@ -474,8 +554,13 @@ class _PartesScreenState extends State<PartesScreen> {
                         style: FilledButton.styleFrom(
                           backgroundColor: const Color(0xFF0E4457),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 22,
+                            vertical: 18,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         onPressed: _openCreateDialog,
                         icon: const Icon(Icons.assignment_add),
@@ -533,7 +618,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       penColor: Colors.black,
       exportBackgroundColor: Colors.white,
     );
-    _observationsCtrl = TextEditingController(text: _workOrder.description ?? '');
+    _observationsCtrl = TextEditingController(
+      text: _workOrder.description ?? '',
+    );
     _syncWorkInputsFromWorkOrder();
   }
 
@@ -549,10 +636,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
 
   bool get _isAdmin => context.read<SessionViewModel>().user?.role == 'ADMIN';
   bool get _isWorker => context.read<SessionViewModel>().user?.role == 'WORKER';
-  bool get _hasEditPermission => context.read<SessionViewModel>().user?.canEditWorkOrders ?? false;
+  bool get _hasEditPermission =>
+      context.read<SessionViewModel>().user?.canEditWorkOrders ?? false;
   bool get _canEditPart => _isAdmin || (_isWorker && _hasEditPermission);
   bool get _canUpdateWorkLog => _isAdmin || _isWorker;
-  bool get _isSigned => _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
+  bool get _isSigned =>
+      _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
   bool get _canSign => _isWorker && !_isSigned;
 
   bool get _canDeleteMedia {
@@ -567,18 +656,22 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     final attachments = _workOrder.attachments.isNotEmpty
         ? _workOrder.attachments
         : _workOrder.attachmentUrls
-            .map((url) => WorkOrderAttachmentItem(
+              .map(
+                (url) => WorkOrderAttachmentItem(
                   id: null,
                   fileUrl: url,
-                  fileType: url.toLowerCase().endsWith('.mp4') ? 'VIDEO' : 'IMAGE',
+                  fileType: url.toLowerCase().endsWith('.mp4')
+                      ? 'VIDEO'
+                      : 'IMAGE',
                   originalFileName: null,
                   capturedAt: null,
                   latitude: null,
                   longitude: null,
                   watermarked: false,
                   audioRemoved: false,
-                ))
-            .toList();
+                ),
+              )
+              .toList();
 
     return SafeArea(
       child: Padding(
@@ -602,7 +695,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                if (_isHighPriority(_workOrder.priority)) const Chip(label: Text('Prioridad alta')),
+                if (_isHighPriority(_workOrder.priority))
+                  const Chip(label: Text('Prioridad alta')),
                 if (_isSigned) const Chip(label: Text('Firmado')),
               ],
             ),
@@ -611,7 +705,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
               child: ListView(
                 children: [
                   _DetailRow(label: 'Propietario', value: _workOrder.ownerName),
-                  _DetailRow(label: 'Embarcacion', value: _workOrder.vesselName ?? 'Sin embarcacion'),
+                  _DetailRow(
+                    label: 'Embarcación',
+                    value: _workOrder.vesselName ?? 'Sin embarcación',
+                  ),
                   _DetailRow(
                     label: 'Asignados',
                     value: _workOrder.workerNames.isEmpty
@@ -623,7 +720,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                     value: _workOrder.createdAt.toLocal().toString(),
                   ),
                   const SizedBox(height: 10),
-                  const Text('Observaciones', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Observaciones',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 6),
                   TextField(
                     controller: _observationsCtrl,
@@ -635,7 +735,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text('Horas de motor', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Horas de motor',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   if (_engineHoursControllers.isEmpty)
                     const Text('Sin motores disponibles para este parte')
@@ -668,14 +771,23 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   ],
                   if (_workOrder.engineHours.isNotEmpty) ...[
                     const SizedBox(height: 10),
-                    const Text('Ultimo registro guardado', style: TextStyle(fontWeight: FontWeight.bold)),
+                    const Text(
+                      'Ultimo registro guardado',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 4),
                     ..._workOrder.engineHours.map(
-                      (item) => _DetailRow(label: item.engineLabel, value: '${item.hours} h'),
+                      (item) => _DetailRow(
+                        label: item.engineLabel,
+                        value: '${item.hours} h',
+                      ),
                     ),
                   ],
                   const SizedBox(height: 14),
-                  const Text('Firma', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text(
+                    'Firma',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                   const SizedBox(height: 6),
                   if (_isSigned) ...[
                     Text(
@@ -707,7 +819,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                     Row(
                       children: [
                         OutlinedButton.icon(
-                          onPressed: () => _openExternal(_workOrder.signatureUrl!),
+                          onPressed: () =>
+                              _openExternal(_workOrder.signatureUrl!),
                           icon: const Icon(Icons.open_in_new),
                           label: const Text('Abrir firma'),
                         ),
@@ -742,7 +855,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton.icon(
-                          onPressed: _busy || _signing ? null : _sigController.clear,
+                          onPressed: _busy || _signing
+                              ? null
+                              : _sigController.clear,
                           icon: const Icon(Icons.clear, size: 18),
                           label: const Text('Borrar firma'),
                         ),
@@ -766,28 +881,34 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                           spacing: 8,
                           runSpacing: 8,
                           children: _proofFiles
-                              .map((proof) => Chip(
-                                    avatar: Icon(
-                                      proof.mimeType.startsWith('video/')
-                                          ? Icons.videocam
-                                          : Icons.image,
-                                      size: 16,
-                                    ),
-                                    label: Text(
-                                      proof.fileName,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    onDeleted: _busy || _signing
-                                        ? null
-                                        : () => setState(() => _proofFiles.remove(proof)),
-                                  ))
+                              .map(
+                                (proof) => Chip(
+                                  avatar: Icon(
+                                    proof.mimeType.startsWith('video/')
+                                        ? Icons.videocam
+                                        : Icons.image,
+                                    size: 16,
+                                  ),
+                                  label: Text(
+                                    proof.fileName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  onDeleted: _busy || _signing
+                                      ? null
+                                      : () => setState(
+                                          () => _proofFiles.remove(proof),
+                                        ),
+                                ),
+                              )
                               .toList(),
                         ),
                       const SizedBox(height: 10),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
-                          onPressed: _busy || _signing ? null : _submitInlineSignature,
+                          onPressed: _busy || _signing
+                              ? null
+                              : _submitInlineSignature,
                           icon: _signing
                               ? const SizedBox(
                                   width: 16,
@@ -798,13 +919,18 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                                   ),
                                 )
                               : const Icon(Icons.draw),
-                          label: Text(_signing ? 'Enviando...' : 'Firmar y enviar'),
+                          label: Text(
+                            _signing ? 'Enviando...' : 'Firmar y enviar',
+                          ),
                         ),
                       ),
                     ],
                   ],
                   const SizedBox(height: 14),
-                  const Text('Multimedia', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const Text(
+                    'Multimedia',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                   const SizedBox(height: 6),
                   if (_canDeleteMedia)
                     Align(
@@ -821,11 +947,17 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                     ...attachments.map((item) {
                       return Card(
                         child: ListTile(
-                          leading: Icon(item.fileType == 'VIDEO' ? Icons.videocam : Icons.image),
+                          leading: Icon(
+                            item.fileType == 'VIDEO'
+                                ? Icons.videocam
+                                : Icons.image,
+                          ),
                           title: Text(item.originalFileName ?? 'Adjunto'),
-                          subtitle: Text(item.capturedAt == null
-                              ? item.fileUrl
-                              : 'Hora: ${item.capturedAt!.toLocal()}'),
+                          subtitle: Text(
+                            item.capturedAt == null
+                                ? item.fileUrl
+                                : 'Hora: ${item.capturedAt!.toLocal()}',
+                          ),
                           trailing: Wrap(
                             spacing: 4,
                             children: [
@@ -835,7 +967,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                               ),
                               if (_canDeleteMedia)
                                 IconButton(
-                                  onPressed: _busy ? null : () => _deleteAttachment(item),
+                                  onPressed: _busy
+                                      ? null
+                                      : () => _deleteAttachment(item),
                                   icon: const Icon(Icons.delete_outline),
                                 ),
                             ],
@@ -861,8 +995,14 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   if (_canEditPart) const SizedBox(width: 8),
                   OutlinedButton.icon(
                     onPressed: _busy ? null : _deleteWorkOrder,
-                    icon: Icon(Icons.delete_forever, color: Colors.red.shade700),
-                    label: Text('Borrar parte', style: TextStyle(color: Colors.red.shade700)),
+                    icon: Icon(
+                      Icons.delete_forever,
+                      color: Colors.red.shade700,
+                    ),
+                    label: Text(
+                      'Borrar parte',
+                      style: TextStyle(color: Colors.red.shade700),
+                    ),
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: Colors.red.shade300),
                     ),
@@ -877,7 +1017,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
   }
 
   Future<void> _openExternal(String url) async {
-    final opened = await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    final opened = await launchUrl(
+      Uri.parse(url),
+      mode: LaunchMode.externalApplication,
+    );
     if (!opened && mounted) {
       AppToast.error(context, 'No se pudo abrir el archivo.');
     }
@@ -893,21 +1036,26 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     for (final entry in _engineHoursControllers.entries) {
       final parsed = int.tryParse(entry.value.text.trim());
       if (parsed == null) {
-        AppToast.warning(context, 'Todas las horas de motor deben ser numeros enteros.');
+        AppToast.warning(
+          context,
+          'Todas las horas de motor deben ser números enteros.',
+        );
         return;
       }
       engineHours.add({'engineLabel': entry.key, 'hours': parsed});
     }
-    final engineHoursPayload = _engineHoursControllers.isEmpty ? null : engineHours;
+    final engineHoursPayload = _engineHoursControllers.isEmpty
+        ? null
+        : engineHours;
 
     setState(() => _busy = true);
     try {
       final updated = await context.read<WorkOrderService>().updateWorkOrder(
-            token,
-            workOrderId: _workOrder.id,
-            description: _observationsCtrl.text.trim(),
-            engineHours: engineHoursPayload,
-          );
+        token,
+        workOrderId: _workOrder.id,
+        description: _observationsCtrl.text.trim(),
+        engineHours: engineHoursPayload,
+      );
       if (!mounted) {
         return;
       }
@@ -939,11 +1087,15 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       if (result == null) return;
       for (final file in result.files) {
         if (file.bytes != null && file.bytes!.isNotEmpty) {
-          setState(() => _proofFiles.add(_PickedProof(
+          setState(
+            () => _proofFiles.add(
+              _PickedProof(
                 fileName: file.name,
                 bytes: file.bytes!,
                 mimeType: _guessMimeType(file.name),
-              )));
+              ),
+            ),
+          );
         }
       }
     } else {
@@ -952,11 +1104,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
       final mime = picked.mimeType ?? _guessMimeType(picked.name);
-      setState(() => _proofFiles.add(_PickedProof(
-            fileName: picked.name,
-            bytes: bytes,
-            mimeType: mime,
-          )));
+      setState(
+        () => _proofFiles.add(
+          _PickedProof(fileName: picked.name, bytes: bytes, mimeType: mime),
+        ),
+      );
     }
   }
 
@@ -994,11 +1146,13 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         signatureBytes: signatureBytes,
         signatureMimeType: 'image/png',
         proofFiles: _proofFiles
-            .map((p) => ProofFile(
-                  fileName: p.fileName,
-                  bytes: p.bytes,
-                  mimeType: p.mimeType,
-                ))
+            .map(
+              (p) => ProofFile(
+                fileName: p.fileName,
+                bytes: p.bytes,
+                mimeType: p.mimeType,
+              ),
+            )
             .toList(),
         latitude: position?.latitude,
         longitude: position?.longitude,
@@ -1031,7 +1185,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
   Future<void> _pickAndUploadMediaForPart() async {
     final token = context.read<SessionViewModel>().token;
     if (token == null || token.isEmpty) {
-      AppToast.error(context, 'No hay sesion activa para subir archivos.');
+      AppToast.error(context, 'No hay sesión activa para subir archivos.');
       return;
     }
 
@@ -1128,13 +1282,13 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     setState(() => _busy = true);
     try {
       final updated = await workOrderService.updateWorkOrder(
-            token,
-            workOrderId: _workOrder.id,
-            ownerId: result.ownerId,
-            vesselId: result.vesselId,
-            workerIds: result.workerIds,
+        token,
+        workOrderId: _workOrder.id,
+        ownerId: result.ownerId,
+        vesselId: result.vesselId,
+        workerIds: result.workerIds,
         priority: result.highPriority ? 'HIGH' : 'NORMAL',
-          );
+      );
       if (!mounted) {
         return;
       }
@@ -1159,9 +1313,14 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Borrar parte'),
-        content: Text('¿Seguro que quieres eliminar "${_workOrder.title}"? Esta acción no se puede deshacer.'),
+        content: Text(
+          '¿Seguro que quieres eliminar "${_workOrder.title}"? Esta acción no se puede deshacer.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
             onPressed: () => Navigator.pop(context, true),
@@ -1182,7 +1341,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
 
     setState(() => _busy = true);
     try {
-      await context.read<WorkOrderService>().deleteWorkOrder(token, workOrderId: _workOrder.id);
+      await context.read<WorkOrderService>().deleteWorkOrder(
+        token,
+        workOrderId: _workOrder.id,
+      );
       if (!mounted) {
         return;
       }
@@ -1209,10 +1371,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     setState(() => _busy = true);
     try {
       final updated = await context.read<WorkOrderService>().updateWorkOrder(
-            token,
-            workOrderId: _workOrder.id,
-            clearSignature: true,
-          );
+        token,
+        workOrderId: _workOrder.id,
+        clearSignature: true,
+      );
       if (!mounted) {
         return;
       }
@@ -1242,10 +1404,16 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('Borrar adjunto'),
-        content: const Text('Esta accion no se puede deshacer. ¿Continuar?'),
+        content: const Text('Esta acción no se puede deshacer. ¿Continuar?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Borrar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Borrar'),
+          ),
         ],
       ),
     );
@@ -1262,10 +1430,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     setState(() => _busy = true);
     try {
       final updated = await context.read<WorkOrderService>().deleteAttachment(
-            token,
-            workOrderId: _workOrder.id,
-            attachmentId: item.id!,
-          );
+        token,
+        workOrderId: _workOrder.id,
+        attachmentId: item.id!,
+      );
       if (!mounted) {
         return;
       }
@@ -1289,7 +1457,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     _observationsCtrl.text = _workOrder.description ?? '';
 
     final existingValues = <String, String>{
-      for (final entry in _engineHoursControllers.entries) entry.key: entry.value.text,
+      for (final entry in _engineHoursControllers.entries)
+        entry.key: entry.value.text,
     };
     for (final controller in _engineHoursControllers.values) {
       controller.dispose();
@@ -1323,7 +1492,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
 
   List<String> _resolveEngineLabelsFromWorkOrder() {
     final fleetVm = context.read<FleetViewModel>();
-    final vessel = fleetVm.vessels.where((item) => item.id == _workOrder.vesselId).firstOrNull;
+    final vessel = fleetVm.vessels
+        .where((item) => item.id == _workOrder.vesselId)
+        .firstOrNull;
     if (vessel == null) {
       return _workOrder.engineHours.map((item) => item.engineLabel).toList();
     }
@@ -1357,7 +1528,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     final session = context.read<SessionViewModel>();
     final vm = context.read<WorkOrdersViewModel>();
     await vm.loadWorkOrders(workerId: _isAdmin ? null : session.user?.id);
-    final updated = vm.workOrders.where((item) => item.id == _workOrder.id).firstOrNull;
+    final updated = vm.workOrders
+        .where((item) => item.id == _workOrder.id)
+        .firstOrNull;
     if (updated != null && mounted) {
       setState(() {
         _workOrder = updated;
@@ -1381,7 +1554,10 @@ class _DetailRow extends StatelessWidget {
         text: TextSpan(
           style: DefaultTextStyle.of(context).style,
           children: [
-            TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.w600)),
+            TextSpan(
+              text: '$label: ',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
             TextSpan(text: value),
           ],
         ),
@@ -1432,7 +1608,9 @@ class _EditPartDialogState extends State<_EditPartDialog> {
     super.initState();
     _ownerId = widget.workOrder.ownerId;
     _vesselId = widget.workOrder.vesselId;
-    _highPriority = widget.workOrder.priority == 'HIGH' || widget.workOrder.priority == 'URGENT';
+    _highPriority =
+        widget.workOrder.priority == 'HIGH' ||
+        widget.workOrder.priority == 'URGENT';
     _selectedWorkers = widget.workOrder.workerIds.toSet();
   }
 
@@ -1443,8 +1621,12 @@ class _EditPartDialogState extends State<_EditPartDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final ownerVessels = widget.vessels.where((v) => v.ownerId == _ownerId).toList();
-    final validVessel = ownerVessels.any((v) => v.id == _vesselId) ? _vesselId : null;
+    final ownerVessels = widget.vessels
+        .where((v) => v.ownerId == _ownerId)
+        .toList();
+    final validVessel = ownerVessels.any((v) => v.id == _vesselId)
+        ? _vesselId
+        : null;
 
     return SafeArea(
       child: Padding(
@@ -1458,24 +1640,40 @@ class _EditPartDialogState extends State<_EditPartDialog> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Editar parte', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text(
+                'Editar parte',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 12),
               Text(
                 widget.workOrder.title,
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<int>(
                 initialValue: _ownerId,
-                decoration: const InputDecoration(labelText: 'Propietario', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Propietario',
+                  border: OutlineInputBorder(),
+                ),
                 items: widget.owners
-                    .map((o) => DropdownMenuItem<int>(value: o.id, child: Text(o.displayName)))
+                    .map(
+                      (o) => DropdownMenuItem<int>(
+                        value: o.id,
+                        child: Text(o.displayName),
+                      ),
+                    )
                     .toList(),
                 onChanged: (value) {
                   if (value == null) return;
                   setState(() {
                     _ownerId = value;
-                    if (!widget.vessels.any((v) => v.ownerId == _ownerId && v.id == _vesselId)) {
+                    if (!widget.vessels.any(
+                      (v) => v.ownerId == _ownerId && v.id == _vesselId,
+                    )) {
                       _vesselId = null;
                     }
                   });
@@ -1484,10 +1682,21 @@ class _EditPartDialogState extends State<_EditPartDialog> {
               const SizedBox(height: 10),
               DropdownButtonFormField<int?>(
                 initialValue: validVessel,
-                decoration: const InputDecoration(labelText: 'Embarcacion', border: OutlineInputBorder()),
+                decoration: const InputDecoration(
+                  labelText: 'Embarcación',
+                  border: OutlineInputBorder(),
+                ),
                 items: [
-                  const DropdownMenuItem<int?>(value: null, child: Text('Sin embarcacion')),
-                  ...ownerVessels.map((v) => DropdownMenuItem<int?>(value: v.id, child: Text(v.name))),
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Sin embarcación'),
+                  ),
+                  ...ownerVessels.map(
+                    (v) => DropdownMenuItem<int?>(
+                      value: v.id,
+                      child: Text(v.name),
+                    ),
+                  ),
                 ],
                 onChanged: (value) => setState(() => _vesselId = value),
               ),
@@ -1495,13 +1704,16 @@ class _EditPartDialogState extends State<_EditPartDialog> {
               CheckboxListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _highPriority,
-                onChanged: (value) => setState(() => _highPriority = value ?? false),
+                onChanged: (value) =>
+                    setState(() => _highPriority = value ?? false),
                 title: const Text('Prioridad alta'),
-                subtitle: const Text('Resalta este parte en amarillo en el panel principal.'),
+                subtitle: const Text(
+                  'Resalta este parte en amarillo en el panel principal.',
+                ),
               ),
               const SizedBox(height: 12),
               const Text(
-                'Mecanicos asignados',
+                'Mecánicos asignados',
                 style: TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 6),
@@ -1608,7 +1820,8 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   bool _highPriority = false;
   bool _uploadingMedia = false;
   final Set<int> _selectedWorkers = <int>{};
-  final List<WorkOrderAttachmentItem> _uploadedAttachments = <WorkOrderAttachmentItem>[];
+  final List<WorkOrderAttachmentItem> _uploadedAttachments =
+      <WorkOrderAttachmentItem>[];
   final Map<String, TextEditingController> _engineHoursControllers =
       <String, TextEditingController>{};
   String? _validationError;
@@ -1680,7 +1893,12 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                     border: OutlineInputBorder(),
                   ),
                   items: widget.owners
-                      .map((o) => DropdownMenuItem(value: o.id, child: Text(o.displayName)))
+                      .map(
+                        (o) => DropdownMenuItem(
+                          value: o.id,
+                          child: Text(o.displayName),
+                        ),
+                      )
                       .toList(),
                   onChanged: (v) {
                     setState(() {
@@ -1693,13 +1911,13 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                 DropdownButtonFormField<int?>(
                   initialValue: _vesselId,
                   decoration: const InputDecoration(
-                    labelText: 'Embarcacion',
+                    labelText: 'Embarcación',
                     border: OutlineInputBorder(),
                   ),
                   items: [
                     const DropdownMenuItem<int?>(
                       value: null,
-                      child: Text('Sin embarcacion'),
+                      child: Text('Sin embarcación'),
                     ),
                     ...availableVessels.map(
                       (vessel) => DropdownMenuItem<int?>(
@@ -1725,10 +1943,16 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               )
                             : const Icon(Icons.upload_file),
-                        label: Text(_uploadingMedia ? 'Subiendo...' : 'Subir foto/video (web)'),
+                        label: Text(
+                          _uploadingMedia
+                              ? 'Subiendo...'
+                              : 'Subir foto/video (web)',
+                        ),
                       ),
                     ),
                   ],
@@ -1739,18 +1963,22 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                     spacing: 8,
                     runSpacing: 8,
                     children: _uploadedAttachments
-                        .map((item) => Chip(
-                              avatar: Icon(
-                                item.fileType == 'VIDEO' ? Icons.videocam : Icons.image,
-                                size: 18,
-                              ),
-                              label: Text(item.originalFileName ?? 'Adjunto'),
-                              onDeleted: () {
-                                setState(() {
-                                  _uploadedAttachments.remove(item);
-                                });
-                              },
-                            ))
+                        .map(
+                          (item) => Chip(
+                            avatar: Icon(
+                              item.fileType == 'VIDEO'
+                                  ? Icons.videocam
+                                  : Icons.image,
+                              size: 18,
+                            ),
+                            label: Text(item.originalFileName ?? 'Adjunto'),
+                            onDeleted: () {
+                              setState(() {
+                                _uploadedAttachments.remove(item);
+                              });
+                            },
+                          ),
+                        )
                         .toList(),
                   ),
                 ],
@@ -1758,9 +1986,12 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                 CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _highPriority,
-                  onChanged: (value) => setState(() => _highPriority = value ?? false),
+                  onChanged: (value) =>
+                      setState(() => _highPriority = value ?? false),
                   title: const Text('Prioridad alta'),
-                  subtitle: const Text('Mostrará este parte como destacado en el panel de operaciones.'),
+                  subtitle: const Text(
+                    'Mostrará este parte como destacado en el panel de operaciones.',
+                  ),
                 ),
                 if (_engineHoursControllers.isNotEmpty) ...[
                   const SizedBox(height: 14),
@@ -1816,7 +2047,9 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                   const SizedBox(height: 8),
                   Text(
                     _validationError!,
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 12),
@@ -1859,7 +2092,8 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
       final hours = int.tryParse(entry.value.text.trim());
       if (hours == null) {
         setState(() {
-          _validationError = 'Rellena las horas de todos los motores con numeros enteros.';
+          _validationError =
+              'Rellena las horas de todos los motores con números enteros.';
         });
         return;
       }
@@ -1883,13 +2117,16 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
 
   Future<void> _pickAndUploadMedia() async {
     if (!kIsWeb) {
-      AppToast.warning(context, 'La subida de multimedia esta habilitada solo en la web.');
+      AppToast.warning(
+        context,
+        'La subida de multimedia esta habilitada solo en la web.',
+      );
       return;
     }
 
     final token = context.read<SessionViewModel>().token;
     if (token == null || token.isEmpty) {
-      AppToast.error(context, 'No hay sesion activa para subir archivos.');
+      AppToast.error(context, 'No hay sesión activa para subir archivos.');
       return;
     }
 
@@ -1928,7 +2165,9 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
         }
 
         final owner = widget.owners.where((o) => o.id == _ownerId).firstOrNull;
-        final vessel = widget.vessels.where((v) => v.id == _vesselId).firstOrNull;
+        final vessel = widget.vessels
+            .where((v) => v.id == _vesselId)
+            .firstOrNull;
 
         final uploaded = await mediaService.uploadMedia(
           token,
@@ -1982,21 +2221,28 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   }
 
   void _syncVesselSelectionForOwner() {
-    final vessels = widget.vessels.where((vessel) => vessel.ownerId == _ownerId).toList();
+    final vessels = widget.vessels
+        .where((vessel) => vessel.ownerId == _ownerId)
+        .toList();
     if (vessels.isEmpty) {
       _vesselId = null;
-    } else if (_vesselId == null || !vessels.any((vessel) => vessel.id == _vesselId)) {
+    } else if (_vesselId == null ||
+        !vessels.any((vessel) => vessel.id == _vesselId)) {
       _vesselId = vessels.first.id;
     }
     _syncEngineHoursForSelectedVessel();
   }
 
   void _syncEngineHoursForSelectedVessel() {
-    final vessel = widget.vessels.where((item) => item.id == _vesselId).cast<Vessel?>().firstOrNull;
+    final vessel = widget.vessels
+        .where((item) => item.id == _vesselId)
+        .cast<Vessel?>()
+        .firstOrNull;
     final labels = vessel == null ? <String>[] : _resolveEngineLabels(vessel);
 
     final existingValues = <String, String>{
-      for (final entry in _engineHoursControllers.entries) entry.key: entry.value.text,
+      for (final entry in _engineHoursControllers.entries)
+        entry.key: entry.value.text,
     };
 
     for (final controller in _engineHoursControllers.values) {
@@ -2103,20 +2349,18 @@ class _PartBadge extends StatelessWidget {
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w700,
-        ),
+        style: TextStyle(color: textColor, fontWeight: FontWeight.w700),
       ),
     );
   }
 }
 
 class _PickedProof {
-  const _PickedProof(
-      {required this.fileName,
-      required this.bytes,
-      required this.mimeType});
+  const _PickedProof({
+    required this.fileName,
+    required this.bytes,
+    required this.mimeType,
+  });
 
   final String fileName;
   final List<int> bytes;

@@ -7,7 +7,8 @@ public record TimeEntryDto(
         Long workerId,
         String workerName,
         Instant clockIn,
-        Instant clockOut
+    Instant clockOut,
+    TimeEntryWorkSite workSite
 ) {
     public static TimeEntryDto from(TimeEntry entry) {
         return new TimeEntryDto(
@@ -15,7 +16,8 @@ public record TimeEntryDto(
                 entry.getWorker().getId(),
                 entry.getWorker().getFullName(),
                 entry.getClockIn(),
-                entry.getClockOut()
+        entry.getClockOut(),
+        entry.getWorkSite()
         );
     }
 }

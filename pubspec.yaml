@@ -43,6 +43,7 @@ dependencies:
   http_parser: ^4.0.2
   signature: ^5.4.0
   image_picker: ^1.1.2
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
 import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
@@ -34,12 +35,30 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   ];
 
   final List<String> _titles = const [
-    'Dashboard',
-    'Gestion de Partes',
+    'Panel de control',
+    'Gestión de partes',
     'Clientes y Flota',
     'Equipo',
-    'Control Horario',
+    'Control horario',
     'Ausencias',
+  ];
+
+  final List<String> _subtitles = const [
+    'Visión general de actividad, equipo y prioridades.',
+    'Firmas, evidencias y seguimiento técnico.',
+    'Propietarios, embarcaciones y motores al día.',
+    'Altas, permisos y estado del personal.',
+    'Entradas, salidas y jornada registrada.',
+    'Solicitudes, aprobaciones y planificación.',
+  ];
+
+  final List<IconData> _sectionIcons = const [
+    Icons.dashboard_outlined,
+    Icons.assignment_outlined,
+    Icons.directions_boat_outlined,
+    Icons.people_outline,
+    Icons.access_time_outlined,
+    Icons.event_note_outlined,
   ];
 
   @override
@@ -55,7 +74,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         _shownUnreadToast = true;
         AppToast.info(
           context,
-          'Tienes ${notificationsVm.unreadCount} notificacion(es) nuevas.',
+          'Tienes ${notificationsVm.unreadCount} notificación(es) nuevas.',
         );
       }
     });
@@ -103,7 +122,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                       children: [
                         const Text(
                           'Notificaciones',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         const Spacer(),
                         TextButton(
@@ -112,30 +134,42 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                               : () async {
                                   await notificationsVm.markAllAsRead();
                                 },
-                          child: const Text('Marcar todas leidas'),
+                          child: const Text('Marcar todas como leídas'),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
                     Expanded(
                       child: notifications.isEmpty
-                          ? const Center(child: Text('No hay notificaciones'))
+                          ? const Center(
+                              child: Text('No tienes notificaciones'),
+                            )
                           : ListView.builder(
                               itemCount: notifications.length,
                               itemBuilder: (context, index) {
                                 final item = notifications[index];
                                 return Card(
-                                  color: item.isRead ? null : Colors.blue.shade50,
+                                  color: item.isRead
+                                      ? null
+                                      : NavalgoColors.mist,
                                   child: ListTile(
                                     leading: Icon(
-                                      item.isRead ? Icons.notifications_none : Icons.notifications_active,
-                                      color: item.isRead ? Colors.grey : Colors.blue.shade900,
+                                      item.isRead
+                                          ? Icons.notifications_none
+                                          : Icons.notifications_active,
+                                      color: item.isRead
+                                          ? Colors.grey
+                                          : NavalgoColors.tide,
                                     ),
                                     title: Text(item.title),
                                     subtitle: Text(item.message),
                                     trailing: item.isRead
                                         ? null
-                                        : const Icon(Icons.fiber_manual_record, size: 12, color: Colors.red),
+                                        : const Icon(
+                                            Icons.fiber_manual_record,
+                                            size: 12,
+                                            color: NavalgoColors.coral,
+                                          ),
                                     onTap: () async {
                                       await notificationsVm.markAsRead(item.id);
                                       if (!mounted) {
@@ -143,7 +177,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                                       }
                                       Navigator.of(this.context).pop();
                                       setState(() {
-                                        _selectedIndex = _mapActionRouteToTab(item.actionRoute);
+                                        _selectedIndex = _mapActionRouteToTab(
+                                          item.actionRoute,
+                                        );
                                       });
                                     },
                                   ),
@@ -163,114 +199,362 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 
   AppBar _buildAppBar(BuildContext context) {
     final notificationsVm = context.watch<NotificationsViewModel>();
+    final session = context.watch<SessionViewModel>();
+    final userName = session.user?.name ?? 'Administrador';
+    final width = MediaQuery.of(context).size.width;
+    final showSubtitle = width >= 760;
+    final showName = width >= 1080;
 
     return AppBar(
-      title: Text(_titles[_selectedIndex], style: const TextStyle(fontWeight: FontWeight.bold)),
-      actions: [
-        IconButton(
-          tooltip: 'Notificaciones',
-          onPressed: _openNotifications,
-          icon: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              const Icon(Icons.notifications_none),
-              if (notificationsVm.unreadCount > 0)
-                Positioned(
-                  right: -6,
-                  top: -6,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                    decoration: const BoxDecoration(
-                      color: Colors.red,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Text(
-                      notificationsVm.unreadCount > 9 ? '9+' : '${notificationsVm.unreadCount}',
-                      style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-            ],
+      toolbarHeight: showSubtitle ? 86 : 74,
+      titleSpacing: 14,
+      title: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: NavalgoColors.mist,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(
+              _sectionIcons[_selectedIndex],
+              color: NavalgoColors.tide,
+            ),
           ),
-        ),
-        PopupMenuButton<String>(
-          offset: const Offset(0, 50),
-          tooltip: 'Opciones de cuenta',
-          onSelected: (value) async {
-            if (value == 'logout') {
-              await context.read<SessionViewModel>().clearSession();
-              if (!mounted) {
-                return;
-              }
-              Navigator.of(this.context).pushReplacement(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
-              );
-              return;
-            }
-
-            if (value == 'profile') {
-              await _showProfileDialog();
-              return;
-            }
-
-            if (value == 'password') {
-              await _showChangePasswordDialog();
-            }
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                CircleAvatar(
-                  radius: 16,
-                  backgroundColor: Colors.blue.shade100,
-                  child: Icon(Icons.person, size: 20, color: Colors.blue.shade900),
+                Text(
+                  _titles[_selectedIndex],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
                 ),
-                const SizedBox(width: 8),
-                if (MediaQuery.of(context).size.width > 400) ...[
-                  Flexible(
-                    child: Text(
-                      context.watch<SessionViewModel>().user?.name ?? 'Admin',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
+                if (showSubtitle)
+                  Text(
+                    _subtitles[_selectedIndex],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium,
                   ),
-                  const Icon(Icons.arrow_drop_down),
-                ],
               ],
             ),
           ),
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-            const PopupMenuItem<String>(
-              value: 'profile',
-              child: ListTile(
-                leading: Icon(Icons.person_outline),
-                title: Text('Mi Perfil'),
-                contentPadding: EdgeInsets.zero,
+        ],
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: Row(
+            children: [
+              _buildHeaderActionButton(
+                tooltip: 'Notificaciones',
+                onTap: _openNotifications,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    const Icon(Icons.notifications_none_rounded),
+                    if (notificationsVm.unreadCount > 0)
+                      Positioned(
+                        right: -6,
+                        top: -6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
+                          decoration: const BoxDecoration(
+                            color: NavalgoColors.coral,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(
+                            notificationsVm.unreadCount > 9
+                                ? '9+'
+                                : '${notificationsVm.unreadCount}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
-            const PopupMenuItem<String>(
-              value: 'password',
-              child: ListTile(
-                leading: Icon(Icons.lock_outline),
-                title: Text('Cambiar Contrasena'),
-                contentPadding: EdgeInsets.zero,
+              const SizedBox(width: 10),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(999),
+                  onTap: _openAccountMenu,
+                  child: Container(
+                    height: 46,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: showName ? 8 : 4,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: NavalgoColors.border),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: NavalgoColors.mist,
+                          child: const Icon(
+                            Icons.person,
+                            size: 18,
+                            color: NavalgoColors.tide,
+                          ),
+                        ),
+                        if (showName) ...[
+                          const SizedBox(width: 10),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 120),
+                            child: Text(
+                              _shortDisplayName(userName),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          const Icon(Icons.expand_more_rounded),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const PopupMenuDivider(),
-            const PopupMenuItem<String>(
-              value: 'logout',
-              child: ListTile(
-                leading: Icon(Icons.logout, color: Colors.red),
-                title: Text('Salir', style: TextStyle(color: Colors.red)),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeaderActionButton({
+    required String tooltip,
+    required VoidCallback onTap,
+    required Widget child,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: NavalgoColors.border),
+            ),
+            child: Center(child: child),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _shortDisplayName(String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) {
+      return 'Cuenta';
+    }
+    return normalized.split(' ').first;
+  }
+
+  Future<void> _openAccountMenu() async {
+    final user = context.read<SessionViewModel>().user;
+    if (user == null) {
+      return;
+    }
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) {
+        final maxHeight = MediaQuery.of(sheetContext).size.height * 0.9;
+        return SafeArea(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxHeight: maxHeight),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: NavalgoColors.heroGradient,
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.14),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Icon(Icons.person, color: Colors.white),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                user.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.titleLarge
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Administrador de NavalGO',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.82,
+                                      ),
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildAccountAction(
+                    context: sheetContext,
+                    value: 'profile',
+                    icon: Icons.person_outline_rounded,
+                    title: 'Mi perfil',
+                    subtitle: 'Consulta tus datos y permisos actuales.',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildAccountAction(
+                    context: sheetContext,
+                    value: 'password',
+                    icon: Icons.lock_outline_rounded,
+                    title: 'Cambiar contraseña',
+                    subtitle: 'Actualiza tus credenciales de acceso.',
+                  ),
+                  const SizedBox(height: 10),
+                  _buildAccountAction(
+                    context: sheetContext,
+                    value: 'logout',
+                    icon: Icons.logout_rounded,
+                    title: 'Cerrar sesión',
+                    subtitle: 'Salir de NavalGO en este dispositivo.',
+                    accent: NavalgoColors.coral,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    if (action == 'profile') {
+      await _showProfileDialog();
+      return;
+    }
+
+    if (action == 'password') {
+      await _showChangePasswordDialog();
+      return;
+    }
+
+    await context.read<SessionViewModel>().clearSession();
+    if (!mounted) {
+      return;
+    }
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
+  }
+
+  Widget _buildAccountAction({
+    required BuildContext context,
+    required String value,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    Color accent = NavalgoColors.tide,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: () => Navigator.of(context).pop(value),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: accent.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: accent.withValues(alpha: 0.14)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: accent),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 16, color: accent),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -295,7 +579,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               const SizedBox(height: 6),
               Text('Rol: ${user.role}'),
               const SizedBox(height: 6),
-              Text('Puede editar partes: ${user.canEditWorkOrders ? 'SI' : 'NO'}'),
+              Text(
+                'Puede editar partes: ${user.canEditWorkOrders ? 'Sí' : 'No'}',
+              ),
             ],
           ),
           actions: [
@@ -312,7 +598,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   Future<void> _showChangePasswordDialog() async {
     final token = context.read<SessionViewModel>().token;
     if (token == null || token.isEmpty) {
-      AppToast.warning(context, 'No hay sesion activa.');
+      AppToast.warning(context, 'No hay sesión activa.');
       return;
     }
 
@@ -325,7 +611,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         context: context,
         builder: (dialogContext) {
           return AlertDialog(
-            title: const Text('Cambiar Contrasena'),
+            title: const Text('Cambiar contraseña'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -333,7 +619,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   controller: currentCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Contrasena actual',
+                    labelText: 'Contraseña actual',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -342,7 +628,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   controller: newCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Nueva contrasena',
+                    labelText: 'Nueva contraseña',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -351,7 +637,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   controller: confirmCtrl,
                   obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Confirmar nueva contrasena',
+                    labelText: 'Confirmar nueva contraseña',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -369,30 +655,42 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   final confirm = confirmCtrl.text.trim();
 
                   if (current.isEmpty || next.isEmpty || confirm.isEmpty) {
-                    AppToast.warning(dialogContext, 'Completa todos los campos.');
+                    AppToast.warning(
+                      dialogContext,
+                      'Completa todos los campos.',
+                    );
                     return;
                   }
-                  if (next.length < 8) {
-                    AppToast.warning(dialogContext, 'La nueva contrasena debe tener al menos 8 caracteres.');
+                  if (next.length < 12) {
+                    AppToast.warning(
+                      dialogContext,
+                      'La nueva contraseña debe tener al menos 12 caracteres.',
+                    );
                     return;
                   }
                   if (next != confirm) {
-                    AppToast.warning(dialogContext, 'Las contrasenas no coinciden.');
+                    AppToast.warning(
+                      dialogContext,
+                      'Las contraseñas no coinciden.',
+                    );
                     return;
                   }
 
                   try {
                     await context.read<AuthService>().changePassword(
-                          token,
-                          currentPassword: current,
-                          newPassword: next,
-                        );
+                      token,
+                      currentPassword: current,
+                      newPassword: next,
+                    );
                     if (dialogContext.mounted) {
                       Navigator.of(dialogContext).pop(true);
                     }
                   } catch (e) {
                     if (dialogContext.mounted) {
-                      AppToast.error(dialogContext, 'No se pudo cambiar la contrasena: $e');
+                      AppToast.error(
+                        dialogContext,
+                        'No se pudo cambiar la contraseña: $e',
+                      );
                     }
                   }
                 },
@@ -404,7 +702,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       );
 
       if (changed == true && mounted) {
-        AppToast.success(context, 'Contrasena actualizada correctamente.');
+        AppToast.success(context, 'Contraseña actualizada correctamente.');
       }
     } finally {
       currentCtrl.dispose();
@@ -420,104 +718,156 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         if (constraints.maxWidth >= 600) {
           return Scaffold(
             appBar: _buildAppBar(context),
-            body: Row(
-              children: [
-                NavigationRail(
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: _onDestinationSelected,
-                  labelType: NavigationRailLabelType.all,
-                  selectedIconTheme: IconThemeData(color: Colors.blue.shade900),
-                  selectedLabelTextStyle: TextStyle(
-                    color: Colors.blue.shade900,
-                    fontWeight: FontWeight.bold,
+            body: Container(
+              decoration: const BoxDecoration(
+                gradient: NavalgoColors.pageGradient,
+              ),
+              child: Row(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: NavalgoColors.railGradient,
+                        borderRadius: BorderRadius.circular(28),
+                        border: Border.all(color: NavalgoColors.border),
+                      ),
+                      child: NavigationRail(
+                        selectedIndex: _selectedIndex,
+                        onDestinationSelected: _onDestinationSelected,
+                        labelType: NavigationRailLabelType.all,
+                        minWidth: 84,
+                        leading: Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 18),
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            decoration: BoxDecoration(
+                              gradient: NavalgoColors.heroGradient,
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: const Icon(
+                              Icons.navigation,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        destinations: const [
+                          NavigationRailDestination(
+                            icon: Icon(Icons.dashboard_outlined),
+                            selectedIcon: Icon(Icons.dashboard),
+                            label: Text('Panel'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.assignment_outlined),
+                            selectedIcon: Icon(Icons.assignment),
+                            label: Text('Partes'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.directions_boat_outlined),
+                            selectedIcon: Icon(Icons.directions_boat),
+                            label: Text('Flota'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.people_outline),
+                            selectedIcon: Icon(Icons.people),
+                            label: Text('Equipo'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.access_time_outlined),
+                            selectedIcon: Icon(Icons.access_time_filled),
+                            label: Text('Fichaje'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.event_note_outlined),
+                            selectedIcon: Icon(Icons.event_note),
+                            label: Text('Ausencias'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: Text('Dashboard'),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                      child: IndexedStack(
+                        index: _selectedIndex,
+                        children: _screens,
+                      ),
                     ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.assignment_outlined),
-                      selectedIcon: Icon(Icons.assignment),
-                      label: Text('Partes'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.directions_boat_outlined),
-                      selectedIcon: Icon(Icons.directions_boat),
-                      label: Text('Flota'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.people_outline),
-                      selectedIcon: Icon(Icons.people),
-                      label: Text('Equipo'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.access_time_outlined),
-                      selectedIcon: Icon(Icons.access_time_filled),
-                      label: Text('Fichaje'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.event_note_outlined),
-                      selectedIcon: Icon(Icons.event_note),
-                      label: Text('Ausencias'),
-                    ),
-                  ],
-                ),
-                const VerticalDivider(thickness: 1, width: 1),
-                Expanded(
-                  child: IndexedStack(
-                    index: _selectedIndex,
-                    children: _screens,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }
 
         return Scaffold(
           appBar: _buildAppBar(context),
-          body: IndexedStack(
-            index: _selectedIndex,
-            children: _screens,
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: NavalgoColors.pageGradient,
+            ),
+            child: IndexedStack(index: _selectedIndex, children: _screens),
           ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _selectedIndex,
-            onDestinationSelected: _onDestinationSelected,
-            indicatorColor: Colors.blue.shade100,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.dashboard_outlined),
-                selectedIcon: Icon(Icons.dashboard, color: Color(0xFF0D47A1)),
-                label: 'Dashboard',
+          bottomNavigationBar: SafeArea(
+            top: false,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+                border: const Border(
+                  top: BorderSide(color: NavalgoColors.border),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: NavalgoColors.deepSea.withValues(alpha: 0.08),
+                    blurRadius: 20,
+                    offset: const Offset(0, -2),
+                  ),
+                ],
               ),
-              NavigationDestination(
-                icon: Icon(Icons.assignment_outlined),
-                selectedIcon: Icon(Icons.assignment, color: Color(0xFF0D47A1)),
-                label: 'Partes',
+              child: NavigationBar(
+                height: 72,
+                selectedIndex: _selectedIndex,
+                onDestinationSelected: _onDestinationSelected,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.dashboard_outlined),
+                    selectedIcon: Icon(Icons.dashboard),
+                    label: 'Panel',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.assignment_outlined),
+                    selectedIcon: Icon(Icons.assignment),
+                    label: 'Partes',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.directions_boat_outlined),
+                    selectedIcon: Icon(Icons.directions_boat),
+                    label: 'Flota',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.people_outline),
+                    selectedIcon: Icon(Icons.people),
+                    label: 'Equipo',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.access_time_outlined),
+                    selectedIcon: Icon(Icons.access_time_filled),
+                    label: 'Fichaje',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.event_note_outlined),
+                    selectedIcon: Icon(Icons.event_note),
+                    label: 'Ausencias',
+                  ),
+                ],
               ),
-              NavigationDestination(
-                icon: Icon(Icons.directions_boat_outlined),
-                selectedIcon: Icon(Icons.directions_boat, color: Color(0xFF0D47A1)),
-                label: 'Flota',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.people_outline),
-                selectedIcon: Icon(Icons.people, color: Color(0xFF0D47A1)),
-                label: 'Equipo',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.access_time_outlined),
-                selectedIcon: Icon(Icons.access_time_filled, color: Color(0xFF0D47A1)),
-                label: 'Fichaje',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.event_note_outlined),
-                selectedIcon: Icon(Icons.event_note, color: Color(0xFF0D47A1)),
-                label: 'Ausencias',
-              ),
-            ],
+            ),
           ),
         );
       },

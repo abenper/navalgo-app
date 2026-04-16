@@ -4,8 +4,10 @@ import 'package:provider/provider.dart';
 import '../../models/owner.dart';
 import '../../models/vessel.dart';
 import '../../services/fleet_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/fleet_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
 
 class FlotaScreen extends StatefulWidget {
   const FlotaScreen({super.key});
@@ -222,7 +224,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
         return;
       }
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo crear la embarcacion: $e')),
+        SnackBar(content: Text('No se pudo crear la embarcación: $e')),
       );
     }
   }
@@ -263,14 +265,14 @@ class _FlotaScreenState extends State<FlotaScreen> {
         return;
       }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Embarcacion actualizada')),
+        const SnackBar(content: Text('Embarcación actualizada')),
       );
     } catch (e) {
       if (!mounted) {
         return;
       }
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo editar la embarcacion: $e')),
+        SnackBar(content: Text('No se pudo editar la embarcación: $e')),
       );
     }
   }
@@ -279,8 +281,10 @@ class _FlotaScreenState extends State<FlotaScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Eliminar embarcacion'),
-        content: Text('Se eliminara ${vessel.name} (${vessel.registrationNumber}).'),
+        title: const Text('Eliminar embarcación'),
+        content: Text(
+          'Se eliminará ${vessel.name} (${vessel.registrationNumber}).',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -315,14 +319,14 @@ class _FlotaScreenState extends State<FlotaScreen> {
         return;
       }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Embarcacion eliminada')),
+        const SnackBar(content: Text('Embarcación eliminada')),
       );
     } catch (e) {
       if (!mounted) {
         return;
       }
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo eliminar la embarcacion: $e')),
+        SnackBar(content: Text('No se pudo eliminar la embarcación: $e')),
       );
     }
   }
@@ -354,151 +358,170 @@ class _FlotaScreenState extends State<FlotaScreen> {
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : vm.error != null
-              ? Center(child: Text(vm.error!))
-              : RefreshIndicator(
-                  onRefresh: () => vm.loadFleet(),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      const Text(
-                        'Propietarios',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _ownerSearchCtrl,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          labelText: 'Filtrar por propietario',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ...filteredOwners.map((owner) {
-                        final esEmpresa = owner.type == 'COMPANY';
-                        final vesselCount = vm.vessels.where((v) => v.ownerId == owner.id).length;
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: esEmpresa ? Colors.blue.shade50 : Colors.green.shade50,
-                              child: Icon(
-                                esEmpresa ? Icons.business : Icons.person,
-                                color: esEmpresa ? Colors.blue.shade900 : Colors.green.shade900,
-                              ),
-                            ),
-                            title: Text(
-                              owner.displayName,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              '${esEmpresa ? 'Empresa' : 'Particular'} • ${owner.documentId} • $vesselCount embarcacion(es)',
-                            ),
-                            trailing: PopupMenuButton<String>(
-                              onSelected: (value) {
-                                if (value == 'edit') {
-                                  _editOwner(owner);
-                                }
-                                if (value == 'delete') {
-                                  _deleteOwner(owner);
-                                }
-                              },
-                              itemBuilder: (context) => const [
-                                PopupMenuItem<String>(
-                                  value: 'edit',
-                                  child: Text('Editar'),
-                                ),
-                                PopupMenuItem<String>(
-                                  value: 'delete',
-                                  child: Text('Eliminar'),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      }),
-                      const SizedBox(height: 18),
-                      const Text(
-                        'Embarcaciones',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: _vesselSearchCtrl,
-                        decoration: const InputDecoration(
-                          prefixIcon: Icon(Icons.search),
-                          labelText: 'Filtrar por embarcacion o propietario',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      ...filteredVessels.map((vessel) => Card(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: Colors.orange.shade50,
-                                child: Icon(
-                                  Icons.directions_boat,
-                                  color: Colors.orange.shade900,
-                                ),
-                              ),
-                              title: Text(
-                                vessel.name,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              subtitle: Text(
-                                '${vessel.registrationNumber} • ${vessel.ownerName}\n'
-                                'Modelo: ${vessel.model ?? 'N/D'} • Motores: ${vessel.engineCount ?? 0}\n'
-                                '${vessel.engineLabels.isEmpty ? 'Sin posiciones definidas' : vessel.engineLabels.join(', ')}',
-                              ),
-                              isThreeLine: true,
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _editVessel(vessel, vm.owners);
-                                  }
-                                  if (value == 'delete') {
-                                    _deleteVessel(vessel);
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem<String>(
-                                    value: 'edit',
-                                    child: Text('Editar'),
-                                  ),
-                                  PopupMenuItem<String>(
-                                    value: 'delete',
-                                    child: Text('Eliminar'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          )),
-                    ],
+          ? Center(child: Text(vm.error!))
+          : RefreshIndicator(
+              onRefresh: () => vm.loadFleet(),
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const NavalgoPageIntro(
+                    eyebrow: 'CLIENTES Y EMBARCACIONES',
+                    title:
+                        'Consulta propietarios, embarcaciones y motores desde una misma vista.',
+                    subtitle:
+                        'Mantén actualizada la información de clientes y flota para la planificación y el seguimiento técnico.',
                   ),
-                ),
+                  const SizedBox(height: 18),
+                  const NavalgoSectionHeader(
+                    title: 'Propietarios',
+                    subtitle:
+                        'Consulta, filtra y actualiza clientes particulares y empresas.',
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _ownerSearchCtrl,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'Filtrar por propietario',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ...filteredOwners.map((owner) {
+                    final esEmpresa = owner.type == 'COMPANY';
+                    final vesselCount = vm.vessels
+                        .where((v) => v.ownerId == owner.id)
+                        .length;
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: esEmpresa
+                              ? NavalgoColors.mist
+                              : NavalgoColors.foam,
+                          child: Icon(
+                            esEmpresa ? Icons.business : Icons.person,
+                            color: esEmpresa
+                                ? NavalgoColors.tide
+                                : NavalgoColors.kelp,
+                          ),
+                        ),
+                        title: Text(
+                          owner.displayName,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${esEmpresa ? 'Empresa' : 'Particular'} • ${owner.documentId} • $vesselCount embarcación(es)',
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _editOwner(owner);
+                            }
+                            if (value == 'delete') {
+                              _deleteOwner(owner);
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem<String>(
+                              value: 'edit',
+                              child: Text('Editar'),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Eliminar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 18),
+                  const NavalgoSectionHeader(
+                    title: 'Embarcaciones',
+                    subtitle:
+                        'Filtra unidades, propietarios y configuración de motores.',
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _vesselSearchCtrl,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      labelText: 'Filtrar por embarcación o propietario',
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ...filteredVessels.map(
+                    (vessel) => Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: NavalgoColors.foam,
+                          child: const Icon(
+                            Icons.directions_boat,
+                            color: NavalgoColors.sand,
+                          ),
+                        ),
+                        title: Text(
+                          vessel.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        subtitle: Text(
+                          '${vessel.registrationNumber} • ${vessel.ownerName}\n'
+                          'Modelo: ${vessel.model ?? 'N/D'} • Motores: ${vessel.engineCount ?? 0}\n'
+                          '${vessel.engineLabels.isEmpty ? 'Sin posiciones definidas' : vessel.engineLabels.join(', ')}',
+                        ),
+                        isThreeLine: true,
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'edit') {
+                              _editVessel(vessel, vm.owners);
+                            }
+                            if (value == 'delete') {
+                              _deleteVessel(vessel);
+                            }
+                          },
+                          itemBuilder: (context) => const [
+                            PopupMenuItem<String>(
+                              value: 'edit',
+                              child: Text('Editar'),
+                            ),
+                            PopupMenuItem<String>(
+                              value: 'delete',
+                              child: Text('Eliminar'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
       bottomNavigationBar: SafeArea(
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _createOwner,
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Nuevo Propietario'),
+          child: NavalgoPanel(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _createOwner,
+                    icon: const Icon(Icons.person_add),
+                    label: const Text('Nuevo Propietario'),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => _createVessel(vm.owners),
-                  icon: const Icon(Icons.directions_boat),
-                  label: const Text('Nueva Embarcacion'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => _createVessel(vm.owners),
+                    icon: const Icon(Icons.directions_boat),
+                    label: const Text('Nueva embarcación'),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -600,7 +623,7 @@ class _OwnerDialogState extends State<_OwnerDialog> {
             TextField(
               controller: _phoneCtrl,
               decoration: const InputDecoration(
-                labelText: 'Telefono',
+                labelText: 'Teléfono',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -608,7 +631,7 @@ class _OwnerDialogState extends State<_OwnerDialog> {
             TextField(
               controller: _emailCtrl,
               decoration: const InputDecoration(
-                labelText: 'Email',
+                labelText: 'Correo electrónico',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -616,7 +639,10 @@ class _OwnerDialogState extends State<_OwnerDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
         ElevatedButton(
           onPressed: () {
             Navigator.pop(
@@ -683,8 +709,12 @@ class _VesselDialogState extends State<_VesselDialog> {
     _nameCtrl = TextEditingController(text: initial?.name ?? '');
     _regCtrl = TextEditingController(text: initial?.registrationNumber ?? '');
     _modelCtrl = TextEditingController(text: initial?.model ?? '');
-    _engineCtrl = TextEditingController(text: (initial?.engineCount ?? 1).toString());
-    _lengthCtrl = TextEditingController(text: initial?.lengthMeters?.toString() ?? '');
+    _engineCtrl = TextEditingController(
+      text: (initial?.engineCount ?? 1).toString(),
+    );
+    _lengthCtrl = TextEditingController(
+      text: initial?.lengthMeters?.toString() ?? '',
+    );
     _ownerId = initial?.ownerId ?? widget.owners.first.id;
 
     final count = int.tryParse(_engineCtrl.text) ?? 1;
@@ -709,7 +739,7 @@ class _VesselDialogState extends State<_VesselDialog> {
     final isEditing = widget.initialVessel != null;
 
     return AlertDialog(
-      title: Text(isEditing ? 'Editar Embarcacion' : 'Nueva Embarcacion'),
+      title: Text(isEditing ? 'Editar embarcación' : 'Nueva embarcación'),
       content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -725,7 +755,7 @@ class _VesselDialogState extends State<_VesselDialog> {
             TextField(
               controller: _regCtrl,
               decoration: const InputDecoration(
-                labelText: 'Matricula',
+                labelText: 'Matrícula',
                 border: OutlineInputBorder(),
               ),
             ),
@@ -741,18 +771,19 @@ class _VesselDialogState extends State<_VesselDialog> {
             TextField(
               controller: _engineCtrl,
               decoration: const InputDecoration(
-                labelText: 'Numero de motores',
+                labelText: 'Número de motores',
                 border: OutlineInputBorder(),
               ),
               keyboardType: TextInputType.number,
-              onChanged: (value) => _syncEnginePositions(int.tryParse(value) ?? 0),
+              onChanged: (value) =>
+                  _syncEnginePositions(int.tryParse(value) ?? 0),
             ),
             if (_enginePositions.isNotEmpty) ...[
               const SizedBox(height: 10),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  'Posicion de cada motor',
+                  'Posición de cada motor',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
               ),
@@ -767,10 +798,12 @@ class _VesselDialogState extends State<_VesselDialog> {
                       border: const OutlineInputBorder(),
                     ),
                     items: _FlotaScreenState._enginePositionOptions
-                        .map((position) => DropdownMenuItem(
-                              value: position,
-                              child: Text(position),
-                            ))
+                        .map(
+                          (position) => DropdownMenuItem(
+                            value: position,
+                            child: Text(position),
+                          ),
+                        )
                         .toList(),
                     onChanged: (value) {
                       setState(() {
@@ -788,7 +821,9 @@ class _VesselDialogState extends State<_VesselDialog> {
                 labelText: 'Eslora (m)',
                 border: OutlineInputBorder(),
               ),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<int>(
@@ -798,7 +833,12 @@ class _VesselDialogState extends State<_VesselDialog> {
                 border: OutlineInputBorder(),
               ),
               items: widget.owners
-                  .map((o) => DropdownMenuItem(value: o.id, child: Text(o.displayName)))
+                  .map(
+                    (o) => DropdownMenuItem(
+                      value: o.id,
+                      child: Text(o.displayName),
+                    ),
+                  )
                   .toList(),
               onChanged: (v) => setState(() => _ownerId = v ?? _ownerId),
             ),
@@ -806,7 +846,10 @@ class _VesselDialogState extends State<_VesselDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
         ElevatedButton(
           onPressed: () {
             Navigator.pop(
@@ -839,7 +882,10 @@ class _VesselDialogState extends State<_VesselDialog> {
       if (_enginePositions.length < safeCount) {
         _enginePositions = <String>[
           ..._enginePositions,
-          ...List<String>.filled(safeCount - _enginePositions.length, 'Fuera borda'),
+          ...List<String>.filled(
+            safeCount - _enginePositions.length,
+            'Fuera borda',
+          ),
         ];
       } else {
         _enginePositions = _enginePositions.take(safeCount).toList();

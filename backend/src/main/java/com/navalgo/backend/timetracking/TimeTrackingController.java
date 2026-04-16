@@ -28,7 +28,7 @@ public class TimeTrackingController {
     public ResponseEntity<TimeEntryDto> clockIn(@RequestBody @Valid ClockRequest request,
                                                 Authentication authentication) {
         validateWorkerScope(request.workerId(), authentication);
-        return ResponseEntity.ok(service.clockIn(request.workerId()));
+        return ResponseEntity.ok(service.clockIn(request.workerId(), request.workSite()));
     }
 
     @PostMapping("/clock-out")
@@ -45,6 +45,12 @@ public class TimeTrackingController {
                                                        Authentication authentication) {
         validateWorkerScope(workerId, authentication);
         return ResponseEntity.ok(service.listByWorker(workerId));
+    }
+
+    @GetMapping("/today-summary")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<TodayClockedWorkersSummaryDto> todaySummary() {
+        return ResponseEntity.ok(service.getTodaySummary());
     }
 
     private void validateWorkerScope(Long targetWorkerId, Authentication authentication) {

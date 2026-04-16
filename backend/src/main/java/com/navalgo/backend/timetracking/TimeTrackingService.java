@@ -7,7 +7,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Transactional(readOnly = true)
@@ -23,9 +27,13 @@ public class TimeTrackingService {
     }
 
     @Transactional
-    public TimeEntryDto clockIn(Long workerId) {
+    public TimeEntryDto clockIn(Long workerId, TimeEntryWorkSite workSite) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+
+        if (workSite == null) {
+            throw new IllegalArgumentException("Debes indicar si el fichaje es en taller o en viaje");
+        }
 
         timeEntryRepository.findFirstByWorkerIdAndClockOutIsNullOrderByClockInDesc(workerId)
                 .ifPresent(entry -> {
@@ -35,6 +43,7 @@ public class TimeTrackingService {
         TimeEntry entry = new TimeEntry();
         entry.setWorker(worker);
         entry.setClockIn(Instant.now());
+        entry.setWorkSite(workSite);
 
         return TimeEntryDto.from(timeEntryRepository.save(entry));
     }
@@ -53,5 +62,26 @@ public class TimeTrackingService {
                 .stream()
                 .map(TimeEntryDto::from)
                 .toList();
+    }
+
+    public TodayClockedWorkersSummaryDto getTodaySummary() {
+        ZoneId zoneId = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(zoneId);
+        Instant start = today.atStartOfDay(zoneId).toInstant();
+        Instant end = today.plusDays(1).atStartOfDay(zoneId).toInstant();
+
+        List<TimeEntry> entries = timeEntryRepository
+                .findByClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(start, end);
+
+        Map<Long, String> uniqueWorkers = new LinkedHashMap<>();
+        for (TimeEntry entry : entries) {
+            uniqueWorkers.putIfAbsent(entry.getWorker().getId(), entry.getWorker().getFullName());
+        }
+
+        List<String> workerNames = uniqueWorkers.values().stream()
+                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .toList();
+
+        return new TodayClockedWorkersSummaryDto(workerNames.size(), workerNames);
     }
 }

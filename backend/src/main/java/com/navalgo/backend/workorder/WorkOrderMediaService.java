@@ -1,6 +1,7 @@
 package com.navalgo.backend.workorder;
 
 import com.navalgo.backend.media.MediaProperties;
+import com.navalgo.backend.media.UploadValidationService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -44,13 +45,16 @@ public class WorkOrderMediaService {
     private final S3Client s3Client;
     private final MediaProperties mediaProperties;
     private final WorkerRepository workerRepository;
+    private final UploadValidationService uploadValidationService;
 
     public WorkOrderMediaService(S3Client s3Client,
                                  MediaProperties mediaProperties,
-                                 WorkerRepository workerRepository) {
+                                 WorkerRepository workerRepository,
+                                 UploadValidationService uploadValidationService) {
         this.s3Client = s3Client;
         this.mediaProperties = mediaProperties;
         this.workerRepository = workerRepository;
+        this.uploadValidationService = uploadValidationService;
     }
 
     public UploadedAttachmentDto uploadMedia(MultipartFile file,
@@ -90,6 +94,7 @@ public class WorkOrderMediaService {
 
     public UploadedAttachmentDto uploadProfilePhoto(MultipartFile file,
                                                     String uploaderEmail) {
+        uploadValidationService.validateProfilePhoto(file);
         String emailFolder = sanitizeSegment(uploaderEmail == null ? "usuario" : uploaderEmail.toLowerCase(Locale.ROOT));
         String basePath = "usuarios/" + emailFolder + "/perfil";
         return uploadMedia(file, null, null, null, uploaderEmail,
@@ -107,6 +112,14 @@ public class WorkOrderMediaService {
                               boolean allowVideo) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("El archivo es obligatorio");
+        }
+
+        if (allowVideo) {
+            uploadValidationService.validateWorkOrderAttachment(file, true);
+        } else if (applyWatermark) {
+            uploadValidationService.validateWorkOrderAttachment(file, false);
+        } else {
+            uploadValidationService.validateSignature(file);
         }
 
         Worker worker = workerRepository.findByEmailIgnoreCase(uploaderEmail)
