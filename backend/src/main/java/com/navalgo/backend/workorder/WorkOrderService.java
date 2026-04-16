@@ -85,6 +85,12 @@ public class WorkOrderService {
                 .getId();
     }
 
+    public boolean isAdminByEmail(String email) {
+        Worker worker = workerRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        return isAdmin(worker);
+    }
+
     @Transactional
     public WorkOrderDto create(CreateWorkOrderRequest request) {
         Owner owner = ownerRepository.findById(request.ownerId())

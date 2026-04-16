@@ -40,10 +40,16 @@ class _PartesScreenState extends State<PartesScreen> {
         return;
       }
 
-      await fleetViewModel.loadFleet();
+      try {
+        await fleetViewModel.loadFleet();
+      } catch (_) {}
+
       if (user.role == 'ADMIN' || user.canEditWorkOrders) {
-        await workersViewModel.loadWorkers();
+        try {
+          await workersViewModel.loadWorkers();
+        } catch (_) {}
       }
+
       await workOrdersViewModel.loadWorkOrders(
         workerId: user.role == 'ADMIN' ? null : user.id,
       );

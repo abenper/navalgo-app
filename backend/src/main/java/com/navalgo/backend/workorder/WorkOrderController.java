@@ -31,8 +31,7 @@ public class WorkOrderController {
     @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
     public ResponseEntity<List<WorkOrderDto>> list(@RequestParam(required = false) Long workerId,
                                                    Authentication authentication) {
-        boolean isAdmin = authentication.getAuthorities().stream()
-                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        boolean isAdmin = service.isAdminByEmail(authentication.getName());
 
         if (isAdmin) {
             if (workerId != null) {
