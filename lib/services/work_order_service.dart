@@ -15,13 +15,28 @@ class WorkOrderService {
       queryParameters: workerId != null ? {'workerId': workerId} : null,
     );
 
-    if (data is! List) {
+    final List<dynamic> rawList;
+    if (data is List) {
+      rawList = data;
+    } else if (data is Map<String, dynamic> && data['content'] is List) {
+      rawList = data['content'] as List<dynamic>;
+    } else {
       return <WorkOrder>[];
     }
 
-    return data
-        .map((item) => WorkOrder.fromJson(item as Map<String, dynamic>))
-        .toList();
+    final workOrders = <WorkOrder>[];
+    for (final item in rawList) {
+      if (item is! Map<String, dynamic>) {
+        continue;
+      }
+      try {
+        workOrders.add(WorkOrder.fromJson(item));
+      } catch (_) {
+        // Skip malformed items so one broken record does not hide the full list.
+      }
+    }
+
+    return workOrders;
   }
 
   Future<WorkOrder> updateStatus(

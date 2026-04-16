@@ -42,15 +42,21 @@ public class WorkOrderService {
     }
 
     public List<WorkOrderDto> findAll() {
-        return workOrderRepository.findAll().stream().map(this::toDto).toList();
+        return workOrderRepository.findAllWithRelationsOrderByCreatedAtDesc()
+                .stream()
+                .map(this::toDto)
+                .toList();
     }
 
     public List<WorkOrderDto> findByWorker(Long workerId) {
-        return workOrderRepository.findByAssignedWorkersId(workerId).stream().map(this::toDto).toList();
+        return workOrderRepository.findByWorkerWithRelationsOrderByCreatedAtDesc(workerId)
+                .stream()
+                .map(this::toDto)
+                .toList();
     }
 
     public WorkOrderMediaContext getWorkOrderMediaContext(Long workOrderId, String currentUserEmail) {
-        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+        WorkOrder workOrder = workOrderRepository.findByIdWithRelations(workOrderId)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
         Worker current = requireWorkerByEmail(currentUserEmail);
@@ -144,7 +150,7 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrderDto updateStatus(Long id, UpdateWorkOrderStatusRequest request, String currentUserEmail) {
-        WorkOrder workOrder = workOrderRepository.findById(id)
+        WorkOrder workOrder = workOrderRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
         Worker current = requireWorkerByEmail(currentUserEmail);
@@ -158,7 +164,7 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrderDto updateWorkOrder(Long id, UpdateWorkOrderRequest request, String currentUserEmail) {
-        WorkOrder workOrder = workOrderRepository.findById(id)
+        WorkOrder workOrder = workOrderRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
         Set<Long> previousWorkerIds = workOrder.getAssignedWorkers().stream().map(Worker::getId).collect(java.util.stream.Collectors.toSet());
 
@@ -275,7 +281,7 @@ public class WorkOrderService {
 
     @Transactional
     public WorkOrderDto deleteAttachment(Long workOrderId, Long attachmentId, String currentUserEmail) {
-        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+        WorkOrder workOrder = workOrderRepository.findByIdWithRelations(workOrderId)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
         Worker current = requireWorkerByEmail(currentUserEmail);
@@ -298,7 +304,7 @@ public class WorkOrderService {
     public WorkOrderDto addAttachment(Long workOrderId,
                                       UploadedAttachmentDto attachment,
                                       String currentUserEmail) {
-        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+        WorkOrder workOrder = workOrderRepository.findByIdWithRelations(workOrderId)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
         Worker current = requireWorkerByEmail(currentUserEmail);
@@ -323,7 +329,7 @@ public class WorkOrderService {
 
     @Transactional
     public void deleteWorkOrder(Long workOrderId, String currentUserEmail) {
-        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+        WorkOrder workOrder = workOrderRepository.findByIdWithRelations(workOrderId)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
         Worker current = requireWorkerByEmail(currentUserEmail);
@@ -433,7 +439,7 @@ public class WorkOrderService {
                                       UploadedAttachmentDto signature,
                                       List<UploadedAttachmentDto> proofAttachments,
                                       String signerEmail) {
-        WorkOrder workOrder = workOrderRepository.findById(id)
+        WorkOrder workOrder = workOrderRepository.findByIdWithRelations(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
         Worker signer = requireWorkerByEmail(signerEmail);

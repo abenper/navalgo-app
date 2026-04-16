@@ -39,6 +39,7 @@ class WorkOrdersViewModel extends ChangeNotifier {
         token,
         workerId: workerId,
       );
+      _workOrders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } catch (e) {
       _error = e.toString();
     } finally {
