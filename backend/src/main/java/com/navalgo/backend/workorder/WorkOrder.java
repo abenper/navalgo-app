@@ -6,9 +6,8 @@ import com.navalgo.backend.worker.Worker;
 import jakarta.persistence.*;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Set;
 
 @Entity
@@ -48,10 +47,10 @@ public class WorkOrder {
     private Set<Worker> assignedWorkers = new HashSet<>();
 
     @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<EngineHourLog> engineHourLogs = new ArrayList<>();
+    private Set<EngineHourLog> engineHourLogs = new LinkedHashSet<>();
 
     @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<WorkOrderAttachment> attachments = new ArrayList<>();
+    private Set<WorkOrderAttachment> attachments = new LinkedHashSet<>();
 
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
@@ -89,11 +88,11 @@ public class WorkOrder {
     public Set<Worker> getAssignedWorkers() { return assignedWorkers; }
     public void setAssignedWorkers(Set<Worker> assignedWorkers) { this.assignedWorkers = assignedWorkers; }
 
-    public List<EngineHourLog> getEngineHourLogs() { return engineHourLogs; }
-    public void setEngineHourLogs(List<EngineHourLog> engineHourLogs) { this.engineHourLogs = engineHourLogs; }
+    public Set<EngineHourLog> getEngineHourLogs() { return engineHourLogs; }
+    public void setEngineHourLogs(Set<EngineHourLog> engineHourLogs) { this.engineHourLogs = engineHourLogs; }
 
-    public List<WorkOrderAttachment> getAttachments() { return attachments; }
-    public void setAttachments(List<WorkOrderAttachment> attachments) { this.attachments = attachments; }
+    public Set<WorkOrderAttachment> getAttachments() { return attachments; }
+    public void setAttachments(Set<WorkOrderAttachment> attachments) { this.attachments = attachments; }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
