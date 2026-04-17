@@ -12,6 +12,7 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import javax.imageio.IIOImage;
 import javax.imageio.ImageIO;
@@ -318,14 +319,57 @@ public class WorkOrderMediaService {
     }
 
     private void uploadToSpaces(String key, byte[] bytes, String contentType) {
-        PutObjectRequest request = PutObjectRequest.builder()
+        byte[] payload = bytes == null ? new byte[0] : bytes;
+        try {
+            s3Client.putObject(
+                    buildPutObjectRequest(key, contentType, true),
+                    RequestBody.fromBytes(payload)
+            );
+        } catch (S3Exception exception) {
+            if (shouldRetryWithoutAcl(exception)) {
+                log.warn("El almacenamiento rechazo ACL para {}. Reintentando sin ACL", key);
+                try {
+                    s3Client.putObject(
+                            buildPutObjectRequest(key, contentType, false),
+                            RequestBody.fromBytes(payload)
+                    );
+                    return;
+                } catch (RuntimeException retryException) {
+                    log.error("Fallo al subir {} al almacenamiento tras reintento sin ACL", key, retryException);
+                    throw new IllegalStateException("No se pudo subir el archivo al almacenamiento", retryException);
+                }
+            }
+            log.error("Fallo al subir {} al almacenamiento", key, exception);
+            throw new IllegalStateException("No se pudo subir el archivo al almacenamiento", exception);
+        } catch (RuntimeException exception) {
+            log.error("Fallo al subir {} al almacenamiento", key, exception);
+            throw new IllegalStateException("No se pudo subir el archivo al almacenamiento", exception);
+        }
+    }
+
+    private PutObjectRequest buildPutObjectRequest(String key, String contentType, boolean publicRead) {
+        PutObjectRequest.Builder builder = PutObjectRequest.builder()
                 .bucket(mediaProperties.spacesBucket())
                 .key(key)
-                .contentType(contentType)
-            .acl("public-read")
-                .build();
+                .contentType(contentType);
+        if (publicRead) {
+            builder.acl("public-read");
+        }
+        return builder.build();
+    }
 
-        s3Client.putObject(request, RequestBody.fromBytes(bytes));
+    private boolean shouldRetryWithoutAcl(S3Exception exception) {
+        String errorCode = exception.awsErrorDetails() == null
+                ? ""
+                : String.valueOf(exception.awsErrorDetails().errorCode());
+        String message = exception.getMessage() == null
+                ? ""
+                : exception.getMessage().toLowerCase(Locale.ROOT);
+
+        return "AccessControlListNotSupported".equals(errorCode)
+                || "NotImplemented".equals(errorCode)
+                || "InvalidArgument".equals(errorCode)
+                || message.contains("acl");
     }
 
     private String buildObjectKey(String keyPrefix, String extension) {

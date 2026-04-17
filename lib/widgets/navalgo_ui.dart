@@ -251,10 +251,7 @@ class NavalgoMetricCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Container(
-                        height: 1,
-                        color: NavalgoColors.border,
-                      ),
+                      child: Container(height: 1, color: NavalgoColors.border),
                     ),
                   ],
                 ),
@@ -360,14 +357,17 @@ class NavalgoFormDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final compact = MediaQuery.sizeOf(context).width < 520;
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      insetPadding: compact
+          ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
+          : const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth),
         decoration: BoxDecoration(
           gradient: NavalgoColors.heroGradient,
-          borderRadius: BorderRadius.circular(32),
+          borderRadius: BorderRadius.circular(compact ? 26 : 32),
           border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
           boxShadow: [
             BoxShadow(
@@ -378,7 +378,7 @@ class NavalgoFormDialog extends StatelessWidget {
           ],
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(28),
+          padding: EdgeInsets.all(compact ? 20 : 28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,9 +442,7 @@ class NavalgoFormStyles {
     final theme = Theme.of(context);
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(20),
-      borderSide: BorderSide(
-        color: Colors.white.withValues(alpha: 0.28),
-      ),
+      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
     );
 
     return InputDecoration(
@@ -575,9 +573,7 @@ class NavalgoGradientButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(18),
           ),
-        ).copyWith(
-          iconSize: const WidgetStatePropertyAll(18),
-        ),
+        ).copyWith(iconSize: const WidgetStatePropertyAll(18)),
       ),
     );
 

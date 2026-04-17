@@ -68,6 +68,15 @@ public class GlobalExceptionHandler {
         return build(HttpStatus.METHOD_NOT_ALLOWED, "METHOD_NOT_ALLOWED", "Method not allowed", request, Map.of());
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<ApiError> handleIllegalState(IllegalStateException ex, HttpServletRequest request) {
+        LOG.error("Illegal state error", ex);
+        String message = ex.getMessage() == null || ex.getMessage().isBlank()
+                ? "Internal server error"
+                : ex.getMessage();
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "ILLEGAL_STATE", message, request, Map.of());
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleUnknown(Exception ex, HttpServletRequest request) {
         LOG.error("Unhandled server error", ex);

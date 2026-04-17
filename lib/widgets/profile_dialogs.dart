@@ -265,68 +265,64 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: Colors.white,
-                    backgroundImage: _photoUrl != null && _photoUrl!.isNotEmpty
-                        ? NetworkImage(_photoUrl!)
-                        : null,
-                    child: _photoUrl == null || _photoUrl!.isEmpty
-                        ? Text(
-                            initials,
-                            style: Theme.of(context).textTheme.titleLarge
-                                ?.copyWith(
-                                  color: NavalgoColors.deepSea,
-                                  fontWeight: FontWeight.w800,
-                                ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _profile.role == 'ADMIN'
-                              ? 'Administrador'
-                              : 'Trabajador',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _profile.canEditWorkOrders
-                              ? 'Con permiso de edición sobre partes'
-                              : 'Sin permiso de edición sobre partes',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(
-                                color: Colors.white.withValues(alpha: 0.82),
-                              ),
-                        ),
-                      ],
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 460;
+                return Container(
+                  padding: EdgeInsets.all(compact ? 16 : 18),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.14),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  NavalgoGhostButton(
-                    label: _isUploadingPhoto ? 'Subiendo...' : 'Cambiar foto',
-                    icon: Icons.photo_camera_outlined,
-                    onPressed: _isUploadingPhoto ? null : _changePhoto,
-                  ),
-                ],
-              ),
+                  child: compact
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                _buildProfileAvatar(context, initials),
+                                const SizedBox(width: 16),
+                                Expanded(child: _buildProfileSummary(context)),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: NavalgoGhostButton(
+                                label: _isUploadingPhoto
+                                    ? 'Subiendo...'
+                                    : 'Cambiar foto',
+                                icon: Icons.photo_camera_outlined,
+                                onPressed: _isUploadingPhoto
+                                    ? null
+                                    : _changePhoto,
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            _buildProfileAvatar(context, initials),
+                            const SizedBox(width: 16),
+                            Expanded(child: _buildProfileSummary(context)),
+                            const SizedBox(width: 12),
+                            NavalgoGhostButton(
+                              label: _isUploadingPhoto
+                                  ? 'Subiendo...'
+                                  : 'Cambiar foto',
+                              icon: Icons.photo_camera_outlined,
+                              onPressed: _isUploadingPhoto
+                                  ? null
+                                  : _changePhoto,
+                            ),
+                          ],
+                        ),
+                );
+              },
             ),
             const SizedBox(height: 18),
             NavalgoFormFieldBlock(
@@ -401,6 +397,54 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
       return 'N';
     }
     return list.map((part) => part[0].toUpperCase()).join();
+  }
+
+  Widget _buildProfileAvatar(BuildContext context, String initials) {
+    return CircleAvatar(
+      radius: 32,
+      backgroundColor: Colors.white,
+      backgroundImage: _photoUrl != null && _photoUrl!.isNotEmpty
+          ? NetworkImage(_photoUrl!)
+          : null,
+      child: _photoUrl == null || _photoUrl!.isEmpty
+          ? Text(
+              initials,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: NavalgoColors.deepSea,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildProfileSummary(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          _profile.role == 'ADMIN' ? 'Administrador' : 'Trabajador',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _profile.canEditWorkOrders
+              ? 'Con permiso de edición sobre partes'
+              : 'Sin permiso de edición sobre partes',
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Colors.white.withValues(alpha: 0.82),
+          ),
+        ),
+      ],
+    );
   }
 }
 
