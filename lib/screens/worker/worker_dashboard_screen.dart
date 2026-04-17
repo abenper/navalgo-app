@@ -81,11 +81,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         _balance = balance;
         _myTasks = myWorkOrders
             .where(
-              (item) => item.status == 'NEW' || item.status == 'IN_PROGRESS',
+              (item) =>
+                  (item.status == 'NEW' || item.status == 'IN_PROGRESS') &&
+                  (item.signatureUrl == null || item.signatureUrl!.isEmpty),
             )
             .length;
         _urgentTasks = myWorkOrders
-            .where((item) => item.priority == 'URGENT')
+            .where(
+              (item) =>
+                  item.priority == 'URGENT' &&
+                  (item.signatureUrl == null || item.signatureUrl!.isEmpty),
+            )
             .length;
         _hoursToday = _formatDuration(totalToday);
       });
@@ -137,12 +143,12 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 sliver: SliverToBoxAdapter(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final crossAxisCount = constraints.maxWidth >= 1380
+                      final crossAxisCount = constraints.maxWidth >= 980
                           ? 4
-                          : (constraints.maxWidth >= 760 ? 2 : 1);
+                          : (constraints.maxWidth >= 560 ? 2 : 1);
                       final childAspectRatio = crossAxisCount == 4
-                          ? 1.7
-                          : (crossAxisCount == 2 ? 1.38 : 2.35);
+                          ? 1.58
+                          : (crossAxisCount == 2 ? 1.95 : 2.5);
                       return GridView(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),

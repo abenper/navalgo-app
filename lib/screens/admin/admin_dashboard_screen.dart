@@ -73,7 +73,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       setState(() {
         _pendingWorkOrders = workOrdersVm.workOrders
             .where(
-              (item) => item.status == 'NEW' || item.status == 'IN_PROGRESS',
+              (item) =>
+                  (item.status == 'NEW' || item.status == 'IN_PROGRESS') &&
+                  (item.signatureUrl == null || item.signatureUrl!.isEmpty),
             )
             .length;
         _urgentWorkOrders = workOrdersVm.workOrders
@@ -128,12 +130,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth >= 1380
+                  final crossAxisCount = constraints.maxWidth >= 980
                       ? 4
-                      : (constraints.maxWidth >= 860 ? 2 : 1);
+                      : (constraints.maxWidth >= 560 ? 2 : 1);
                   final childAspectRatio = crossAxisCount == 4
-                      ? 1.72
-                      : (crossAxisCount == 2 ? 1.42 : 2.4);
+                      ? 1.56
+                      : (crossAxisCount == 2 ? 1.9 : 2.45);
                   return GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

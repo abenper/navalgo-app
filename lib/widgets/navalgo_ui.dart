@@ -150,56 +150,118 @@ class NavalgoMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: accent.withValues(alpha: 0.16)),
-        boxShadow: [
-          BoxShadow(
-            color: accent.withValues(alpha: 0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: accent),
-              ),
-              const Spacer(),
-              Text(
-                label,
-                style: textTheme.labelLarge?.copyWith(
-                  color: NavalgoColors.storm,
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 240;
+
+        return Container(
+          padding: EdgeInsets.all(compact ? 14 : 16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: accent.withValues(alpha: 0.16)),
+            boxShadow: [
+              BoxShadow(
+                color: accent.withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 12),
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          Text(
-            value,
-            style: textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: compact ? 40 : 44,
+                    height: compact ? 40 : 44,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: accent, size: compact ? 20 : 22),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: textTheme.labelLarge?.copyWith(
+                            color: NavalgoColors.storm,
+                            height: 1.15,
+                          ),
+                        ),
+                        SizedBox(height: compact ? 6 : 8),
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            value,
+                            style: textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: NavalgoColors.deepSea,
+                              height: 1,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (note != null)
+                Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 10 : 12,
+                    vertical: compact ? 8 : 10,
+                  ),
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Text(
+                    note!,
+                    maxLines: compact ? 2 : 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: NavalgoColors.storm,
+                      height: 1.3,
+                    ),
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Container(
+                      width: compact ? 28 : 34,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: accent,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        height: 1,
+                        color: NavalgoColors.border,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
           ),
-          if (note != null) ...[
-            const SizedBox(height: 6),
-            Text(note!, style: textTheme.bodyMedium),
-          ],
-        ],
-      ),
+        );
+      },
     );
   }
 }
