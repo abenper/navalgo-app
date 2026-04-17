@@ -716,8 +716,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   _buildWorkLogSection(),
                   const SizedBox(height: 14),
                   _buildSignatureSection(),
-                  const SizedBox(height: 14),
-                  _buildAttachmentsSection(_attachments),
                 ],
               ),
             ),
@@ -810,6 +808,13 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
+          const SizedBox(height: 4),
+          Text(
+            'Cada campo deja claro a qué motor corresponde el registro: central, auxiliar u otro.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
+          ),
           const SizedBox(height: 8),
           if (_engineHoursControllers.isEmpty)
             Text(
@@ -825,9 +830,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   readOnly: !_canUpdateWorkLog || _busy,
                   keyboardType: TextInputType.number,
                   decoration: InputDecoration(
-                    labelText: entry.key,
+                    labelText: _formatEngineLabel(entry.key),
                     border: const OutlineInputBorder(),
-                    hintText: 'Horas',
+                    hintText: 'Horas actuales',
                   ),
                 ),
               ),
@@ -842,8 +847,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
             ),
             const SizedBox(height: 6),
             ..._workOrder.engineHours.map(
-              (item) =>
-                  _DetailRow(label: item.engineLabel, value: '${item.hours} h'),
+              (item) => _DetailRow(
+                label: _formatEngineLabel(item.engineLabel),
+                value: '${item.hours} h',
+              ),
             ),
           ],
         ],
@@ -905,6 +912,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   ),
               ],
             ),
+            const SizedBox(height: 16),
+            _buildProofAttachmentsPanel(
+              title: 'Pruebas adjuntas a esta firma',
+              emptyText: 'No hay pruebas adjuntas registradas en este cierre.',
+            ),
           ],
         ),
       );
@@ -914,9 +926,19 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       return _buildSectionCard(
         title: 'Firma del parte',
         subtitle: 'Este parte todavía no tiene firma registrada.',
-        child: Text(
-          'Solo el trabajador asignado puede firmar el parte cuando esté pendiente de cierre.',
-          style: Theme.of(context).textTheme.bodyMedium,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Solo el trabajador asignado puede firmar el parte cuando esté pendiente de cierre.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            _buildProofAttachmentsPanel(
+              title: 'Pruebas vinculadas al cierre',
+              emptyText: 'Todavía no hay pruebas adjuntas a este parte.',
+            ),
+          ],
         ),
       );
     }
@@ -952,6 +974,13 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
               label: const Text('Borrar trazo'),
             ),
           ),
+          if (_attachments.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            _buildProofAttachmentsPanel(
+              title: 'Pruebas ya guardadas',
+              emptyText: 'No hay pruebas guardadas todavía.',
+            ),
+          ],
           const SizedBox(height: 10),
           Container(
             width: double.infinity,
@@ -1037,22 +1066,38 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     );
   }
 
-  Widget _buildAttachmentsSection(List<WorkOrderAttachmentItem> attachments) {
-    return _buildSectionCard(
-      title: 'Adjuntos del parte',
-      subtitle:
-          'Fotos y vídeos generales asociados al parte, separados de las pruebas específicas de la firma.',
-      action: _canDeleteMedia
-          ? OutlinedButton.icon(
-              onPressed: _busy ? null : _pickAndUploadMediaForPart,
-              icon: const Icon(Icons.upload_file_outlined),
-              label: const Text('Añadir multimedia'),
-            )
-          : null,
-      child: attachments.isEmpty
-          ? Text('Sin adjuntos.', style: Theme.of(context).textTheme.bodyMedium)
-          : Column(
-              children: attachments
+  Widget _buildProofAttachmentsPanel({
+    required String title,
+    required String emptyText,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: NavalgoColors.foam,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Aquí solo se muestran las evidencias vinculadas al cierre del parte.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 12),
+          if (_attachments.isEmpty)
+            Text(emptyText, style: Theme.of(context).textTheme.bodyMedium)
+          else
+            Column(
+              children: _attachments
                   .map(
                     (item) => Card(
                       margin: const EdgeInsets.only(bottom: 10),
@@ -1071,7 +1116,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                             color: NavalgoColors.harbor,
                           ),
                         ),
-                        title: Text(item.originalFileName ?? 'Adjunto'),
+                        title: Text(item.originalFileName ?? 'Prueba adjunta'),
                         subtitle: Text(
                           item.capturedAt == null
                               ? item.fileUrl
@@ -1098,6 +1143,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   )
                   .toList(),
             ),
+        ],
+      ),
     );
   }
 
@@ -1254,72 +1301,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     } finally {
       if (mounted) {
         setState(() => _signing = false);
-      }
-    }
-  }
-
-  Future<void> _pickAndUploadMediaForPart() async {
-    final token = context.read<SessionViewModel>().token;
-    if (token == null || token.isEmpty) {
-      AppToast.error(context, 'No hay sesión activa para subir archivos.');
-      return;
-    }
-
-    final mediaService = context.read<WorkOrderMediaService>();
-
-    setState(() => _busy = true);
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: true,
-        type: FileType.custom,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'mp4', 'mov'],
-      );
-
-      if (result == null || result.files.isEmpty) {
-        return;
-      }
-
-      Position? position;
-      try {
-        if (await Geolocator.isLocationServiceEnabled()) {
-          position = await Geolocator.getCurrentPosition();
-        }
-      } catch (_) {
-        position = null;
-      }
-
-      for (final file in result.files) {
-        final bytes = file.bytes;
-        if (bytes == null || bytes.isEmpty) {
-          continue;
-        }
-        final updated = await mediaService.attachToWorkOrder(
-          token,
-          workOrderId: _workOrder.id,
-          fileName: file.name,
-          bytes: bytes,
-          mimeType: _guessMimeType(file.name),
-          latitude: position?.latitude,
-          longitude: position?.longitude,
-          capturedAt: DateTime.now(),
-        );
-        _updateWorkOrder(updated);
-      }
-
-      if (!mounted) {
-        return;
-      }
-      setState(() {});
-      AppToast.success(context, 'Multimedia subida correctamente.');
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      AppToast.error(context, 'No se pudo subir multimedia: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _busy = false);
       }
     }
   }
@@ -1655,6 +1636,104 @@ class _DetailRow extends StatelessWidget {
   }
 }
 
+String _formatEngineLabel(String rawLabel) {
+  final label = rawLabel.trim();
+  if (label.isEmpty) {
+    return 'Motor sin identificar';
+  }
+  return 'Motor: $label';
+}
+
+class _WorkerAssignmentList extends StatelessWidget {
+  const _WorkerAssignmentList({
+    required this.workers,
+    required this.selectedWorkers,
+    required this.onToggle,
+  });
+
+  final List<WorkerProfile> workers;
+  final Set<int> selectedWorkers;
+  final void Function(int workerId, bool selected) onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    if (workers.isEmpty) {
+      return const SizedBox(
+        height: 120,
+        child: Center(child: Text('No hay mecánicos disponibles.')),
+      );
+    }
+
+    return SizedBox(
+      height: 220,
+      child: ListView.separated(
+        itemCount: workers.length,
+        separatorBuilder: (_, index) => Divider(
+          height: 1,
+          color: NavalgoColors.border.withValues(alpha: 0.55),
+        ),
+        itemBuilder: (context, index) {
+          final worker = workers[index];
+          final selected = selectedWorkers.contains(worker.id);
+          return CheckboxListTile(
+            value: selected,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+            controlAffinity: ListTileControlAffinity.trailing,
+            secondary: _WorkerAvatar(worker: worker),
+            title: Text(
+              worker.fullName,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(worker.role),
+            onChanged: (value) => onToggle(worker.id, value ?? false),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _WorkerAvatar extends StatelessWidget {
+  const _WorkerAvatar({required this.worker});
+
+  final WorkerProfile worker;
+
+  @override
+  Widget build(BuildContext context) {
+    final photoUrl = worker.photoUrl?.trim();
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: NavalgoColors.mist,
+      foregroundImage: photoUrl != null && photoUrl.isNotEmpty
+          ? NetworkImage(photoUrl)
+          : null,
+      child: Text(
+        _workerInitials(worker.fullName),
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: NavalgoColors.tide,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+String _workerInitials(String fullName) {
+  final parts = fullName
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) {
+    return 'M';
+  }
+  if (parts.length == 1) {
+    return parts.first.substring(0, 1).toUpperCase();
+  }
+  return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
+      .toUpperCase();
+}
+
 class _EditPartInput {
   const _EditPartInput({
     required this.ownerId,
@@ -1862,27 +1941,18 @@ class _EditPartDialogState extends State<_EditPartDialog> {
               caption: 'Selecciona el equipo que trabajará sobre este parte.',
               child: NavalgoPanel(
                 tint: Colors.white.withValues(alpha: 0.96),
-                child: SizedBox(
-                  height: 220,
-                  child: ListView(
-                    children: widget.workers.map((worker) {
-                      final selected = _selectedWorkers.contains(worker.id);
-                      return CheckboxListTile(
-                        value: selected,
-                        title: Text(worker.fullName),
-                        subtitle: Text(worker.role),
-                        onChanged: (value) {
-                          setState(() {
-                            if (value == true) {
-                              _selectedWorkers.add(worker.id);
-                            } else {
-                              _selectedWorkers.remove(worker.id);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
+                child: _WorkerAssignmentList(
+                  workers: widget.workers,
+                  selectedWorkers: _selectedWorkers,
+                  onToggle: (workerId, selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedWorkers.add(workerId);
+                      } else {
+                        _selectedWorkers.remove(workerId);
+                      }
+                    });
+                  },
                 ),
               ),
             ),
@@ -1937,10 +2007,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   late int _ownerId;
   int? _vesselId;
   bool _highPriority = false;
-  bool _uploadingMedia = false;
   final Set<int> _selectedWorkers = <int>{};
-  final List<WorkOrderAttachmentItem> _uploadedAttachments =
-      <WorkOrderAttachmentItem>[];
   final Map<String, TextEditingController> _engineHoursControllers =
       <String, TextEditingController>{};
   String? _validationError;
@@ -2084,65 +2151,6 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
-              label: 'Multimedia del parte',
-              caption:
-                  'Sube fotos o vídeos generales del parte. Las pruebas de firma se adjuntan después al cerrarlo.',
-              child: NavalgoPanel(
-                tint: Colors.white.withValues(alpha: 0.96),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: _uploadingMedia ? null : _pickAndUploadMedia,
-                        icon: _uploadingMedia
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.upload_file_outlined),
-                        label: Text(
-                          _uploadingMedia
-                              ? 'Subiendo...'
-                              : 'Subir foto/video (web)',
-                        ),
-                      ),
-                    ),
-                    if (_uploadedAttachments.isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _uploadedAttachments
-                            .map(
-                              (item) => Chip(
-                                avatar: Icon(
-                                  item.fileType == 'VIDEO'
-                                      ? Icons.videocam
-                                      : Icons.image,
-                                  size: 18,
-                                ),
-                                label: Text(item.originalFileName ?? 'Adjunto'),
-                                onDeleted: () {
-                                  setState(() {
-                                    _uploadedAttachments.remove(item);
-                                  });
-                                },
-                              ),
-                            )
-                            .toList(),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 14),
-            NavalgoFormFieldBlock(
               label: 'Prioridad',
               child: NavalgoPanel(
                 tint: Colors.white.withValues(alpha: 0.96),
@@ -2161,9 +2169,9 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
             if (_engineHoursControllers.isNotEmpty) ...[
               const SizedBox(height: 14),
               NavalgoFormFieldBlock(
-                label: 'Horas de motor',
+                label: 'Horas por motor',
                 caption:
-                    'Completa las horas actuales de cada motor de la embarcación seleccionada.',
+                    'Opcional al crear. Puedes completarlas más tarde indicando qué motor corresponde a cada campo.',
                 child: Column(
                   children: _engineHoursControllers.entries.map((entry) {
                     return Padding(
@@ -2173,8 +2181,8 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                         keyboardType: TextInputType.number,
                         decoration: NavalgoFormStyles.inputDecoration(
                           context,
-                          label: entry.key,
-                          hint: 'Horas',
+                          label: _formatEngineLabel(entry.key),
+                          hint: 'Horas actuales',
                           prefixIcon: const Icon(Icons.av_timer_outlined),
                         ),
                       ),
@@ -2190,27 +2198,18 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                   'Marca los mecánicos que quedan vinculados al parte desde el inicio.',
               child: NavalgoPanel(
                 tint: Colors.white.withValues(alpha: 0.96),
-                child: SizedBox(
-                  height: 220,
-                  child: ListView(
-                    children: widget.workers.map((worker) {
-                      final selected = _selectedWorkers.contains(worker.id);
-                      return CheckboxListTile(
-                        value: selected,
-                        title: Text(worker.fullName),
-                        subtitle: Text(worker.role),
-                        onChanged: (v) {
-                          setState(() {
-                            if (v == true) {
-                              _selectedWorkers.add(worker.id);
-                            } else {
-                              _selectedWorkers.remove(worker.id);
-                            }
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
+                child: _WorkerAssignmentList(
+                  workers: widget.workers,
+                  selectedWorkers: _selectedWorkers,
+                  onToggle: (workerId, selected) {
+                    setState(() {
+                      if (selected) {
+                        _selectedWorkers.add(workerId);
+                      } else {
+                        _selectedWorkers.remove(workerId);
+                      }
+                    });
+                  },
                 ),
               ),
             ),
@@ -2240,11 +2239,14 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
 
     final engineHours = <EngineHourLog>[];
     for (final entry in _engineHoursControllers.entries) {
-      final hours = int.tryParse(entry.value.text.trim());
+      final rawHours = entry.value.text.trim();
+      if (rawHours.isEmpty) {
+        continue;
+      }
+      final hours = int.tryParse(rawHours);
       if (hours == null) {
         setState(() {
-          _validationError =
-              'Rellena las horas de todos los motores con números enteros.';
+          _validationError = 'Las horas de motor deben ser números enteros.';
         });
         return;
       }
@@ -2260,115 +2262,10 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
         vesselId: _vesselId,
         workerIds: _selectedWorkers.toList(),
         engineHours: engineHours,
-        attachments: List<WorkOrderAttachmentItem>.from(_uploadedAttachments),
+        attachments: const <WorkOrderAttachmentItem>[],
         priority: _highPriority ? 'HIGH' : 'NORMAL',
       ),
     );
-  }
-
-  Future<void> _pickAndUploadMedia() async {
-    if (!kIsWeb) {
-      AppToast.warning(
-        context,
-        'La subida de multimedia esta habilitada solo en la web.',
-      );
-      return;
-    }
-
-    final token = context.read<SessionViewModel>().token;
-    if (token == null || token.isEmpty) {
-      AppToast.error(context, 'No hay sesión activa para subir archivos.');
-      return;
-    }
-
-    setState(() {
-      _uploadingMedia = true;
-    });
-
-    final mediaService = context.read<WorkOrderMediaService>();
-
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: true,
-        type: FileType.custom,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'mp4', 'mov'],
-      );
-
-      if (result == null || result.files.isEmpty) {
-        return;
-      }
-
-      Position? position;
-      try {
-        final enabled = await Geolocator.isLocationServiceEnabled();
-        if (enabled) {
-          position = await Geolocator.getCurrentPosition();
-        }
-      } catch (_) {
-        position = null;
-      }
-
-      for (final file in result.files) {
-        final bytes = file.bytes;
-        if (bytes == null || bytes.isEmpty) {
-          continue;
-        }
-
-        final owner = widget.owners.where((o) => o.id == _ownerId).firstOrNull;
-        final vessel = widget.vessels
-            .where((v) => v.id == _vesselId)
-            .firstOrNull;
-
-        final uploaded = await mediaService.uploadMedia(
-          token,
-          fileName: file.name,
-          bytes: bytes,
-          mimeType: _guessMimeType(file.name),
-          latitude: position?.latitude,
-          longitude: position?.longitude,
-          capturedAt: DateTime.now(),
-          ownerName: owner?.displayName,
-          vesselName: vessel?.name,
-          workOrderDate: DateTime.now(),
-        );
-
-        _uploadedAttachments.add(uploaded);
-      }
-
-      if (!mounted) {
-        return;
-      }
-      setState(() {});
-      AppToast.success(context, 'Multimedia subida correctamente.');
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      AppToast.error(context, 'No se pudo subir multimedia: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _uploadingMedia = false;
-        });
-      }
-    }
-  }
-
-  String _guessMimeType(String fileName) {
-    final ext = fileName.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'mov':
-        return 'video/quicktime';
-      case 'mp4':
-      default:
-        return 'video/mp4';
-    }
   }
 
   void _syncVesselSelectionForOwner() {

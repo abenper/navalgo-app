@@ -28,7 +28,8 @@ Future<void> showProfileEditorDialog(BuildContext context) async {
 
   await showDialog<void>(
     context: context,
-    builder: (_) => _ProfileEditorDialog(initialProfile: _fallbackProfile(user)),
+    builder: (_) =>
+        _ProfileEditorDialog(initialProfile: _fallbackProfile(user)),
   );
 }
 
@@ -74,9 +75,7 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
   void initState() {
     super.initState();
     _profile = widget.initialProfile;
-    _fullNameController = TextEditingController(
-      text: _profile.fullName,
-    );
+    _fullNameController = TextEditingController(text: _profile.fullName);
     _emailController = TextEditingController(text: _profile.email);
     _specialityController = TextEditingController(
       text: _profile.speciality ?? '',
@@ -100,7 +99,9 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
     }
 
     try {
-      final latestProfile = await context.read<WorkerService>().getMyProfile(token);
+      final latestProfile = await context.read<WorkerService>().getMyProfile(
+        token,
+      );
       if (!mounted) {
         return;
       }
@@ -228,7 +229,8 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
       AppToast.success(context, 'Foto de perfil actualizada.');
     } catch (e) {
       if (mounted) {
-        AppToast.error(context, 'Error al subir foto: $e');
+        final message = e.toString().replaceFirst('Exception: ', '');
+        AppToast.error(context, 'Error al subir foto: $message');
       }
     } finally {
       if (mounted) {
@@ -309,7 +311,8 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
                           _profile.canEditWorkOrders
                               ? 'Con permiso de edición sobre partes'
                               : 'Sin permiso de edición sobre partes',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
                                 color: Colors.white.withValues(alpha: 0.82),
                               ),
                         ),
@@ -372,7 +375,8 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Especialidad',
-              caption: 'Opcional, pero útil para identificar el perfil operativo.',
+              caption:
+                  'Opcional, pero útil para identificar el perfil operativo.',
               child: TextFormField(
                 controller: _specialityController,
                 textInputAction: TextInputAction.done,
@@ -449,9 +453,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         newPassword: _newController.text.trim(),
       );
 
-      await session.updateUser(
-        currentUser.copyWith(mustChangePassword: false),
-      );
+      await session.updateUser(currentUser.copyWith(mustChangePassword: false));
 
       if (!mounted) {
         return;
@@ -503,7 +505,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   label: 'Contraseña actual',
                   prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
-                    onPressed: () => setState(() => _showCurrent = !_showCurrent),
+                    onPressed: () =>
+                        setState(() => _showCurrent = !_showCurrent),
                     icon: Icon(
                       _showCurrent ? Icons.visibility_off : Icons.visibility,
                     ),
@@ -531,7 +534,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   prefixIcon: const Icon(Icons.key_outlined),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _showNew = !_showNew),
-                    icon: Icon(_showNew ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(
+                      _showNew ? Icons.visibility_off : Icons.visibility,
+                    ),
                   ),
                 ),
                 validator: (value) {
@@ -558,7 +563,8 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                   label: 'Confirmar nueva contraseña',
                   prefixIcon: const Icon(Icons.verified_user_outlined),
                   suffixIcon: IconButton(
-                    onPressed: () => setState(() => _showConfirm = !_showConfirm),
+                    onPressed: () =>
+                        setState(() => _showConfirm = !_showConfirm),
                     icon: Icon(
                       _showConfirm ? Icons.visibility_off : Icons.visibility,
                     ),

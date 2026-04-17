@@ -29,8 +29,9 @@ class WorkerPhotoService {
     final response = await http.Response.fromStream(streamed);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      final message = _extractErrorMessage(response.body);
       throw Exception(
-          'Error subiendo foto de perfil (${response.statusCode}): ${response.body}');
+          'Error subiendo foto de perfil (${response.statusCode}): $message');
     }
 
     return WorkerProfile.fromJson(
@@ -41,5 +42,20 @@ class WorkerPhotoService {
     final parts = mimeType.split('/');
     if (parts.length == 2) return MediaType(parts[0], parts[1]);
     return MediaType('application', 'octet-stream');
+  }
+
+  String _extractErrorMessage(String responseBody) {
+    try {
+      final decoded = jsonDecode(responseBody);
+      if (decoded is Map<String, dynamic>) {
+        final message = decoded['message']?.toString().trim();
+        if (message != null && message.isNotEmpty) {
+          return message;
+        }
+      }
+    } catch (_) {}
+
+    final fallback = responseBody.trim();
+    return fallback.isEmpty ? 'Error desconocido del servidor' : fallback;
   }
 }

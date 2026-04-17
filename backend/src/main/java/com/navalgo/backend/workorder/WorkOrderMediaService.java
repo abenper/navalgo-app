@@ -97,8 +97,25 @@ public class WorkOrderMediaService {
         uploadValidationService.validateProfilePhoto(file);
         String emailFolder = sanitizeSegment(uploaderEmail == null ? "usuario" : uploaderEmail.toLowerCase(Locale.ROOT));
         String basePath = "usuarios/" + emailFolder + "/perfil";
-        return uploadMedia(file, null, null, null, uploaderEmail,
-            false, false, basePath, false);
+        String contentType = file.getContentType() == null
+                ? "image/jpeg"
+                : file.getContentType().trim().toLowerCase(Locale.ROOT);
+        String objectKey = buildObjectKey(basePath, resolveImageExtension(file, contentType));
+        try {
+            uploadToSpaces(objectKey, file.getBytes(), contentType);
+        } catch (IOException exception) {
+            throw new IllegalStateException("No se pudo procesar la foto de perfil", exception);
+        }
+        return new UploadedAttachmentDto(
+                buildPublicUrl(objectKey),
+                "IMAGE",
+                file.getOriginalFilename(),
+                null,
+                null,
+                null,
+                false,
+                false
+        );
     }
 
     private UploadedAttachmentDto uploadMedia(MultipartFile file,
@@ -327,6 +344,25 @@ public class WorkOrderMediaService {
             }
         }
         return ".mp4";
+    }
+
+    private String resolveImageExtension(MultipartFile file, String contentType) {
+        String originalName = file.getOriginalFilename();
+        if (originalName != null) {
+            int dotIndex = originalName.lastIndexOf('.');
+            if (dotIndex >= 0 && dotIndex < originalName.length() - 1) {
+                String ext = originalName.substring(dotIndex).toLowerCase(Locale.ROOT);
+                if (ext.matches("\\.(jpg|jpeg|png|webp)")) {
+                    return ext;
+                }
+            }
+        }
+
+        return switch (contentType) {
+            case "image/png" -> ".png";
+            case "image/webp" -> ".webp";
+            default -> ".jpg";
+        };
     }
 
     private String buildWorkOrderBasePath(String ownerName, String vesselName, LocalDate workOrderDate) {
