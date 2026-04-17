@@ -13,6 +13,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -33,11 +34,11 @@ public class SecurityConfig {
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtFilter,
-        RequestIdFilter requestIdFilter,
+            RequestIdFilter requestIdFilter,
             @Value("${app.security.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}") String allowedOriginsCsv
     ) {
         this.jwtFilter = jwtFilter;
-    this.requestIdFilter = requestIdFilter;
+        this.requestIdFilter = requestIdFilter;
         this.allowedOrigins = Arrays.stream(allowedOriginsCsv.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
@@ -51,7 +52,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/auth/**", "/h2-console/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health").permitAll()
+                        .requestMatchers("/api/auth/**", "/h2-console/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
                         .anyRequest().authenticated()
                 )
@@ -61,8 +62,8 @@ public class SecurityConfig {
                     headers.permissionsPolicy(permissions -> permissions.policy("geolocation=(), microphone=(), camera=()"));
                     headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::deny);
                 })
-                .addFilterBefore(requestIdFilter, JwtAuthenticationFilter.class)
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(requestIdFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(jwtFilter, AuthorizationFilter.class);
 
         return http.build();
     }
