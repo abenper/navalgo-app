@@ -128,17 +128,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             else
               LayoutBuilder(
                 builder: (context, constraints) {
-                  final crossAxisCount = constraints.maxWidth > 900
+                  final crossAxisCount = constraints.maxWidth >= 1380
                       ? 4
-                      : (constraints.maxWidth > 520 ? 2 : 1);
-                  final childAspectRatio = crossAxisCount == 1 ? 2.1 : 1.15;
-                  return GridView.count(
-                    crossAxisCount: crossAxisCount,
-                    childAspectRatio: childAspectRatio,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
+                      : (constraints.maxWidth >= 860 ? 2 : 1);
+                  final childAspectRatio = crossAxisCount == 4
+                      ? 1.72
+                      : (crossAxisCount == 2 ? 1.42 : 2.4);
+                  return GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: crossAxisCount,
+                      childAspectRatio: childAspectRatio,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
                     children: [
                       _buildStatCard(
                         'Partes Pendientes',

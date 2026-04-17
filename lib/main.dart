@@ -1,3 +1,4 @@
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
@@ -82,6 +83,13 @@ class MyApp extends StatelessWidget {
       title: 'NavalGO',
       debugShowCheckedModeBanner: false, // Oculta la etiqueta roja de "DEBUG"
       theme: buildNavalgoTheme(),
+      locale: const Locale('es'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [Locale('es')],
       home: const _RootScreen(),
     );
   }

@@ -36,6 +36,12 @@ public class WorkerService {
         return workerRepository.findAll().stream().map(WorkerDto::from).toList();
     }
 
+    public WorkerDto findOwnProfile(String email) {
+        Worker worker = workerRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        return WorkerDto.from(worker);
+    }
+
     public CreateWorkerResponse create(CreateWorkerRequest request) {
         workerRepository.findByEmailIgnoreCase(request.email()).ifPresent(existing -> {
             throw new IllegalArgumentException("Ya existe un trabajador con ese email");
@@ -82,6 +88,23 @@ public class WorkerService {
         worker.setRole(request.role());
         worker.setCanEditWorkOrders(request.canEditWorkOrders());
         worker.setContractStartDate(request.contractStartDate());
+        return WorkerDto.from(workerRepository.save(worker));
+    }
+
+    @Transactional
+    public WorkerDto updateOwnProfile(String currentEmail, UpdateOwnProfileRequest request) {
+        Worker worker = workerRepository.findByEmailIgnoreCase(currentEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+
+        workerRepository.findByEmailIgnoreCase(request.email()).ifPresent(existing -> {
+            if (!existing.getId().equals(worker.getId())) {
+                throw new IllegalArgumentException("Ya existe un trabajador con ese email");
+            }
+        });
+
+        worker.setFullName(inputSanitizer.requiredText(request.fullName(), "El nombre", 255));
+        worker.setEmail(inputSanitizer.email(request.email()));
+        worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
         return WorkerDto.from(workerRepository.save(worker));
     }
 

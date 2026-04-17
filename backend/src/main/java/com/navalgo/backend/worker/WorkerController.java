@@ -1,5 +1,6 @@
 package com.navalgo.backend.worker;
 
+import com.navalgo.backend.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -10,6 +11,7 @@ import com.navalgo.backend.workorder.WorkOrderMediaService;
 import com.navalgo.backend.workorder.UploadedAttachmentDto;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/workers")
@@ -17,10 +19,32 @@ public class WorkerController {
 
     private final WorkerService workerService;
     private final WorkOrderMediaService mediaService;
+    private final JwtService jwtService;
 
-    public WorkerController(WorkerService workerService, WorkOrderMediaService mediaService) {
+    public WorkerController(WorkerService workerService,
+                            WorkOrderMediaService mediaService,
+                            JwtService jwtService) {
         this.workerService = workerService;
         this.mediaService = mediaService;
+        this.jwtService = jwtService;
+    }
+
+    @GetMapping("/me")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkerDto> me(Authentication authentication) {
+        return ResponseEntity.ok(workerService.findOwnProfile(authentication.getName()));
+    }
+
+    @PutMapping("/me")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<OwnProfileResponse> updateOwnProfile(@RequestBody @Valid UpdateOwnProfileRequest request,
+                                                               Authentication authentication) {
+        WorkerDto updated = workerService.updateOwnProfile(authentication.getName(), request);
+        String token = jwtService.generateToken(updated.email(), Map.of(
+                "role", updated.role().name(),
+                "userId", updated.id()
+        ));
+        return ResponseEntity.ok(new OwnProfileResponse(updated, token, jwtService.calculateExpiryInstant()));
     }
 
     @GetMapping

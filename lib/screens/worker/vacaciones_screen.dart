@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/leave_request.dart';
@@ -6,6 +7,7 @@ import '../../models/worker_profile.dart';
 import '../../services/leave_service.dart';
 import '../../services/worker_service.dart';
 import '../../theme/navalgo_theme.dart';
+import '../../utils/app_toast.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 
@@ -14,8 +16,58 @@ const List<String> _leaveReasons = [
   'Médico',
   'Maternidad/Paternidad',
   'Asuntos Propios',
-  'Otro',
+  'Otros',
 ];
+
+const List<String> _calendarWeekdays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
+const String _otherLeaveReason = 'Otros';
+
+bool _isOtherReason(String reason) {
+  final normalized = reason.trim().toLowerCase();
+  return normalized == 'otro' ||
+      normalized == 'otros' ||
+      normalized.startsWith('otro:') ||
+      normalized.startsWith('otros:') ||
+      !_leaveReasons.contains(reason);
+}
+
+String _selectorReason(String? initialReason) {
+  final reason = initialReason?.trim();
+  if (reason == null || reason.isEmpty) {
+    return 'Vacaciones';
+  }
+  if (!_isOtherReason(reason)) {
+    return reason;
+  }
+  return _otherLeaveReason;
+}
+
+String _extractOtherReason(String? initialReason) {
+  final reason = initialReason?.trim() ?? '';
+  if (reason.isEmpty) {
+    return '';
+  }
+  final lower = reason.toLowerCase();
+  if (lower.startsWith('otro:') || lower.startsWith('otros:')) {
+    final separator = reason.indexOf(':');
+    if (separator != -1 && separator + 1 < reason.length) {
+      return reason.substring(separator + 1).trim();
+    }
+  }
+  if (_leaveReasons.contains(reason)) {
+    return '';
+  }
+  return reason;
+}
+
+String _composeReason(String selectedReason, String otherReason) {
+  if (selectedReason != _otherLeaveReason) {
+    return selectedReason;
+  }
+
+  final trimmed = otherReason.trim();
+  return trimmed.isEmpty ? _otherLeaveReason : 'Otros: $trimmed';
+}
 
 class AusenciasScreen extends StatefulWidget {
   const AusenciasScreen({super.key});
@@ -30,6 +82,11 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   List<LeaveRequestModel> _requests = <LeaveRequestModel>[];
   LeaveBalance? _balance;
   List<WorkerProfile> _workers = <WorkerProfile>[];
+  DateTime _calendarMonth = DateTime(
+    DateTime.now().year,
+    DateTime.now().month,
+  );
+  DateTime _selectedCalendarDay = DateTime.now();
 
   bool get _isAdmin => context.read<SessionViewModel>().user?.role == 'ADMIN';
 
@@ -85,6 +142,25 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         _requests = requests;
         _balance = balance;
         _workers = workers;
+        final visibleRequests = requests
+            .where(
+              (item) => item.status == 'APPROVED' || item.status == 'PENDING',
+            )
+            .toList();
+        if (visibleRequests.isNotEmpty) {
+          final currentSelection = DateTime(
+            _selectedCalendarDay.year,
+            _selectedCalendarDay.month,
+            _selectedCalendarDay.day,
+          );
+          final hasSelectedDayData = _requestsForDay(
+            currentSelection,
+            source: visibleRequests,
+          ).isNotEmpty;
+          if (!hasSelectedDayData) {
+            _selectedCalendarDay = visibleRequests.first.startDate;
+          }
+        }
       });
     } catch (e) {
       if (!mounted) {
@@ -322,6 +398,341 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     }
   }
 
+  List<LeaveRequestModel> get _calendarRequests => _requests
+      .where((item) => item.status == 'APPROVED' || item.status == 'PENDING')
+      .toList();
+
+  List<LeaveRequestModel> _requestsForDay(
+    DateTime day, {
+    List<LeaveRequestModel>? source,
+  }) {
+    final currentDay = DateTime(day.year, day.month, day.day);
+    return (source ?? _calendarRequests)
+        .where((item) {
+          final start = DateTime(
+            item.startDate.year,
+            item.startDate.month,
+            item.startDate.day,
+          );
+          final end = DateTime(
+            item.endDate.year,
+            item.endDate.month,
+            item.endDate.day,
+          );
+          return !currentDay.isBefore(start) && !currentDay.isAfter(end);
+        })
+        .toList()
+      ..sort((a, b) {
+        final statusOrder = _statusPriority(a.status).compareTo(
+          _statusPriority(b.status),
+        );
+        if (statusOrder != 0) {
+          return statusOrder;
+        }
+        return a.workerName.compareTo(b.workerName);
+      });
+  }
+
+  int _statusPriority(String status) {
+    switch (status) {
+      case 'APPROVED':
+        return 0;
+      case 'PENDING':
+        return 1;
+      default:
+        return 2;
+    }
+  }
+
+  String _formatShortDate(DateTime value) {
+    return DateFormat('d MMM yyyy', 'es').format(value);
+  }
+
+  String _formatMonthLabel(DateTime value) {
+    final raw = DateFormat('MMMM yyyy', 'es').format(value);
+    if (raw.isEmpty) {
+      return raw;
+    }
+    return raw[0].toUpperCase() + raw.substring(1);
+  }
+
+  String _formatLongDay(DateTime value) {
+    final raw = DateFormat("EEEE d 'de' MMMM", 'es').format(value);
+    if (raw.isEmpty) {
+      return raw;
+    }
+    return raw[0].toUpperCase() + raw.substring(1);
+  }
+
+  Widget _buildAdminCalendar() {
+    final month = DateTime(_calendarMonth.year, _calendarMonth.month);
+    final firstDayOfMonth = DateTime(month.year, month.month, 1);
+    final gridStart = firstDayOfMonth.subtract(
+      Duration(days: firstDayOfMonth.weekday - 1),
+    );
+    final selectedItems = _requestsForDay(_selectedCalendarDay);
+
+    return NavalgoPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Calendario de ausencias',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Visualiza de un vistazo qué días tienen ausencias pendientes o confirmadas y quién está fuera cada jornada.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Mes anterior',
+                onPressed: () {
+                  setState(() {
+                    _calendarMonth = DateTime(month.year, month.month - 1);
+                  });
+                },
+                icon: const Icon(Icons.chevron_left_rounded),
+              ),
+              Text(
+                _formatMonthLabel(month),
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Mes siguiente',
+                onPressed: () {
+                  setState(() {
+                    _calendarMonth = DateTime(month.year, month.month + 1);
+                  });
+                },
+                icon: const Icon(Icons.chevron_right_rounded),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: const [
+              _CalendarLegendChip(
+                label: 'Confirmadas',
+                color: NavalgoColors.kelp,
+              ),
+              _CalendarLegendChip(
+                label: 'Pendientes',
+                color: NavalgoColors.sand,
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: _calendarWeekdays
+                .map(
+                  (label) => Expanded(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Text(
+                          label,
+                          style: Theme.of(context).textTheme.labelLarge
+                              ?.copyWith(color: NavalgoColors.storm),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+          const SizedBox(height: 8),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: 42,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 7,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 0.96,
+            ),
+            itemBuilder: (context, index) {
+              final day = gridStart.add(Duration(days: index));
+              final items = _requestsForDay(day);
+              final approvedCount = items
+                  .where((item) => item.status == 'APPROVED')
+                  .length;
+              final pendingCount = items
+                  .where((item) => item.status == 'PENDING')
+                  .length;
+              final inMonth = day.month == month.month;
+              final isSelected = DateUtils.isSameDay(day, _selectedCalendarDay);
+              final isToday = DateUtils.isSameDay(day, DateTime.now());
+
+              return InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  setState(() {
+                    _selectedCalendarDay = day;
+                    _calendarMonth = DateTime(day.year, day.month);
+                  });
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? NavalgoColors.deepSea.withValues(alpha: 0.08)
+                        : inMonth
+                        ? NavalgoColors.shell
+                        : NavalgoColors.mist.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: isSelected
+                          ? NavalgoColors.harbor
+                          : isToday
+                          ? NavalgoColors.sand
+                          : NavalgoColors.border,
+                      width: isSelected || isToday ? 1.4 : 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${day.day}',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: inMonth
+                                  ? NavalgoColors.deepSea
+                                  : NavalgoColors.storm,
+                            ),
+                      ),
+                      const Spacer(),
+                      if (approvedCount > 0 || pendingCount > 0)
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: [
+                            if (approvedCount > 0)
+                              _CalendarCountBadge(
+                                label: '$approvedCount C',
+                                color: NavalgoColors.kelp,
+                              ),
+                            if (pendingCount > 0)
+                              _CalendarCountBadge(
+                                label: '$pendingCount P',
+                                color: NavalgoColors.sand,
+                              ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 18),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: NavalgoColors.shell,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: NavalgoColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ausencias del ${_formatLongDay(_selectedCalendarDay)}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                if (selectedItems.isEmpty)
+                  Text(
+                    'No hay ausencias pendientes ni confirmadas para este día.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  )
+                else
+                  ...selectedItems.map(
+                    (item) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: NavalgoColors.border),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: _statusColor(item.status).withValues(
+                                  alpha: 0.12,
+                                ),
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              child: Icon(
+                                Icons.event_busy_outlined,
+                                color: _statusColor(item.status),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.workerName,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontWeight: FontWeight.w800),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(item.reason),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_formatShortDate(item.startDate)} - ${_formatShortDate(item.endDate)}',
+                                    style: Theme.of(context).textTheme.bodyMedium,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            NavalgoStatusChip(
+                              label: _statusLabel(item.status),
+                              color: _statusColor(item.status),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -354,6 +765,10 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                   : 'Tu saldo disponible, las solicitudes enviadas y su estado quedan reunidos en una sola pantalla.',
             ),
             const SizedBox(height: 18),
+            if (_isAdmin) ...[
+              _buildAdminCalendar(),
+              const SizedBox(height: 18),
+            ],
             if (_balance != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),
@@ -632,39 +1047,60 @@ class _FormularioAusenciaDialog extends StatefulWidget {
 }
 
 class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
-  String _motivo = 'Vacaciones';
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  late final TextEditingController _otherReasonController;
+  late String _motivo;
   DateTimeRange? _fechas;
-
-  List<String> get _motivosDisponibles {
-    final initialReason = widget.initialReason?.trim();
-    if (initialReason == null || initialReason.isEmpty) {
-      return _leaveReasons;
-    }
-    if (_leaveReasons.contains(initialReason)) {
-      return _leaveReasons;
-    }
-    return <String>[..._leaveReasons, initialReason];
-  }
 
   @override
   void initState() {
     super.initState();
-    _motivo = widget.initialReason ?? 'Vacaciones';
+    _motivo = _selectorReason(widget.initialReason);
+    _otherReasonController = TextEditingController(
+      text: _extractOtherReason(widget.initialReason),
+    );
     _fechas = widget.initialRange;
+  }
+
+  @override
+  void dispose() {
+    _otherReasonController.dispose();
+    super.dispose();
   }
 
   Future<void> _seleccionarFechas() async {
     final DateTime now = DateTime.now();
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
+      locale: const Locale('es'),
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       initialDateRange: _fechas,
       helpText: 'Selecciona fechas',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
+      saveText: 'Guardar',
+      fieldStartHintText: 'Inicio',
+      fieldEndHintText: 'Fin',
+      fieldStartLabelText: 'Fecha de inicio',
+      fieldEndLabelText: 'Fecha de fin',
+      errorFormatText: 'Fecha inválida',
+      errorInvalidText: 'Fecha inválida',
+      errorInvalidRangeText: 'El rango no es válido',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: Colors.blue.shade900),
+            colorScheme: const ColorScheme.light(
+              primary: NavalgoColors.tide,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: NavalgoColors.ink,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: NavalgoColors.deepSea,
+              ),
+            ),
           ),
           child: child!,
         );
@@ -677,93 +1113,120 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: Text(
-        widget.title,
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Tipo de ausencia',
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _motivo,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 12,
-                vertical: 12,
-              ),
-            ),
-            items: _motivosDisponibles
-                .map((m) => DropdownMenuItem(value: m, child: Text(m)))
-                .toList(),
-            onChanged: (val) => setState(() => _motivo = val!),
-          ),
-          const SizedBox(height: 20),
-          const Text('Fechas', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.maxFinite,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 16,
-                  horizontal: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                alignment: Alignment.centerLeft,
-              ),
-              icon: const Icon(Icons.calendar_today),
-              label: Text(
-                _fechas == null
-                    ? 'Toca para seleccionar fechas'
-                    : '${_fechas!.start.day}/${_fechas!.start.month}/${_fechas!.start.year} - ${_fechas!.end.day}/${_fechas!.end.month}/${_fechas!.end.year}',
-                style: const TextStyle(fontSize: 16, color: Colors.black87),
-              ),
-              onPressed: _seleccionarFechas,
-            ),
-          ),
-        ],
-      ),
+    return NavalgoFormDialog(
+      eyebrow: 'AUSENCIAS',
+      title: widget.title,
+      subtitle:
+          'Selecciona el motivo, añade contexto cuando sea necesario y fija el rango exacto de fechas.',
       actions: [
-        TextButton(
+        NavalgoGhostButton(
+          label: 'Cancelar',
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade900,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
+        NavalgoGradientButton(
+          label: widget.submitLabel,
+          icon: Icons.event_available_outlined,
           onPressed: () {
+            final form = _formKey.currentState;
+            if (form == null || !form.validate()) {
+              return;
+            }
             if (_fechas == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Selecciona fechas')),
-              );
+              AppToast.warning(context, 'Selecciona un rango de fechas.');
               return;
             }
             Navigator.pop(
               context,
-              _LeaveFormResult(reason: _motivo, range: _fechas!),
+              _LeaveFormResult(
+                reason: _composeReason(_motivo, _otherReasonController.text),
+                range: _fechas!,
+              ),
             );
           },
-          child: Text(widget.submitLabel),
         ),
       ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            NavalgoFormFieldBlock(
+              label: 'Tipo de ausencia',
+              child: DropdownButtonFormField<String>(
+                initialValue: _motivo,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Tipo de ausencia',
+                  prefixIcon: const Icon(Icons.fact_check_outlined),
+                ),
+                items: _leaveReasons
+                    .map((reason) => DropdownMenuItem(
+                          value: reason,
+                          child: Text(reason),
+                        ))
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _motivo = value ?? _motivo),
+              ),
+            ),
+            if (_motivo == _otherLeaveReason) ...[
+              const SizedBox(height: 14),
+              NavalgoFormFieldBlock(
+                label: '¿Qué ocurre?',
+                caption: 'Este texto se guardará junto a la solicitud para que el equipo sepa el motivo real.',
+                child: TextFormField(
+                  controller: _otherReasonController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: NavalgoFormStyles.inputDecoration(
+                    context,
+                    label: '¿Qué ocurre?',
+                    hint: 'Explica brevemente el motivo de la ausencia.',
+                    prefixIcon: const Icon(Icons.edit_note_outlined),
+                  ),
+                  validator: (value) {
+                    if (_motivo != _otherLeaveReason) {
+                      return null;
+                    }
+                    if ((value?.trim() ?? '').isEmpty) {
+                      return 'Añade un detalle para el motivo "Otros".';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Rango de fechas',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: _seleccionarFechas,
+                child: InputDecorator(
+                  decoration: NavalgoFormStyles.inputDecoration(
+                    context,
+                    label: 'Rango de fechas',
+                    hint: 'Toca para seleccionar las fechas',
+                    prefixIcon: const Icon(Icons.calendar_month_outlined),
+                  ),
+                  child: Text(
+                    _fechas == null
+                        ? 'Toca para seleccionar las fechas'
+                        : '${DateFormat('d MMM yyyy', 'es').format(_fechas!.start)} - ${DateFormat('d MMM yyyy', 'es').format(_fechas!.end)}',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: _fechas == null
+                              ? NavalgoColors.storm
+                              : NavalgoColors.deepSea,
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -779,6 +1242,8 @@ class _AdminAssignLeaveDialog extends StatefulWidget {
 }
 
 class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  late final TextEditingController _otherReasonController;
   String _reason = 'Vacaciones';
   DateTimeRange? _dates;
   late int _workerId;
@@ -787,86 +1252,156 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
   void initState() {
     super.initState();
     _workerId = widget.workers.first.id;
+    _otherReasonController = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _otherReasonController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Asignar ausencia (aceptada)'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            DropdownButtonFormField<int>(
-              initialValue: _workerId,
-              decoration: const InputDecoration(
-                labelText: 'Trabajador',
-                border: OutlineInputBorder(),
-              ),
-              items: widget.workers
-                  .map(
-                    (worker) => DropdownMenuItem<int>(
-                      value: worker.id,
-                      child: Text(worker.fullName),
-                    ),
-                  )
-                  .toList(),
-              onChanged: (value) =>
-                  setState(() => _workerId = value ?? _workerId),
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              initialValue: _reason,
-              decoration: const InputDecoration(
-                labelText: 'Tipo de ausencia',
-                border: OutlineInputBorder(),
-              ),
-              items: _leaveReasons
-                  .map(
-                    (reason) =>
-                        DropdownMenuItem(value: reason, child: Text(reason)),
-                  )
-                  .toList(),
-              onChanged: (value) => setState(() => _reason = value ?? _reason),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _pickDates,
-              icon: const Icon(Icons.calendar_month),
-              label: Text(
-                _dates == null
-                    ? 'Seleccionar fechas'
-                    : '${_dates!.start.day}/${_dates!.start.month}/${_dates!.start.year} - ${_dates!.end.day}/${_dates!.end.month}/${_dates!.end.year}',
-              ),
-            ),
-          ],
-        ),
-      ),
+    return NavalgoFormDialog(
+      eyebrow: 'PLANIFICACIÓN',
+      title: 'Asignar ausencia aceptada',
+      subtitle:
+          'Reserva directamente días de ausencia para el trabajador seleccionado y deja el motivo claro desde el calendario operativo.',
       actions: [
-        TextButton(
+        NavalgoGhostButton(
+          label: 'Cancelar',
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
         ),
-        FilledButton(
+        NavalgoGradientButton(
+          label: 'Asignar ausencia',
+          icon: Icons.event_busy_outlined,
           onPressed: () {
+            final form = _formKey.currentState;
+            if (form == null || !form.validate()) {
+              return;
+            }
             if (_dates == null) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Selecciona un rango de fechas')),
-              );
+              AppToast.warning(context, 'Selecciona un rango de fechas.');
               return;
             }
             Navigator.pop(
               context,
               _AdminAssignLeaveFormResult(
                 workerId: _workerId,
-                reason: _reason.trim().isEmpty ? 'Vacaciones' : _reason.trim(),
+                reason: _composeReason(_reason, _otherReasonController.text),
                 range: _dates!,
               ),
             );
           },
-          child: const Text('Asignar'),
         ),
       ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            NavalgoFormFieldBlock(
+              label: 'Trabajador',
+              child: DropdownButtonFormField<int>(
+                initialValue: _workerId,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Trabajador',
+                  prefixIcon: const Icon(Icons.person_outline),
+                ),
+                items: widget.workers
+                    .map(
+                      (worker) => DropdownMenuItem<int>(
+                        value: worker.id,
+                        child: Text(worker.fullName),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _workerId = value ?? _workerId),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Motivo',
+              child: DropdownButtonFormField<String>(
+                initialValue: _reason,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Motivo',
+                  prefixIcon: const Icon(Icons.fact_check_outlined),
+                ),
+                items: _leaveReasons
+                    .map(
+                      (reason) => DropdownMenuItem(
+                        value: reason,
+                        child: Text(reason),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _reason = value ?? _reason),
+              ),
+            ),
+            if (_reason == _otherLeaveReason) ...[
+              const SizedBox(height: 14),
+              NavalgoFormFieldBlock(
+                label: 'Detalle del motivo',
+                caption: 'Este texto queda visible en el calendario y en la ficha de ausencia.',
+                child: TextFormField(
+                  controller: _otherReasonController,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: NavalgoFormStyles.inputDecoration(
+                    context,
+                    label: 'Detalle del motivo',
+                    hint: 'Especifica qué sucede con esta ausencia.',
+                    prefixIcon: const Icon(Icons.description_outlined),
+                  ),
+                  validator: (value) {
+                    if (_reason != _otherLeaveReason) {
+                      return null;
+                    }
+                    if ((value?.trim() ?? '').isEmpty) {
+                      return 'Añade un detalle para el motivo "Otros".';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+            ],
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Fechas reservadas',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: _pickDates,
+                child: InputDecorator(
+                  decoration: NavalgoFormStyles.inputDecoration(
+                    context,
+                    label: 'Fechas reservadas',
+                    hint: 'Selecciona el rango de fechas',
+                    prefixIcon: const Icon(Icons.calendar_today_outlined),
+                  ),
+                  child: Text(
+                    _dates == null
+                        ? 'Selecciona el rango de fechas'
+                        : '${DateFormat('d MMM yyyy', 'es').format(_dates!.start)} - ${DateFormat('d MMM yyyy', 'es').format(_dates!.end)}',
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: _dates == null
+                              ? NavalgoColors.storm
+                              : NavalgoColors.deepSea,
+                        ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -874,9 +1409,39 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
     final now = DateTime.now();
     final picked = await showDateRangePicker(
       context: context,
+      locale: const Locale('es'),
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       initialDateRange: _dates,
+      helpText: 'Selecciona fechas',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
+      saveText: 'Guardar',
+      fieldStartHintText: 'Inicio',
+      fieldEndHintText: 'Fin',
+      fieldStartLabelText: 'Fecha de inicio',
+      fieldEndLabelText: 'Fecha de fin',
+      errorFormatText: 'Fecha inválida',
+      errorInvalidText: 'Fecha inválida',
+      errorInvalidRangeText: 'El rango no es válido',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: const ColorScheme.light(
+              primary: NavalgoColors.tide,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: NavalgoColors.ink,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: NavalgoColors.deepSea,
+              ),
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (picked != null) {
@@ -884,5 +1449,65 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
         _dates = picked;
       });
     }
+  }
+}
+
+class _CalendarLegendChip extends StatelessWidget {
+  const _CalendarLegendChip({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: NavalgoColors.deepSea,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CalendarCountBadge extends StatelessWidget {
+  const _CalendarCountBadge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+      ),
+    );
   }
 }

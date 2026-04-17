@@ -276,3 +276,282 @@ class NavalgoPageBackground extends StatelessWidget {
     );
   }
 }
+
+class NavalgoFormDialog extends StatelessWidget {
+  const NavalgoFormDialog({
+    super.key,
+    required this.title,
+    required this.child,
+    this.subtitle,
+    this.eyebrow,
+    this.actions,
+    this.maxWidth = 560,
+  });
+
+  final String title;
+  final String? subtitle;
+  final String? eyebrow;
+  final Widget child;
+  final List<Widget>? actions;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Container(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        decoration: BoxDecoration(
+          gradient: NavalgoColors.heroGradient,
+          borderRadius: BorderRadius.circular(32),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          boxShadow: [
+            BoxShadow(
+              color: NavalgoColors.deepSea.withValues(alpha: 0.26),
+              blurRadius: 40,
+              offset: const Offset(0, 24),
+            ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (eyebrow != null) ...[
+                Text(
+                  eyebrow!,
+                  style: textTheme.labelLarge?.copyWith(
+                    color: NavalgoColors.sand,
+                    letterSpacing: 1.1,
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              Text(
+                title,
+                style: textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  subtitle!,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: Colors.white.withValues(alpha: 0.84),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 24),
+              child,
+              if (actions != null && actions!.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  alignment: WrapAlignment.end,
+                  children: actions!,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NavalgoFormStyles {
+  const NavalgoFormStyles._();
+
+  static InputDecoration inputDecoration(
+    BuildContext context, {
+    required String label,
+    String? hint,
+    String? helper,
+    Widget? prefixIcon,
+    Widget? suffixIcon,
+  }) {
+    final theme = Theme.of(context);
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(20),
+      borderSide: BorderSide(
+        color: Colors.white.withValues(alpha: 0.28),
+      ),
+    );
+
+    return InputDecoration(
+      hintText: hint ?? label,
+      helperText: helper,
+      filled: true,
+      fillColor: Colors.white.withValues(alpha: 0.94),
+      prefixIcon: prefixIcon,
+      suffixIcon: suffixIcon,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      hintStyle: theme.textTheme.bodyMedium?.copyWith(
+        color: NavalgoColors.storm,
+      ),
+      helperStyle: theme.textTheme.bodySmall?.copyWith(
+        color: Colors.white.withValues(alpha: 0.78),
+      ),
+      prefixIconColor: NavalgoColors.tide,
+      suffixIconColor: NavalgoColors.tide,
+      border: border,
+      enabledBorder: border,
+      focusedBorder: border.copyWith(
+        borderSide: const BorderSide(color: NavalgoColors.sand, width: 1.5),
+      ),
+      errorBorder: border.copyWith(
+        borderSide: const BorderSide(color: NavalgoColors.alert),
+      ),
+      focusedErrorBorder: border.copyWith(
+        borderSide: const BorderSide(color: NavalgoColors.alert, width: 1.5),
+      ),
+    );
+  }
+}
+
+class NavalgoFormFieldBlock extends StatelessWidget {
+  const NavalgoFormFieldBlock({
+    super.key,
+    required this.label,
+    required this.child,
+    this.caption,
+    this.inverse = true,
+  });
+
+  final String label;
+  final Widget child;
+  final String? caption;
+  final bool inverse;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final labelColor = inverse
+        ? Colors.white.withValues(alpha: 0.94)
+        : NavalgoColors.deepSea;
+    final captionColor = inverse
+        ? Colors.white.withValues(alpha: 0.76)
+        : NavalgoColors.storm;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: textTheme.labelLarge?.copyWith(
+            color: labelColor,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        if (caption != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            caption!,
+            style: textTheme.bodySmall?.copyWith(color: captionColor),
+          ),
+        ],
+        const SizedBox(height: 8),
+        child,
+      ],
+    );
+  }
+}
+
+class NavalgoGradientButton extends StatelessWidget {
+  const NavalgoGradientButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.icon,
+    this.expand = false,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+  final bool expand;
+
+  @override
+  Widget build(BuildContext context) {
+    final button = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: onPressed == null
+            ? LinearGradient(
+                colors: [
+                  NavalgoColors.storm.withValues(alpha: 0.45),
+                  NavalgoColors.storm.withValues(alpha: 0.35),
+                ],
+              )
+            : NavalgoColors.heroGradient,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: NavalgoColors.deepSea.withValues(alpha: 0.2),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: FilledButton.icon(
+        onPressed: onPressed,
+        icon: icon == null ? const SizedBox.shrink() : Icon(icon),
+        label: Text(label),
+        style: FilledButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          minimumSize: const Size(0, 56),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+        ).copyWith(
+          iconSize: const WidgetStatePropertyAll(18),
+        ),
+      ),
+    );
+
+    if (expand) {
+      return SizedBox(width: double.infinity, child: button);
+    }
+    return button;
+  }
+}
+
+class NavalgoGhostButton extends StatelessWidget {
+  const NavalgoGhostButton({
+    super.key,
+    required this.label,
+    this.onPressed,
+    this.icon,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: icon == null ? const SizedBox.shrink() : Icon(icon),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
+        backgroundColor: Colors.white.withValues(alpha: 0.08),
+        minimumSize: const Size(0, 56),
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      ),
+    );
+  }
+}

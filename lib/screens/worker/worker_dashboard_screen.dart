@@ -137,14 +137,21 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 sliver: SliverToBoxAdapter(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final crossAxis = constraints.maxWidth > 500 ? 4 : 2;
-                      return GridView.count(
-                        crossAxisCount: crossAxis,
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
+                      final crossAxisCount = constraints.maxWidth >= 1380
+                          ? 4
+                          : (constraints.maxWidth >= 760 ? 2 : 1);
+                      final childAspectRatio = crossAxisCount == 4
+                          ? 1.7
+                          : (crossAxisCount == 2 ? 1.38 : 2.35);
+                      return GridView(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
-                        childAspectRatio: 1.05,
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: crossAxisCount,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          childAspectRatio: childAspectRatio,
+                        ),
                         children: [
                           _buildStatCard(
                             'Mis partes',

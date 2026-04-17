@@ -9,6 +9,13 @@ class CreateWorkerResult {
   final String? temporaryPassword;
 }
 
+class UpdateOwnProfileResult {
+  const UpdateOwnProfileResult({required this.worker, required this.token});
+
+  final WorkerProfile worker;
+  final String token;
+}
+
 class WorkerService {
   WorkerService({ApiClient? apiClient})
     : _apiClient = apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl);
@@ -28,6 +35,37 @@ class WorkerService {
     return data
         .map((item) => WorkerProfile.fromJson(item as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<WorkerProfile> getMyProfile(String token) async {
+    final data = await _apiClient.get(
+      '/workers/me',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    return WorkerProfile.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<UpdateOwnProfileResult> updateMyProfile(
+    String token, {
+    required String fullName,
+    required String email,
+    String? speciality,
+  }) async {
+    final data = await _apiClient.put(
+      '/workers/me',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'fullName': fullName,
+        'email': email,
+        'speciality': speciality,
+      },
+    );
+
+    final map = data as Map<String, dynamic>;
+    return UpdateOwnProfileResult(
+      worker: WorkerProfile.fromJson(map['worker'] as Map<String, dynamic>),
+      token: (map['token'] as String?) ?? token,
+    );
   }
 
   Future<CreateWorkerResult> createWorker(

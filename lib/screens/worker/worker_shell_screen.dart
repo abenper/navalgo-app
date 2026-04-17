@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:image_picker/image_picker.dart';
 
-import '../../services/auth_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
 import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
+import '../../widgets/profile_dialogs.dart';
 import '../admin/partes_screen.dart';
 import '../common/login_screen.dart';
-import '../../services/worker_photo_service.dart';
 import 'fichaje_screen.dart';
 import 'vacaciones_screen.dart';
 import 'worker_dashboard_screen.dart';
@@ -556,199 +554,12 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     );
   }
 
-  Future<void> _changeProfilePhoto() async {
-    final session = context.read<SessionViewModel>();
-    final token = session.token;
-    final userId = session.user?.id;
-    if (token == null || userId == null) return;
-    final photoService = context.read<WorkerPhotoService>();
-
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 82,
-      maxWidth: 800,
-    );
-    if (picked == null) return;
-
-    if (!mounted) return;
-    final bytes = await picked.readAsBytes();
-    final mimeType = picked.mimeType ?? 'image/jpeg';
-    final fileName = picked.name;
-
-    try {
-      await photoService.uploadPhoto(
-        token,
-        workerId: userId,
-        fileName: fileName,
-        bytes: bytes,
-        mimeType: mimeType,
-      );
-      if (mounted) AppToast.success(context, 'Foto de perfil actualizada.');
-    } catch (e) {
-      if (mounted) AppToast.error(context, 'Error al subir foto: $e');
-    }
-  }
-
   Future<void> _showProfileDialog() async {
-    final user = context.read<SessionViewModel>().user;
-    if (user == null) {
-      return;
-    }
-
-    await showDialog<void>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Mi Perfil'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Nombre: ${user.name}'),
-              const SizedBox(height: 6),
-              Text('Correo: ${user.email}'),
-              const SizedBox(height: 6),
-              Text('Rol: ${user.role}'),
-              const SizedBox(height: 6),
-              Text(
-                'Puede editar partes: ${user.canEditWorkOrders ? 'Sí' : 'No'}',
-              ),
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: () async {
-                  await _changeProfilePhoto();
-                },
-                icon: const Icon(Icons.photo_camera),
-                label: const Text('Cambiar foto de perfil'),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cerrar'),
-            ),
-          ],
-        );
-      },
-    );
+    await showProfileEditorDialog(context);
   }
 
   Future<void> _showChangePasswordDialog() async {
-    final token = context.read<SessionViewModel>().token;
-    if (token == null || token.isEmpty) {
-      AppToast.warning(context, 'No hay sesión activa.');
-      return;
-    }
-
-    final currentCtrl = TextEditingController();
-    final newCtrl = TextEditingController();
-    final confirmCtrl = TextEditingController();
-
-    try {
-      final changed = await showDialog<bool>(
-        context: context,
-        builder: (dialogContext) {
-          return AlertDialog(
-            title: const Text('Cambiar contraseña'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: currentCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Contraseña actual',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: newCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Nueva contraseña',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: confirmCtrl,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirmar nueva contraseña',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('Cancelar'),
-              ),
-              FilledButton(
-                onPressed: () async {
-                  final current = currentCtrl.text.trim();
-                  final next = newCtrl.text.trim();
-                  final confirm = confirmCtrl.text.trim();
-
-                  if (current.isEmpty || next.isEmpty || confirm.isEmpty) {
-                    AppToast.warning(
-                      dialogContext,
-                      'Completa todos los campos.',
-                    );
-                    return;
-                  }
-                  if (next.length < 12) {
-                    AppToast.warning(
-                      dialogContext,
-                      'La nueva contraseña debe tener al menos 12 caracteres.',
-                    );
-                    return;
-                  }
-                  if (next != confirm) {
-                    AppToast.warning(
-                      dialogContext,
-                      'Las contraseñas no coinciden.',
-                    );
-                    return;
-                  }
-
-                  try {
-                    await context.read<AuthService>().changePassword(
-                      token,
-                      currentPassword: current,
-                      newPassword: next,
-                    );
-                    if (dialogContext.mounted) {
-                      Navigator.of(dialogContext).pop(true);
-                    }
-                  } catch (e) {
-                    if (dialogContext.mounted) {
-                      AppToast.error(
-                        dialogContext,
-                        'No se pudo cambiar la contraseña: $e',
-                      );
-                    }
-                  }
-                },
-                child: const Text('Guardar'),
-              ),
-            ],
-          );
-        },
-      );
-
-      if (changed == true && mounted) {
-        AppToast.success(context, 'Contraseña actualizada correctamente.');
-      }
-    } finally {
-      currentCtrl.dispose();
-      newCtrl.dispose();
-      confirmCtrl.dispose();
-    }
+    await showChangePasswordFormDialog(context);
   }
 
   @override

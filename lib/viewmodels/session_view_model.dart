@@ -72,4 +72,17 @@ class SessionViewModel extends ChangeNotifier {
     _rememberedEmail = '';
     notifyListeners();
   }
+
+  Future<void> updateUser(User user) async {
+    _user = user;
+
+    final prefs = await SharedPreferences.getInstance();
+    if (_rememberMeEnabled) {
+      await prefs.setString(_userSessionKey, jsonEncode(user.toJson()));
+      await prefs.setString(_rememberedEmailKey, user.email);
+    }
+
+    _rememberedEmail = user.email;
+    notifyListeners();
+  }
 }

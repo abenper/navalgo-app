@@ -14,10 +14,12 @@ import '../../models/work_order.dart';
 import '../../services/work_order_media_service.dart';
 import '../../utils/app_toast.dart';
 import '../../services/work_order_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/fleet_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/work_orders_view_model.dart';
 import '../../viewmodels/workers_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
 
 class PartesScreen extends StatefulWidget {
   const PartesScreen({super.key});
@@ -129,7 +131,7 @@ class _PartesScreenState extends State<PartesScreen> {
   }
 
   Future<void> _openPartDetails(WorkOrder parte) async {
-    await showModalBottomSheet<void>(
+    final signed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -144,6 +146,10 @@ class _PartesScreenState extends State<PartesScreen> {
     await context.read<WorkOrdersViewModel>().loadWorkOrders(
       workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
     );
+
+    if (signed == true && mounted) {
+      AppToast.success(context, 'Parte firmado correctamente.');
+    }
   }
 
   Future<void> _deleteWorkOrderFromList(WorkOrder parte) async {
@@ -719,264 +725,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                     label: 'Creado',
                     value: _workOrder.createdAt.toLocal().toString(),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Observaciones',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 6),
-                  TextField(
-                    controller: _observationsCtrl,
-                    readOnly: !_canUpdateWorkLog || _busy,
-                    maxLines: 3,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      hintText: 'Añadir observaciones del trabajo',
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Horas de motor',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 4),
-                  if (_engineHoursControllers.isEmpty)
-                    const Text('Sin motores disponibles para este parte')
-                  else
-                    ..._engineHoursControllers.entries.map(
-                      (entry) => Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
-                        child: TextField(
-                          controller: entry.value,
-                          readOnly: !_canUpdateWorkLog || _busy,
-                          keyboardType: TextInputType.number,
-                          decoration: InputDecoration(
-                            labelText: entry.key,
-                            border: const OutlineInputBorder(),
-                            hintText: 'Horas',
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_canUpdateWorkLog) ...[
-                    const SizedBox(height: 4),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: FilledButton.icon(
-                        onPressed: _busy ? null : _saveWorkLogChanges,
-                        icon: const Icon(Icons.save),
-                        label: const Text('Guardar horas y observaciones'),
-                      ),
-                    ),
-                  ],
-                  if (_workOrder.engineHours.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Ultimo registro guardado',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 4),
-                    ..._workOrder.engineHours.map(
-                      (item) => _DetailRow(
-                        label: item.engineLabel,
-                        value: '${item.hours} h',
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 16),
+                  _buildWorkLogSection(),
                   const SizedBox(height: 14),
-                  const Text(
-                    'Firma',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 6),
-                  if (_isSigned) ...[
-                    Text(
-                      'Firmado por: ${_workOrder.signedByWorkerName ?? 'Usuario no disponible'}',
-                      style: const TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 4),
-                    if (_workOrder.signedAt != null)
-                      Text('Firmado el: ${_workOrder.signedAt!.toLocal()}'),
-                    const SizedBox(height: 8),
-                    AspectRatio(
-                      aspectRatio: 3.4,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade300),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Image.network(
-                          _workOrder.signatureUrl!,
-                          fit: BoxFit.contain,
-                          errorBuilder: (_, _, _) => const Center(
-                            child: Text('No se pudo cargar la firma'),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              _openExternal(_workOrder.signatureUrl!),
-                          icon: const Icon(Icons.open_in_new),
-                          label: const Text('Abrir firma'),
-                        ),
-                        const SizedBox(width: 8),
-                        if (_canEditPart)
-                          OutlinedButton.icon(
-                            onPressed: _busy ? null : _clearSignature,
-                            icon: const Icon(Icons.delete_outline),
-                            label: const Text('Borrar firma'),
-                          ),
-                      ],
-                    ),
-                  ] else ...[
-                    const Text('Este parte todavia no tiene firma.'),
-                    if (_canSign) ...[
-                      const SizedBox(height: 10),
-                      Container(
-                        height: 160,
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(8),
-                          color: Colors.white,
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Signature(
-                            controller: _sigController,
-                            backgroundColor: Colors.white,
-                          ),
-                        ),
-                      ),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton.icon(
-                          onPressed: _busy || _signing
-                              ? null
-                              : _sigController.clear,
-                          icon: const Icon(Icons.clear, size: 18),
-                          label: const Text('Borrar firma'),
-                        ),
-                      ),
-                      Row(
-                        children: [
-                          const Text(
-                            'Evidencias para firma',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          const Spacer(),
-                          TextButton.icon(
-                            onPressed: _busy || _signing ? null : _pickProof,
-                            icon: const Icon(Icons.add_a_photo, size: 18),
-                            label: const Text('Añadir'),
-                          ),
-                        ],
-                      ),
-                      if (_proofFiles.isNotEmpty)
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _proofFiles
-                              .map(
-                                (proof) => Chip(
-                                  avatar: Icon(
-                                    proof.mimeType.startsWith('video/')
-                                        ? Icons.videocam
-                                        : Icons.image,
-                                    size: 16,
-                                  ),
-                                  label: Text(
-                                    proof.fileName,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  onDeleted: _busy || _signing
-                                      ? null
-                                      : () => setState(
-                                          () => _proofFiles.remove(proof),
-                                        ),
-                                ),
-                              )
-                              .toList(),
-                        ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.icon(
-                          onPressed: _busy || _signing
-                              ? null
-                              : _submitInlineSignature,
-                          icon: _signing
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Icon(Icons.draw),
-                          label: Text(
-                            _signing ? 'Enviando...' : 'Firmar y enviar',
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+                  _buildSignatureSection(),
                   const SizedBox(height: 14),
-                  const Text(
-                    'Multimedia',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 6),
-                  if (_canDeleteMedia)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: OutlinedButton.icon(
-                        onPressed: _busy ? null : _pickAndUploadMediaForPart,
-                        icon: const Icon(Icons.upload_file),
-                        label: const Text('Añadir multimedia'),
-                      ),
-                    ),
-                  if (attachments.isEmpty)
-                    const Text('Sin adjuntos')
-                  else
-                    ...attachments.map((item) {
-                      return Card(
-                        child: ListTile(
-                          leading: Icon(
-                            item.fileType == 'VIDEO'
-                                ? Icons.videocam
-                                : Icons.image,
-                          ),
-                          title: Text(item.originalFileName ?? 'Adjunto'),
-                          subtitle: Text(
-                            item.capturedAt == null
-                                ? item.fileUrl
-                                : 'Hora: ${item.capturedAt!.toLocal()}',
-                          ),
-                          trailing: Wrap(
-                            spacing: 4,
-                            children: [
-                              IconButton(
-                                onPressed: () => _openExternal(item.fileUrl),
-                                icon: const Icon(Icons.open_in_new),
-                              ),
-                              if (_canDeleteMedia)
-                                IconButton(
-                                  onPressed: _busy
-                                      ? null
-                                      : () => _deleteAttachment(item),
-                                  icon: const Icon(Icons.delete_outline),
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }),
+                  _buildAttachmentsSection(attachments),
                 ],
               ),
             ),
@@ -1013,6 +767,359 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildSectionCard({
+    required String title,
+    required String subtitle,
+    Widget? action,
+    required Widget child,
+  }) {
+    return NavalgoPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          NavalgoSectionHeader(
+            title: title,
+            subtitle: subtitle,
+            action: action,
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWorkLogSection() {
+    return _buildSectionCard(
+      title: 'Avance del trabajo',
+      subtitle:
+          'Actualiza observaciones y horas de motor antes de cerrar o firmar el parte.',
+      action: _canUpdateWorkLog
+          ? FilledButton.icon(
+              onPressed: _busy ? null : _saveWorkLogChanges,
+              icon: const Icon(Icons.save_outlined),
+              label: const Text('Guardar avance'),
+            )
+          : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _observationsCtrl,
+            readOnly: !_canUpdateWorkLog || _busy,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+              hintText: 'Añadir observaciones del trabajo',
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Horas de motor',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 8),
+          if (_engineHoursControllers.isEmpty)
+            Text(
+              'Sin motores disponibles para este parte.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            )
+          else
+            ..._engineHoursControllers.entries.map(
+              (entry) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: TextField(
+                  controller: entry.value,
+                  readOnly: !_canUpdateWorkLog || _busy,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: entry.key,
+                    border: const OutlineInputBorder(),
+                    hintText: 'Horas',
+                  ),
+                ),
+              ),
+            ),
+          if (_workOrder.engineHours.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Último registro guardado',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: NavalgoColors.storm,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            ..._workOrder.engineHours.map(
+              (item) => _DetailRow(
+                label: item.engineLabel,
+                value: '${item.hours} h',
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignatureSection() {
+    if (_isSigned) {
+      return _buildSectionCard(
+        title: 'Firma del parte',
+        subtitle:
+            'El parte ya está cerrado. Puedes revisar la firma registrada y, si tienes permisos, eliminarla.',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Firmado por: ${_workOrder.signedByWorkerName ?? 'Usuario no disponible'}',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 4),
+            if (_workOrder.signedAt != null)
+              Text('Firmado el: ${_workOrder.signedAt!.toLocal()}'),
+            const SizedBox(height: 10),
+            AspectRatio(
+              aspectRatio: 3.4,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.network(
+                  _workOrder.signatureUrl!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) => const Center(
+                    child: Text('No se pudo cargar la firma'),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () => _openExternal(_workOrder.signatureUrl!),
+                  icon: const Icon(Icons.open_in_new),
+                  label: const Text('Abrir firma'),
+                ),
+                if (_canEditPart)
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _clearSignature,
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Borrar firma'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: NavalgoColors.coral,
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!_canSign) {
+      return _buildSectionCard(
+        title: 'Firma del parte',
+        subtitle: 'Este parte todavía no tiene firma registrada.',
+        child: Text(
+          'Solo el trabajador asignado puede firmar el parte cuando esté pendiente de cierre.',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      );
+    }
+
+    return _buildSectionCard(
+      title: 'Firma y cierre',
+      subtitle:
+          'Dibuja la firma y añade pruebas opcionales que viajarán junto al cierre del parte.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 180,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(14),
+              color: Colors.white,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Signature(
+                controller: _sigController,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _busy || _signing ? null : _sigController.clear,
+              icon: const Icon(Icons.clear, size: 18),
+              label: const Text('Borrar trazo'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: NavalgoColors.foam,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: NavalgoColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pruebas adjuntas a esta firma',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Fotos o vídeos opcionales que se enviarán junto con la firma, no como multimedia general del parte.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    OutlinedButton.icon(
+                      onPressed: _busy || _signing ? null : _pickProof,
+                      icon: const Icon(Icons.add_a_photo_outlined, size: 18),
+                      label: const Text('Añadir prueba'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (_proofFiles.isEmpty)
+                  Text(
+                    'No has añadido pruebas para esta firma.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _proofFiles
+                        .map(
+                          (proof) => Chip(
+                            avatar: Icon(
+                              proof.mimeType.startsWith('video/')
+                                  ? Icons.videocam
+                                  : Icons.image,
+                              size: 16,
+                            ),
+                            label: Text(
+                              proof.fileName,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onDeleted: _busy || _signing
+                                ? null
+                                : () => setState(
+                                      () => _proofFiles.remove(proof),
+                                    ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          NavalgoGradientButton(
+            label: _signing ? 'Cerrando parte...' : 'Firmar y cerrar parte',
+            icon: _signing ? null : Icons.draw_outlined,
+            onPressed: _busy || _signing ? null : _submitInlineSignature,
+            expand: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentsSection(List<WorkOrderAttachmentItem> attachments) {
+    return _buildSectionCard(
+      title: 'Adjuntos del parte',
+      subtitle:
+          'Fotos y vídeos generales asociados al parte, separados de las pruebas específicas de la firma.',
+      action: _canDeleteMedia
+          ? OutlinedButton.icon(
+              onPressed: _busy ? null : _pickAndUploadMediaForPart,
+              icon: const Icon(Icons.upload_file_outlined),
+              label: const Text('Añadir multimedia'),
+            )
+          : null,
+      child: attachments.isEmpty
+          ? Text(
+              'Sin adjuntos.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            )
+          : Column(
+              children: attachments
+                  .map(
+                    (item) => Card(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      child: ListTile(
+                        leading: Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: NavalgoColors.mist,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            item.fileType == 'VIDEO'
+                                ? Icons.videocam
+                                : Icons.image,
+                            color: NavalgoColors.harbor,
+                          ),
+                        ),
+                        title: Text(item.originalFileName ?? 'Adjunto'),
+                        subtitle: Text(
+                          item.capturedAt == null
+                              ? item.fileUrl
+                              : 'Hora: ${item.capturedAt!.toLocal()}',
+                        ),
+                        trailing: Wrap(
+                          spacing: 4,
+                          children: [
+                            IconButton(
+                              onPressed: () => _openExternal(item.fileUrl),
+                              icon: const Icon(Icons.open_in_new),
+                            ),
+                            if (_canDeleteMedia)
+                              IconButton(
+                                onPressed: _busy
+                                    ? null
+                                    : () => _deleteAttachment(item),
+                                icon: const Icon(Icons.delete_outline),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
     );
   }
 
@@ -1161,15 +1268,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       if (!mounted) {
         return;
       }
-      await _reloadFromServer();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _proofFiles.clear();
-        _sigController.clear();
-      });
-      AppToast.success(context, 'Parte firmado correctamente.');
+      Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) {
         return;
@@ -1521,21 +1620,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       case 'mp4':
       default:
         return 'video/mp4';
-    }
-  }
-
-  Future<void> _reloadFromServer() async {
-    final session = context.read<SessionViewModel>();
-    final vm = context.read<WorkOrdersViewModel>();
-    await vm.loadWorkOrders(workerId: _isAdmin ? null : session.user?.id);
-    final updated = vm.workOrders
-        .where((item) => item.id == _workOrder.id)
-        .firstOrNull;
-    if (updated != null && mounted) {
-      setState(() {
-        _workOrder = updated;
-        _syncWorkInputsFromWorkOrder();
-      });
     }
   }
 }
