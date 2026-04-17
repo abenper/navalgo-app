@@ -421,21 +421,48 @@ public class WorkOrderService {
     }
 
     private WorkOrderDto toDto(WorkOrder w) {
+        Owner owner = w.getOwner();
+        Vessel vessel = w.getVessel();
+
+        Set<Worker> assignedWorkers = w.getAssignedWorkers() == null
+            ? Collections.emptySet()
+            : w.getAssignedWorkers();
+
+        List<Long> workerIds = assignedWorkers.stream()
+            .map(Worker::getId)
+            .filter(Objects::nonNull)
+            .toList();
+
+        List<String> workerNames = assignedWorkers.stream()
+            .map(Worker::getFullName)
+            .filter(Objects::nonNull)
+            .toList();
+
+        List<EngineHourRequest> engineHours = w.getEngineHourLogs() == null
+            ? List.of()
+            : w.getEngineHourLogs().stream()
+                .map(e -> new EngineHourRequest(e.getEngineLabel(), e.getHours()))
+                .toList();
+
+        Set<WorkOrderAttachment> attachments = w.getAttachments() == null
+            ? Set.of()
+            : w.getAttachments();
+
         return new WorkOrderDto(
                 w.getId(),
                 w.getTitle(),
                 w.getDescription(),
                 w.getStatus(),
                 w.getPriority(),
-                w.getOwner().getId(),
-                w.getOwner().getDisplayName(),
-                w.getVessel() != null ? w.getVessel().getId() : null,
-                w.getVessel() != null ? w.getVessel().getName() : null,
-                w.getAssignedWorkers().stream().map(Worker::getId).toList(),
-                w.getAssignedWorkers().stream().map(Worker::getFullName).toList(),
-                w.getEngineHourLogs().stream().map(e -> new EngineHourRequest(e.getEngineLabel(), e.getHours())).toList(),
-                w.getAttachments().stream().map(WorkOrderAttachment::getFileUrl).toList(),
-                w.getAttachments().stream().map(AttachmentInfoDto::from).toList(),
+            owner != null ? owner.getId() : null,
+            owner != null ? owner.getDisplayName() : "Sin propietario",
+            vessel != null ? vessel.getId() : null,
+            vessel != null ? vessel.getName() : null,
+            workerIds,
+            workerNames,
+            engineHours,
+            attachments.stream().map(WorkOrderAttachment::getFileUrl).filter(Objects::nonNull).toList(),
+            attachments.stream().map(AttachmentInfoDto::from).toList(),
                 w.getCreatedAt(),
                 w.getSignatureUrl(),
                 w.getSignedAt(),

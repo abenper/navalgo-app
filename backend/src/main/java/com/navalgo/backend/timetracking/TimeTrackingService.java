@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -75,11 +76,20 @@ public class TimeTrackingService {
 
         Map<Long, String> uniqueWorkers = new LinkedHashMap<>();
         for (TimeEntry entry : entries) {
-            uniqueWorkers.putIfAbsent(entry.getWorker().getId(), entry.getWorker().getFullName());
+            Worker worker = entry.getWorker();
+            if (worker == null || worker.getId() == null) {
+                continue;
+            }
+
+            String fullName = worker.getFullName();
+            if (fullName == null || fullName.isBlank()) {
+                fullName = "Trabajador " + worker.getId();
+            }
+            uniqueWorkers.putIfAbsent(worker.getId(), fullName);
         }
 
         List<String> workerNames = uniqueWorkers.values().stream()
-                .sorted(String.CASE_INSENSITIVE_ORDER)
+                .sorted(Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
                 .toList();
 
         return new TodayClockedWorkersSummaryDto(workerNames.size(), workerNames);
