@@ -24,6 +24,7 @@ class AdminShellScreen extends StatefulWidget {
 class _AdminShellScreenState extends State<AdminShellScreen> {
   int _selectedIndex = 0;
   bool _shownUnreadToast = false;
+  final Set<int> _loadedIndices = <int>{0};
 
   final List<Widget> _screens = [
     const AdminDashboardScreen(),
@@ -81,8 +82,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   }
 
   void _onDestinationSelected(int index) {
+    if (_selectedIndex == index) {
+      return;
+    }
     setState(() {
       _selectedIndex = index;
+      _loadedIndices.add(index);
     });
   }
 
@@ -180,6 +185,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                                         _selectedIndex = _mapActionRouteToTab(
                                           item.actionRoute,
                                         );
+                                        _loadedIndices.add(_selectedIndex);
                                       });
                                     },
                                   ),
@@ -198,9 +204,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   }
 
   AppBar _buildAppBar(BuildContext context) {
-    final notificationsVm = context.watch<NotificationsViewModel>();
-    final session = context.watch<SessionViewModel>();
-    final userName = session.user?.name ?? 'Administrador';
+    final unreadCount = context.select<NotificationsViewModel, int>(
+      (vm) => vm.unreadCount,
+    );
+    final userName = context.select<SessionViewModel, String>(
+      (session) => session.user?.name ?? 'Administrador',
+    );
     final width = MediaQuery.of(context).size.width;
     final showSubtitle = width >= 760;
     final showName = width >= 1080;
@@ -258,7 +267,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   clipBehavior: Clip.none,
                   children: [
                     const Icon(Icons.notifications_none_rounded),
-                    if (notificationsVm.unreadCount > 0)
+                    if (unreadCount > 0)
                       Positioned(
                         right: -6,
                         top: -6,
@@ -272,9 +281,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                             shape: BoxShape.circle,
                           ),
                           child: Text(
-                            notificationsVm.unreadCount > 9
-                                ? '9+'
-                                : '${notificationsVm.unreadCount}',
+                            unreadCount > 9 ? '9+' : '$unreadCount',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
@@ -566,6 +573,15 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     await showChangePasswordFormDialog(context);
   }
 
+  List<Widget> _buildLoadedScreens() {
+    return List<Widget>.generate(_screens.length, (index) {
+      if (_loadedIndices.contains(index)) {
+        return _screens[index];
+      }
+      return const SizedBox.shrink();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -647,7 +663,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                       padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
                       child: IndexedStack(
                         index: _selectedIndex,
-                        children: _screens,
+                        children: _buildLoadedScreens(),
                       ),
                     ),
                   ),
@@ -663,7 +679,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
             decoration: const BoxDecoration(
               gradient: NavalgoColors.pageGradient,
             ),
-            child: IndexedStack(index: _selectedIndex, children: _screens),
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: _buildLoadedScreens(),
+            ),
           ),
           bottomNavigationBar: SafeArea(
             top: false,

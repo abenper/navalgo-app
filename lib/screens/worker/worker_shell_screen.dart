@@ -22,6 +22,7 @@ class WorkerShellScreen extends StatefulWidget {
 class _WorkerShellScreenState extends State<WorkerShellScreen> {
   int _selectedIndex = 0;
   bool _shownUnreadToast = false;
+  final Set<int> _loadedIndices = <int>{0};
 
   final List<Widget> _screens = const [
     WorkerDashboardScreen(),
@@ -71,8 +72,12 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
   }
 
   void _onDestinationSelected(int index) {
+    if (_selectedIndex == index) {
+      return;
+    }
     setState(() {
       _selectedIndex = index;
+      _loadedIndices.add(index);
     });
   }
 
@@ -170,6 +175,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                                         _selectedIndex = _mapActionRouteToTab(
                                           item.actionRoute,
                                         );
+                                        _loadedIndices.add(_selectedIndex);
                                       });
                                     },
                                   ),
@@ -188,9 +194,15 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
   }
 
   AppBar _buildAppBar(BuildContext context) {
-    final notificationsVm = context.watch<NotificationsViewModel>();
-    final session = context.watch<SessionViewModel>();
-    final userName = session.user?.name ?? 'Trabajador';
+    final unreadCount = context.select<NotificationsViewModel, int>(
+      (vm) => vm.unreadCount,
+    );
+    final userName = context.select<SessionViewModel, String>(
+      (session) => session.user?.name ?? 'Trabajador',
+    );
+    final photoUrl = context.select<SessionViewModel, String?>(
+      (session) => session.user?.photoUrl,
+    );
     final width = MediaQuery.of(context).size.width;
     final showSubtitle = width >= 760;
     final showName = width >= 1080;
@@ -248,7 +260,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                   clipBehavior: Clip.none,
                   children: [
                     const Icon(Icons.notifications_none_rounded),
-                    if (notificationsVm.unreadCount > 0)
+                    if (unreadCount > 0)
                       Positioned(
                         right: -6,
                         top: -6,
@@ -262,9 +274,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                             shape: BoxShape.circle,
                           ),
                           child: Text(
-                            notificationsVm.unreadCount > 9
-                                ? '9+'
-                                : '${notificationsVm.unreadCount}',
+                            unreadCount > 9 ? '9+' : '$unreadCount',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
@@ -296,7 +306,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildAvatarWidget(context),
+                        _buildAvatarWidget(photoUrl),
                         if (showName) ...[
                           const SizedBox(width: 10),
                           ConstrainedBox(
@@ -538,8 +548,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     );
   }
 
-  Widget _buildAvatarWidget(BuildContext context) {
-    final photoUrl = context.watch<SessionViewModel>().user?.photoUrl;
+  Widget _buildAvatarWidget(String? photoUrl) {
     if (photoUrl != null && photoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: 16,
@@ -560,6 +569,15 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
 
   Future<void> _showChangePasswordDialog() async {
     await showChangePasswordFormDialog(context);
+  }
+
+  List<Widget> _buildLoadedScreens() {
+    return List<Widget>.generate(_screens.length, (index) {
+      if (_loadedIndices.contains(index)) {
+        return _screens[index];
+      }
+      return const SizedBox.shrink();
+    });
   }
 
   @override
@@ -633,7 +651,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                       padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
                       child: IndexedStack(
                         index: _selectedIndex,
-                        children: _screens,
+                        children: _buildLoadedScreens(),
                       ),
                     ),
                   ),
@@ -649,7 +667,10 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
             decoration: const BoxDecoration(
               gradient: NavalgoColors.pageGradient,
             ),
-            child: IndexedStack(index: _selectedIndex, children: _screens),
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: _buildLoadedScreens(),
+            ),
           ),
           bottomNavigationBar: SafeArea(
             top: false,

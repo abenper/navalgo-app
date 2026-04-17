@@ -79,10 +79,8 @@ class _PartesScreenState extends State<PartesScreen> {
       return;
     }
 
-    final input = await showModalBottomSheet<_CreatePartInput>(
+    final input = await showDialog<_CreatePartInput>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
       builder: (_) => _CreatePartDialog(
         owners: fleetVm.owners,
         vessels: fleetVm.vessels,
@@ -206,17 +204,24 @@ class _PartesScreenState extends State<PartesScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<WorkOrdersViewModel>();
-    final isAdmin = context.watch<SessionViewModel>().user?.role == 'ADMIN';
+    final isAdmin = context.select<SessionViewModel, bool>(
+      (session) => session.user?.role == 'ADMIN',
+    );
     final workOrders = vm.workOrders;
-    final signedCount = vm.workOrders
-        .where((item) => item.signatureUrl?.isNotEmpty ?? false)
-        .length;
-    final pendingSignatureCount = vm.workOrders
-        .where((item) => item.signatureUrl?.isEmpty ?? true)
-        .length;
-    final highPriorityCount = vm.workOrders
-        .where((item) => _isHighPriority(item.priority))
-        .length;
+    var signedCount = 0;
+    var pendingSignatureCount = 0;
+    var highPriorityCount = 0;
+    for (final item in workOrders) {
+      final isSigned = item.signatureUrl?.isNotEmpty ?? false;
+      if (isSigned) {
+        signedCount += 1;
+      } else {
+        pendingSignatureCount += 1;
+      }
+      if (_isHighPriority(item.priority)) {
+        highPriorityCount += 1;
+      }
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF3F7FA),
@@ -607,6 +612,7 @@ class _WorkOrderDetailsSheet extends StatefulWidget {
 
 class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
   late WorkOrder _workOrder;
+  late List<WorkOrderAttachmentItem> _attachments;
   bool _busy = false;
   bool _signing = false;
   late final SignatureController _sigController;
@@ -619,6 +625,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
   void initState() {
     super.initState();
     _workOrder = widget.initialWorkOrder;
+    _attachments = _resolveAttachments(_workOrder);
     _sigController = SignatureController(
       penStrokeWidth: 3,
       penColor: Colors.black,
@@ -659,26 +666,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final attachments = _workOrder.attachments.isNotEmpty
-        ? _workOrder.attachments
-        : _workOrder.attachmentUrls
-              .map(
-                (url) => WorkOrderAttachmentItem(
-                  id: null,
-                  fileUrl: url,
-                  fileType: url.toLowerCase().endsWith('.mp4')
-                      ? 'VIDEO'
-                      : 'IMAGE',
-                  originalFileName: null,
-                  capturedAt: null,
-                  latitude: null,
-                  longitude: null,
-                  watermarked: false,
-                  audioRemoved: false,
-                ),
-              )
-              .toList();
-
     return SafeArea(
       child: Padding(
         padding: EdgeInsets.fromLTRB(
@@ -730,7 +717,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                   const SizedBox(height: 14),
                   _buildSignatureSection(),
                   const SizedBox(height: 14),
-                  _buildAttachmentsSection(attachments),
+                  _buildAttachmentsSection(_attachments),
                 ],
               ),
             ),
@@ -819,9 +806,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
           const SizedBox(height: 14),
           Text(
             'Horas de motor',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           if (_engineHoursControllers.isEmpty)
@@ -849,16 +836,14 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
             const SizedBox(height: 8),
             Text(
               'Último registro guardado',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: NavalgoColors.storm,
-                  ),
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: NavalgoColors.storm),
             ),
             const SizedBox(height: 6),
             ..._workOrder.engineHours.map(
-              (item) => _DetailRow(
-                label: item.engineLabel,
-                value: '${item.hours} h',
-              ),
+              (item) =>
+                  _DetailRow(label: item.engineLabel, value: '${item.hours} h'),
             ),
           ],
         ],
@@ -894,9 +879,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                 child: Image.network(
                   _workOrder.signatureUrl!,
                   fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => const Center(
-                    child: Text('No se pudo cargar la firma'),
-                  ),
+                  errorBuilder: (_, _, _) =>
+                      const Center(child: Text('No se pudo cargar la firma')),
                 ),
               ),
             ),
@@ -988,9 +972,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                         children: [
                           Text(
                             'Pruebas adjuntas a esta firma',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleMedium
+                            style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w800),
                           ),
                           const SizedBox(height: 4),
@@ -1034,9 +1016,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                             ),
                             onDeleted: _busy || _signing
                                 ? null
-                                : () => setState(
-                                      () => _proofFiles.remove(proof),
-                                    ),
+                                : () =>
+                                      setState(() => _proofFiles.remove(proof)),
                           ),
                         )
                         .toList(),
@@ -1069,10 +1050,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
             )
           : null,
       child: attachments.isEmpty
-          ? Text(
-              'Sin adjuntos.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            )
+          ? Text('Sin adjuntos.', style: Theme.of(context).textTheme.bodyMedium)
           : Column(
               children: attachments
                   .map(
@@ -1167,8 +1145,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         return;
       }
       setState(() {
-        _workOrder = updated;
-        _syncWorkInputsFromWorkOrder();
+        _updateWorkOrder(updated, syncInputs: true);
       });
       AppToast.success(context, 'Horas y observaciones actualizadas.');
     } catch (e) {
@@ -1327,7 +1304,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
           longitude: position?.longitude,
           capturedAt: DateTime.now(),
         );
-        _workOrder = updated;
+        _updateWorkOrder(updated);
       }
 
       if (!mounted) {
@@ -1357,10 +1334,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       return;
     }
 
-    final result = await showModalBottomSheet<_EditPartInput>(
+    final result = await showDialog<_EditPartInput>(
       context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
       builder: (_) => _EditPartDialog(
         workOrder: _workOrder,
         owners: fleetVm.owners,
@@ -1392,7 +1367,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         return;
       }
       setState(() {
-        _workOrder = updated;
+        _updateWorkOrder(updated);
       });
       AppToast.success(context, 'Parte actualizado.');
     } catch (e) {
@@ -1478,7 +1453,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         return;
       }
       setState(() {
-        _workOrder = updated;
+        _updateWorkOrder(updated);
       });
       AppToast.success(context, 'Firma eliminada.');
     } catch (e) {
@@ -1537,7 +1512,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         return;
       }
       setState(() {
-        _workOrder = updated;
+        _updateWorkOrder(updated);
       });
       AppToast.success(context, 'Adjunto eliminado.');
     } catch (e) {
@@ -1583,6 +1558,36 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         text: existingValues[log.engineLabel] ?? log.hours.toString(),
       );
     }
+  }
+
+  void _updateWorkOrder(WorkOrder updated, {bool syncInputs = false}) {
+    _workOrder = updated;
+    _attachments = _resolveAttachments(updated);
+    if (syncInputs) {
+      _syncWorkInputsFromWorkOrder();
+    }
+  }
+
+  List<WorkOrderAttachmentItem> _resolveAttachments(WorkOrder workOrder) {
+    if (workOrder.attachments.isNotEmpty) {
+      return workOrder.attachments;
+    }
+
+    return workOrder.attachmentUrls
+        .map(
+          (url) => WorkOrderAttachmentItem(
+            id: null,
+            fileUrl: url,
+            fileType: url.toLowerCase().endsWith('.mp4') ? 'VIDEO' : 'IMAGE',
+            originalFileName: null,
+            capturedAt: null,
+            latitude: null,
+            longitude: null,
+            watermarked: false,
+            audioRemoved: false,
+          ),
+        )
+        .toList();
   }
 
   bool _isHighPriority(String priority) {
@@ -1682,6 +1687,7 @@ class _EditPartDialog extends StatefulWidget {
 }
 
 class _EditPartDialogState extends State<_EditPartDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   late int _ownerId;
   int? _vesselId;
   late bool _highPriority;
@@ -1712,36 +1718,77 @@ class _EditPartDialogState extends State<_EditPartDialog> {
         ? _vesselId
         : null;
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          MediaQuery.of(context).viewInsets.bottom + 16,
+    return NavalgoFormDialog(
+      eyebrow: 'PARTES',
+      title: 'Editar parte',
+      subtitle:
+          'Actualiza propietario, embarcación, prioridad y mecánicos con la misma estética del editor de perfil.',
+      maxWidth: 820,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
         ),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Editar parte',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        NavalgoGradientButton(
+          label: 'Guardar',
+          icon: Icons.save_outlined,
+          onPressed: () {
+            Navigator.pop(
+              context,
+              _EditPartInput(
+                ownerId: _ownerId,
+                vesselId: _vesselId,
+                workerIds: _selectedWorkers.toList(),
+                highPriority: _highPriority,
               ),
-              const SizedBox(height: 12),
-              Text(
-                widget.workOrder.title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+            );
+          },
+        ),
+      ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
               ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<int>(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.workOrder.title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Reorganiza la asignación del parte sin salir del panel operativo.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.82),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 18),
+            NavalgoFormFieldBlock(
+              label: 'Propietario',
+              child: DropdownButtonFormField<int>(
                 initialValue: _ownerId,
-                decoration: const InputDecoration(
-                  labelText: 'Propietario',
-                  border: OutlineInputBorder(),
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Propietario',
+                  prefixIcon: const Icon(Icons.person_pin_outlined),
                 ),
                 items: widget.owners
                     .map(
@@ -1752,7 +1799,9 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                     )
                     .toList(),
                 onChanged: (value) {
-                  if (value == null) return;
+                  if (value == null) {
+                    return;
+                  }
                   setState(() {
                     _ownerId = value;
                     if (!widget.vessels.any(
@@ -1763,12 +1812,17 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                   });
                 },
               ),
-              const SizedBox(height: 10),
-              DropdownButtonFormField<int?>(
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Embarcación',
+              child: DropdownButtonFormField<int?>(
                 initialValue: validVessel,
-                decoration: const InputDecoration(
-                  labelText: 'Embarcación',
-                  border: OutlineInputBorder(),
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Embarcación',
+                  prefixIcon: const Icon(Icons.directions_boat_outlined),
                 ),
                 items: [
                   const DropdownMenuItem<int?>(
@@ -1784,75 +1838,55 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                 ],
                 onChanged: (value) => setState(() => _vesselId = value),
               ),
-              const SizedBox(height: 8),
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _highPriority,
-                onChanged: (value) =>
-                    setState(() => _highPriority = value ?? false),
-                title: const Text('Prioridad alta'),
-                subtitle: const Text(
-                  'Resalta este parte en amarillo en el panel principal.',
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Prioridad',
+              child: NavalgoPanel(
+                tint: Colors.white.withValues(alpha: 0.96),
+                child: CheckboxListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _highPriority,
+                  onChanged: (value) =>
+                      setState(() => _highPriority = value ?? false),
+                  title: const Text('Prioridad alta'),
+                  subtitle: const Text(
+                    'Resalta este parte en el panel principal de operaciones.',
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text(
-                'Mecánicos asignados',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 6),
-              SizedBox(
-                height: 180,
-                child: ListView(
-                  children: widget.workers.map((worker) {
-                    final selected = _selectedWorkers.contains(worker.id);
-                    return CheckboxListTile(
-                      value: selected,
-                      title: Text(worker.fullName),
-                      subtitle: Text(worker.role),
-                      onChanged: (value) {
-                        setState(() {
-                          if (value == true) {
-                            _selectedWorkers.add(worker.id);
-                          } else {
-                            _selectedWorkers.remove(worker.id);
-                          }
-                        });
-                      },
-                    );
-                  }).toList(),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Mecánicos asignados',
+              caption: 'Selecciona el equipo que trabajará sobre este parte.',
+              child: NavalgoPanel(
+                tint: Colors.white.withValues(alpha: 0.96),
+                child: SizedBox(
+                  height: 220,
+                  child: ListView(
+                    children: widget.workers.map((worker) {
+                      final selected = _selectedWorkers.contains(worker.id);
+                      return CheckboxListTile(
+                        value: selected,
+                        title: Text(worker.fullName),
+                        subtitle: Text(worker.role),
+                        onChanged: (value) {
+                          setState(() {
+                            if (value == true) {
+                              _selectedWorkers.add(worker.id);
+                            } else {
+                              _selectedWorkers.remove(worker.id);
+                            }
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancelar'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: () {
-                        Navigator.pop(
-                          context,
-                          _EditPartInput(
-                            ownerId: _ownerId,
-                            vesselId: _vesselId,
-                            workerIds: _selectedWorkers.toList(),
-                            highPriority: _highPriority,
-                          ),
-                        );
-                      },
-                      child: const Text('Guardar'),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1897,6 +1931,7 @@ class _CreatePartDialog extends StatefulWidget {
 }
 
 class _CreatePartDialogState extends State<_CreatePartDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
   late int _ownerId;
@@ -1933,94 +1968,132 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
         .where((vessel) => vessel.ownerId == _ownerId)
         .toList();
 
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          8,
-          16,
-          MediaQuery.of(context).viewInsets.bottom + 16,
+    return NavalgoFormDialog(
+      eyebrow: 'PARTES',
+      title: 'Nuevo parte',
+      subtitle:
+          'Da de alta un parte con el mismo estilo del formulario de perfil: limpio, compacto y con bloques claros.',
+      maxWidth: 860,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
         ),
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Nuevo Parte',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        NavalgoGradientButton(
+          label: 'Crear',
+          icon: Icons.note_add_outlined,
+          onPressed: _submit,
+        ),
+      ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            NavalgoFormFieldBlock(
+              label: 'Título',
+              child: TextFormField(
+                controller: _titleCtrl,
+                textInputAction: TextInputAction.next,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Título',
+                  prefixIcon: const Icon(Icons.title_outlined),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _titleCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Titulo',
-                    border: OutlineInputBorder(),
-                  ),
+                validator: (value) {
+                  if ((value?.trim() ?? '').isEmpty) {
+                    return 'El título es obligatorio.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Descripción',
+              child: TextFormField(
+                controller: _descriptionCtrl,
+                minLines: 3,
+                maxLines: 5,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Descripción',
+                  hint: 'Describe la intervención a realizar.',
+                  prefixIcon: const Icon(Icons.notes_outlined),
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _descriptionCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'Descripcion',
-                    border: OutlineInputBorder(),
-                  ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Propietario',
+              child: DropdownButtonFormField<int>(
+                initialValue: _ownerId,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Propietario',
+                  prefixIcon: const Icon(Icons.person_pin_outlined),
                 ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<int>(
-                  initialValue: _ownerId,
-                  decoration: const InputDecoration(
-                    labelText: 'Propietario',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: widget.owners
-                      .map(
-                        (o) => DropdownMenuItem(
-                          value: o.id,
-                          child: Text(o.displayName),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (v) {
-                    setState(() {
-                      _ownerId = v ?? _ownerId;
-                    });
-                    _syncVesselSelectionForOwner();
-                  },
-                ),
-                const SizedBox(height: 10),
-                DropdownButtonFormField<int?>(
-                  initialValue: _vesselId,
-                  decoration: const InputDecoration(
-                    labelText: 'Embarcación',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<int?>(
-                      value: null,
-                      child: Text('Sin embarcación'),
-                    ),
-                    ...availableVessels.map(
-                      (vessel) => DropdownMenuItem<int?>(
-                        value: vessel.id,
-                        child: Text(vessel.name),
+                items: widget.owners
+                    .map(
+                      (o) => DropdownMenuItem(
+                        value: o.id,
+                        child: Text(o.displayName),
                       ),
-                    ),
-                  ],
-                  onChanged: (value) {
-                    setState(() {
-                      _vesselId = value;
-                    });
-                    _syncEngineHoursForSelectedVessel();
-                  },
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  setState(() {
+                    _ownerId = v ?? _ownerId;
+                  });
+                  _syncVesselSelectionForOwner();
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Embarcación',
+              child: DropdownButtonFormField<int?>(
+                initialValue: _vesselId,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Embarcación',
+                  prefixIcon: const Icon(Icons.directions_boat_outlined),
                 ),
-                const SizedBox(height: 10),
-                Row(
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Sin embarcación'),
+                  ),
+                  ...availableVessels.map(
+                    (vessel) => DropdownMenuItem<int?>(
+                      value: vessel.id,
+                      child: Text(vessel.name),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _vesselId = value;
+                  });
+                  _syncEngineHoursForSelectedVessel();
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Multimedia del parte',
+              caption:
+                  'Sube fotos o vídeos generales del parte. Las pruebas de firma se adjuntan después al cerrarlo.',
+              child: NavalgoPanel(
+                tint: Colors.white.withValues(alpha: 0.96),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
+                    SizedBox(
+                      width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: _uploadingMedia ? null : _pickAndUploadMedia,
                         icon: _uploadingMedia
@@ -2031,7 +2104,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.upload_file),
+                            : const Icon(Icons.upload_file_outlined),
                         label: Text(
                           _uploadingMedia
                               ? 'Subiendo...'
@@ -2039,35 +2112,41 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                         ),
                       ),
                     ),
+                    if (_uploadedAttachments.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _uploadedAttachments
+                            .map(
+                              (item) => Chip(
+                                avatar: Icon(
+                                  item.fileType == 'VIDEO'
+                                      ? Icons.videocam
+                                      : Icons.image,
+                                  size: 18,
+                                ),
+                                label: Text(item.originalFileName ?? 'Adjunto'),
+                                onDeleted: () {
+                                  setState(() {
+                                    _uploadedAttachments.remove(item);
+                                  });
+                                },
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
                   ],
                 ),
-                if (_uploadedAttachments.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _uploadedAttachments
-                        .map(
-                          (item) => Chip(
-                            avatar: Icon(
-                              item.fileType == 'VIDEO'
-                                  ? Icons.videocam
-                                  : Icons.image,
-                              size: 18,
-                            ),
-                            label: Text(item.originalFileName ?? 'Adjunto'),
-                            onDeleted: () {
-                              setState(() {
-                                _uploadedAttachments.remove(item);
-                              });
-                            },
-                          ),
-                        )
-                        .toList(),
-                  ),
-                ],
-                const SizedBox(height: 10),
-                CheckboxListTile(
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Prioridad',
+              child: NavalgoPanel(
+                tint: Colors.white.withValues(alpha: 0.96),
+                child: CheckboxListTile(
                   contentPadding: EdgeInsets.zero,
                   value: _highPriority,
                   onChanged: (value) =>
@@ -2077,36 +2156,42 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                     'Mostrará este parte como destacado en el panel de operaciones.',
                   ),
                 ),
-                if (_engineHoursControllers.isNotEmpty) ...[
-                  const SizedBox(height: 14),
-                  const Text(
-                    'Horas de motor',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 8),
-                  ..._engineHoursControllers.entries.map((entry) {
+              ),
+            ),
+            if (_engineHoursControllers.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              NavalgoFormFieldBlock(
+                label: 'Horas de motor',
+                caption:
+                    'Completa las horas actuales de cada motor de la embarcación seleccionada.',
+                child: Column(
+                  children: _engineHoursControllers.entries.map((entry) {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: TextField(
                         controller: entry.value,
                         keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          labelText: entry.key,
-                          hintText: 'Horas',
-                          border: const OutlineInputBorder(),
+                        decoration: NavalgoFormStyles.inputDecoration(
+                          context,
+                          label: entry.key,
+                          hint: 'Horas',
+                          prefixIcon: const Icon(Icons.av_timer_outlined),
                         ),
                       ),
                     );
-                  }),
-                ],
-                const SizedBox(height: 10),
-                const Text(
-                  'Asignar trabajadores',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+                  }).toList(),
                 ),
-                const SizedBox(height: 4),
-                SizedBox(
-                  height: 180,
+              ),
+            ],
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Asignar trabajadores',
+              caption:
+                  'Marca los mecánicos que quedan vinculados al parte desde el inicio.',
+              child: NavalgoPanel(
+                tint: Colors.white.withValues(alpha: 0.96),
+                child: SizedBox(
+                  height: 220,
                   child: ListView(
                     children: widget.workers.map((worker) {
                       final selected = _selectedWorkers.contains(worker.id);
@@ -2127,49 +2212,31 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                     }).toList(),
                   ),
                 ),
-                if (_validationError != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _validationError!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text('Cancelar'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _submit,
-                        child: const Text('Crear'),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          ),
+            if (_validationError != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _validationError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 
   void _submit() {
-    final title = _titleCtrl.text.trim();
-    if (title.isEmpty) {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
       setState(() {
-        _validationError = 'El titulo es obligatorio.';
+        _validationError = null;
       });
       return;
     }
+
+    final title = _titleCtrl.text.trim();
 
     final engineHours = <EngineHourLog>[];
     for (final entry in _engineHoursControllers.entries) {

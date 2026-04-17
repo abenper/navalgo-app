@@ -24,7 +24,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<WorkersViewModel>().loadWorkers();
     });
-    _searchCtrl.addListener(() => setState(() {}));
   }
 
   @override
@@ -280,15 +279,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<WorkersViewModel>();
-    final query = _searchCtrl.text.trim().toLowerCase();
-    final filteredWorkers = vm.workers.where((worker) {
-      if (query.isEmpty) {
-        return true;
-      }
-      return worker.fullName.toLowerCase().contains(query) ||
-          worker.email.toLowerCase().contains(query) ||
-          (worker.speciality ?? '').toLowerCase().contains(query);
-    }).toList();
 
     return Scaffold(
       body: vm.isLoading
@@ -322,81 +312,108 @@ class _EquipoScreenState extends State<EquipoScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  ...filteredWorkers.map((worker) {
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: NavalgoColors.mist,
-                          child: const Icon(
-                            Icons.person,
-                            color: NavalgoColors.tide,
-                          ),
-                        ),
-                        title: Text(
-                          worker.fullName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        subtitle: Text(
-                          '${worker.email}\n'
-                          '${worker.role} • ${worker.speciality ?? 'Sin especialidad'}\n'
-                          'Fecha de contratación: ${_fmtDate(worker.contractStartDate)} • '
-                          'Editar partes: ${worker.canEditWorkOrders ? 'Sí' : 'No'}',
-                        ),
-                        isThreeLine: true,
-                        trailing: PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'edit') {
-                              _openEditWorkerDialog(worker);
-                            }
-                            if (value == 'delete') {
-                              _deleteWorker(worker);
-                            }
-                            if (value == 'reset') {
-                              _resetPassword(worker);
-                            }
-                            if (value == 'toggle_active') {
-                              _toggleActive(worker, !worker.active);
-                            }
-                            if (value == 'toggle_edit') {
-                              _toggleEditPermission(
-                                worker,
-                                !worker.canEditWorkOrders,
-                              );
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem<String>(
-                              value: 'edit',
-                              child: Text('Editar trabajador'),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'delete',
-                              child: Text('Eliminar trabajador'),
-                            ),
-                            PopupMenuItem<String>(
-                              value: 'toggle_active',
-                              child: Text(
-                                worker.active ? 'Desactivar' : 'Activar',
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _searchCtrl,
+                    builder: (context, value, _) {
+                      final query = value.text.trim().toLowerCase();
+                      final filteredWorkers = vm.workers.where((worker) {
+                        if (query.isEmpty) {
+                          return true;
+                        }
+                        return worker.fullName.toLowerCase().contains(query) ||
+                            worker.email.toLowerCase().contains(query) ||
+                            (worker.speciality ?? '').toLowerCase().contains(
+                              query,
+                            );
+                      }).toList();
+
+                      if (filteredWorkers.isEmpty) {
+                        return const NavalgoPanel(
+                          child: Text('No se encontraron trabajadores.'),
+                        );
+                      }
+
+                      return Column(
+                        children: filteredWorkers.map((worker) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: NavalgoColors.mist,
+                                child: const Icon(
+                                  Icons.person,
+                                  color: NavalgoColors.tide,
+                                ),
+                              ),
+                              title: Text(
+                                worker.fullName,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${worker.email}\n'
+                                '${worker.role} • ${worker.speciality ?? 'Sin especialidad'}\n'
+                                'Fecha de contratación: ${_fmtDate(worker.contractStartDate)} • '
+                                'Editar partes: ${worker.canEditWorkOrders ? 'Sí' : 'No'}',
+                              ),
+                              isThreeLine: true,
+                              trailing: PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    _openEditWorkerDialog(worker);
+                                  }
+                                  if (value == 'delete') {
+                                    _deleteWorker(worker);
+                                  }
+                                  if (value == 'reset') {
+                                    _resetPassword(worker);
+                                  }
+                                  if (value == 'toggle_active') {
+                                    _toggleActive(worker, !worker.active);
+                                  }
+                                  if (value == 'toggle_edit') {
+                                    _toggleEditPermission(
+                                      worker,
+                                      !worker.canEditWorkOrders,
+                                    );
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem<String>(
+                                    value: 'edit',
+                                    child: Text('Editar trabajador'),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: 'delete',
+                                    child: Text('Eliminar trabajador'),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: 'toggle_active',
+                                    child: Text(
+                                      worker.active ? 'Desactivar' : 'Activar',
+                                    ),
+                                  ),
+                                  PopupMenuItem<String>(
+                                    value: 'toggle_edit',
+                                    child: Text(
+                                      worker.canEditWorkOrders
+                                          ? 'Quitar permiso editar partes'
+                                          : 'Dar permiso editar partes',
+                                    ),
+                                  ),
+                                  const PopupMenuItem<String>(
+                                    value: 'reset',
+                                    child: Text('Restablecer contraseña'),
+                                  ),
+                                ],
                               ),
                             ),
-                            PopupMenuItem<String>(
-                              value: 'toggle_edit',
-                              child: Text(
-                                worker.canEditWorkOrders
-                                    ? 'Quitar permiso editar partes'
-                                    : 'Dar permiso editar partes',
-                              ),
-                            ),
-                            const PopupMenuItem<String>(
-                              value: 'reset',
-                              child: Text('Restablecer contraseña'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
                 ],
               ),
             ),

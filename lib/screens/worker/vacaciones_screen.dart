@@ -21,6 +21,9 @@ const List<String> _leaveReasons = [
 
 const List<String> _calendarWeekdays = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
 const String _otherLeaveReason = 'Otros';
+final DateFormat _shortDateFormatter = DateFormat('d MMM yyyy', 'es');
+final DateFormat _monthLabelFormatter = DateFormat('MMMM yyyy', 'es');
+final DateFormat _longDayFormatter = DateFormat("EEEE d 'de' MMMM", 'es');
 
 bool _isOtherReason(String reason) {
   final normalized = reason.trim().toLowerCase();
@@ -82,10 +85,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   List<LeaveRequestModel> _requests = <LeaveRequestModel>[];
   LeaveBalance? _balance;
   List<WorkerProfile> _workers = <WorkerProfile>[];
-  DateTime _calendarMonth = DateTime(
-    DateTime.now().year,
-    DateTime.now().month,
-  );
+  DateTime _calendarMonth = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime _selectedCalendarDay = DateTime.now();
 
   bool get _isAdmin => context.read<SessionViewModel>().user?.role == 'ADMIN';
@@ -407,30 +407,27 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     List<LeaveRequestModel>? source,
   }) {
     final currentDay = DateTime(day.year, day.month, day.day);
-    return (source ?? _calendarRequests)
-        .where((item) {
-          final start = DateTime(
-            item.startDate.year,
-            item.startDate.month,
-            item.startDate.day,
-          );
-          final end = DateTime(
-            item.endDate.year,
-            item.endDate.month,
-            item.endDate.day,
-          );
-          return !currentDay.isBefore(start) && !currentDay.isAfter(end);
-        })
-        .toList()
-      ..sort((a, b) {
-        final statusOrder = _statusPriority(a.status).compareTo(
-          _statusPriority(b.status),
-        );
-        if (statusOrder != 0) {
-          return statusOrder;
-        }
-        return a.workerName.compareTo(b.workerName);
-      });
+    return (source ?? _calendarRequests).where((item) {
+      final start = DateTime(
+        item.startDate.year,
+        item.startDate.month,
+        item.startDate.day,
+      );
+      final end = DateTime(
+        item.endDate.year,
+        item.endDate.month,
+        item.endDate.day,
+      );
+      return !currentDay.isBefore(start) && !currentDay.isAfter(end);
+    }).toList()..sort((a, b) {
+      final statusOrder = _statusPriority(
+        a.status,
+      ).compareTo(_statusPriority(b.status));
+      if (statusOrder != 0) {
+        return statusOrder;
+      }
+      return a.workerName.compareTo(b.workerName);
+    });
   }
 
   int _statusPriority(String status) {
@@ -445,11 +442,11 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   }
 
   String _formatShortDate(DateTime value) {
-    return DateFormat('d MMM yyyy', 'es').format(value);
+    return _shortDateFormatter.format(value);
   }
 
   String _formatMonthLabel(DateTime value) {
-    final raw = DateFormat('MMMM yyyy', 'es').format(value);
+    final raw = _monthLabelFormatter.format(value);
     if (raw.isEmpty) {
       return raw;
     }
@@ -457,7 +454,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   }
 
   String _formatLongDay(DateTime value) {
-    final raw = DateFormat("EEEE d 'de' MMMM", 'es').format(value);
+    final raw = _longDayFormatter.format(value);
     if (raw.isEmpty) {
       return raw;
     }
@@ -505,9 +502,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
               ),
               Text(
                 _formatMonthLabel(month),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               IconButton(
                 tooltip: 'Mes siguiente',
@@ -610,7 +607,8 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                     children: [
                       Text(
                         '${day.day}',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
                               fontWeight: FontWeight.w800,
                               color: inMonth
                                   ? NavalgoColors.deepSea
@@ -656,8 +654,8 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                 Text(
                   'Ausencias del ${_formatLongDay(_selectedCalendarDay)}',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 if (selectedItems.isEmpty)
@@ -683,9 +681,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                               width: 42,
                               height: 42,
                               decoration: BoxDecoration(
-                                color: _statusColor(item.status).withValues(
-                                  alpha: 0.12,
-                                ),
+                                color: _statusColor(
+                                  item.status,
+                                ).withValues(alpha: 0.12),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Icon(
@@ -710,7 +708,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                                   const SizedBox(height: 4),
                                   Text(
                                     '${_formatShortDate(item.startDate)} - ${_formatShortDate(item.endDate)}',
-                                    style: Theme.of(context).textTheme.bodyMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
                                   ),
                                 ],
                               ),
@@ -1162,10 +1162,10 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
                   prefixIcon: const Icon(Icons.fact_check_outlined),
                 ),
                 items: _leaveReasons
-                    .map((reason) => DropdownMenuItem(
-                          value: reason,
-                          child: Text(reason),
-                        ))
+                    .map(
+                      (reason) =>
+                          DropdownMenuItem(value: reason, child: Text(reason)),
+                    )
                     .toList(),
                 onChanged: (value) =>
                     setState(() => _motivo = value ?? _motivo),
@@ -1175,7 +1175,8 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
               const SizedBox(height: 14),
               NavalgoFormFieldBlock(
                 label: '¿Qué ocurre?',
-                caption: 'Este texto se guardará junto a la solicitud para que el equipo sepa el motivo real.',
+                caption:
+                    'Este texto se guardará junto a la solicitud para que el equipo sepa el motivo real.',
                 child: TextFormField(
                   controller: _otherReasonController,
                   minLines: 2,
@@ -1214,12 +1215,12 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
                   child: Text(
                     _fechas == null
                         ? 'Toca para seleccionar las fechas'
-                        : '${DateFormat('d MMM yyyy', 'es').format(_fechas!.start)} - ${DateFormat('d MMM yyyy', 'es').format(_fechas!.end)}',
+                        : '${_shortDateFormatter.format(_fechas!.start)} - ${_shortDateFormatter.format(_fechas!.end)}',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: _fechas == null
-                              ? NavalgoColors.storm
-                              : NavalgoColors.deepSea,
-                        ),
+                      color: _fechas == null
+                          ? NavalgoColors.storm
+                          : NavalgoColors.deepSea,
+                    ),
                   ),
                 ),
               ),
@@ -1336,10 +1337,8 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
                 ),
                 items: _leaveReasons
                     .map(
-                      (reason) => DropdownMenuItem(
-                        value: reason,
-                        child: Text(reason),
-                      ),
+                      (reason) =>
+                          DropdownMenuItem(value: reason, child: Text(reason)),
                     )
                     .toList(),
                 onChanged: (value) =>
@@ -1350,7 +1349,8 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
               const SizedBox(height: 14),
               NavalgoFormFieldBlock(
                 label: 'Detalle del motivo',
-                caption: 'Este texto queda visible en el calendario y en la ficha de ausencia.',
+                caption:
+                    'Este texto queda visible en el calendario y en la ficha de ausencia.',
                 child: TextFormField(
                   controller: _otherReasonController,
                   minLines: 2,
@@ -1389,12 +1389,12 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
                   child: Text(
                     _dates == null
                         ? 'Selecciona el rango de fechas'
-                        : '${DateFormat('d MMM yyyy', 'es').format(_dates!.start)} - ${DateFormat('d MMM yyyy', 'es').format(_dates!.end)}',
+                        : '${_shortDateFormatter.format(_dates!.start)} - ${_shortDateFormatter.format(_dates!.end)}',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: _dates == null
-                              ? NavalgoColors.storm
-                              : NavalgoColors.deepSea,
-                        ),
+                      color: _dates == null
+                          ? NavalgoColors.storm
+                          : NavalgoColors.deepSea,
+                    ),
                   ),
                 ),
               ),
@@ -1477,9 +1477,9 @@ class _CalendarLegendChip extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: NavalgoColors.deepSea,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(color: NavalgoColors.deepSea),
           ),
         ],
       ),
@@ -1504,9 +1504,9 @@ class _CalendarCountBadge extends StatelessWidget {
       child: Text(
         label,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
-            ),
+          color: color,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     );
   }
