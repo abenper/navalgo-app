@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../theme/navalgo_theme.dart';
+import '../../utils/media_url.dart';
 import '../../utils/app_toast.dart';
 import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
@@ -210,6 +211,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     final userName = context.select<SessionViewModel, String>(
       (session) => session.user?.name ?? 'Administrador',
     );
+    final photoUrl = context.select<SessionViewModel, String?>(
+      (session) => session.user?.photoUrl,
+    );
     final width = MediaQuery.of(context).size.width;
     final showSubtitle = width >= 760;
     final showName = width >= 1080;
@@ -313,15 +317,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: NavalgoColors.mist,
-                          child: const Icon(
-                            Icons.person,
-                            size: 18,
-                            color: NavalgoColors.tide,
-                          ),
-                        ),
+                        _buildAvatarWidget(photoUrl),
                         if (showName) ...[
                           const SizedBox(width: 10),
                           ConstrainedBox(
@@ -382,6 +378,27 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       return 'Cuenta';
     }
     return normalized.split(' ').first;
+  }
+
+  Widget _buildAvatarWidget(
+    String? photoUrl, {
+    double radius = 16,
+    double iconSize = 18,
+  }) {
+    final resolvedPhotoUrl = resolveMediaUrl(photoUrl);
+    if (resolvedPhotoUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundImage: NetworkImage(resolvedPhotoUrl),
+        backgroundColor: NavalgoColors.mist,
+      );
+    }
+
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: NavalgoColors.mist,
+      child: Icon(Icons.person, size: iconSize, color: NavalgoColors.tide),
+    );
   }
 
   Future<void> _openAccountMenu() async {

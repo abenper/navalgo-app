@@ -225,6 +225,7 @@ public class WorkOrderMediaService {
         Path inputFile = Files.createTempFile("navalgo-upload-", ".mp4");
         Path outputFile = Files.createTempFile("navalgo-upload-processed-", ".mp4");
         byte[] originalBytes = file.getBytes();
+        String watermarkText = buildVideoWatermarkText(worker.getFullName(), capturedAt, latitude, longitude);
         String originalContentType = file.getContentType() == null || file.getContentType().isBlank()
             ? "video/mp4"
             : file.getContentType();
@@ -236,6 +237,7 @@ public class WorkOrderMediaService {
                     "ffmpeg",
                     "-y",
                     "-i", inputFile.toAbsolutePath().toString(),
+                    "-vf", buildVideoWatermarkFilter(watermarkText),
                     "-an",
                     "-c:v", "libx264",
                     "-preset", "medium",
@@ -272,7 +274,7 @@ public class WorkOrderMediaService {
                     capturedAt,
                     latitude,
                     longitude,
-                    false,
+                    true,
                     true
             );
         } finally {
@@ -285,13 +287,13 @@ public class WorkOrderMediaService {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        int outerMargin = Math.max(8, Math.min(width, height) / 28);
-        int horizontalPadding = Math.max(10, Math.min(width, height) / 34);
-        int verticalPadding = Math.max(8, Math.min(width, height) / 40);
-        int maxBoxWidth = Math.max(120, (int) Math.round(width * 0.72));
-        int maxBoxHeight = Math.max(44, (int) Math.round(height * 0.34));
+        int outerMargin = Math.max(8, Math.min(width, height) / 34);
+        int horizontalPadding = Math.max(8, Math.min(width, height) / 42);
+        int verticalPadding = Math.max(6, Math.min(width, height) / 48);
+        int maxBoxWidth = Math.max(120, (int) Math.round(width * 0.56));
+        int maxBoxHeight = Math.max(44, (int) Math.round(height * 0.26));
 
-        int fontSize = Math.max(10, Math.min(24, Math.min(width, height) / 12));
+        int fontSize = Math.max(9, Math.min(18, Math.min(width, height) / 16));
         FontMetrics metrics = null;
         List<String> lines = List.of(text);
 
@@ -543,6 +545,40 @@ public class WorkOrderMediaService {
                 : "GPS:" + String.format(Locale.ROOT, "%.5f,%.5f", latitude, longitude);
 
         return "NavalGO | " + workerName + " | " + ts + " | " + location;
+    }
+
+    private String buildVideoWatermarkText(String workerName,
+                                           Instant capturedAt,
+                                           Double latitude,
+                                           Double longitude) {
+        String ts = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+                .withZone(ZoneId.systemDefault())
+                .format(capturedAt);
+
+        String location = (latitude == null || longitude == null)
+                ? "GPS:N/D"
+                : "GPS:" + String.format(Locale.ROOT, "%.5f,%.5f", latitude, longitude);
+
+        return "NavalGO\n" + workerName + "\n" + ts + "\n" + location;
+    }
+
+    private String buildVideoWatermarkFilter(String watermarkText) {
+        return "drawtext=text='" + escapeForFfmpegDrawtext(watermarkText)
+                + "':fontcolor=white:fontsize=h/32:line_spacing=6:box=1:boxcolor=black@0.55:boxborderw=14:x=w-tw-24:y=h-th-24";
+    }
+
+    private String escapeForFfmpegDrawtext(String value) {
+        return value
+                .replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace(":", "\\:")
+                .replace("%", "\\%")
+                .replace(",", "\\,")
+                .replace(";", "\\;")
+                .replace("[", "\\[")
+                .replace("]", "\\]")
+                .replace("\r", "")
+                .replace("\n", "\\n");
     }
 
     private int waitFor(Process process) {

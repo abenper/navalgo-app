@@ -9,6 +9,22 @@ import '../../viewmodels/fleet_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 
+IconData _engineOptionIcon(String position) {
+  switch (position) {
+    case 'Motor central':
+      return Icons.adjust_outlined;
+    case 'Babor':
+      return Icons.keyboard_double_arrow_left_rounded;
+    case 'Estribor':
+      return Icons.keyboard_double_arrow_right_rounded;
+    case 'Auxiliar':
+      return Icons.extension_outlined;
+    case 'Fuera borda':
+    default:
+      return Icons.power_outlined;
+  }
+}
+
 class FlotaScreen extends StatefulWidget {
   const FlotaScreen({super.key});
 
@@ -27,6 +43,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
 
   final TextEditingController _ownerSearchCtrl = TextEditingController();
   final TextEditingController _vesselSearchCtrl = TextEditingController();
+  int? _selectedOwnerId;
 
   @override
   void initState() {
@@ -41,6 +58,27 @@ class _FlotaScreenState extends State<FlotaScreen> {
     _ownerSearchCtrl.dispose();
     _vesselSearchCtrl.dispose();
     super.dispose();
+  }
+
+  void _toggleOwnerSelection(Owner owner) {
+    setState(() {
+      _selectedOwnerId = _selectedOwnerId == owner.id ? null : owner.id;
+    });
+  }
+
+  Future<void> _showVesselDetails(Vessel vessel) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _VesselDetailsDialog(vessel: vessel),
+    );
+  }
+
+  IconData _ownerIcon(Owner owner) {
+    return owner.type == 'COMPANY' ? Icons.business : Icons.person;
+  }
+
+  Color _ownerAccent(Owner owner) {
+    return owner.type == 'COMPANY' ? NavalgoColors.tide : NavalgoColors.kelp;
   }
 
   Future<void> _createOwner() async {
@@ -338,6 +376,10 @@ class _FlotaScreenState extends State<FlotaScreen> {
       vesselCountByOwner[vessel.ownerId] =
           (vesselCountByOwner[vessel.ownerId] ?? 0) + 1;
     }
+    final selectedOwner = vm.owners.cast<Owner?>().firstWhere(
+      (owner) => owner?.id == _selectedOwnerId,
+      orElse: () => null,
+    );
 
     return Scaffold(
       body: vm.isLoading
@@ -395,49 +437,211 @@ class _FlotaScreenState extends State<FlotaScreen> {
                         children: filteredOwners.map((owner) {
                           final esEmpresa = owner.type == 'COMPANY';
                           final vesselCount = vesselCountByOwner[owner.id] ?? 0;
+                          final isSelected = selectedOwner?.id == owner.id;
+                          final accent = _ownerAccent(owner);
+                          final ownerVessels = vm.vessels
+                              .where((vessel) => vessel.ownerId == owner.id)
+                              .toList();
                           return Card(
                             margin: const EdgeInsets.only(bottom: 10),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: esEmpresa
-                                    ? NavalgoColors.mist
-                                    : NavalgoColors.foam,
-                                child: Icon(
-                                  esEmpresa ? Icons.business : Icons.person,
-                                  color: esEmpresa
-                                      ? NavalgoColors.tide
-                                      : NavalgoColors.kelp,
-                                ),
+                            color: isSelected
+                                ? accent.withValues(alpha: 0.08)
+                                : null,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(22),
+                              side: BorderSide(
+                                color: isSelected
+                                    ? accent.withValues(alpha: 0.36)
+                                    : NavalgoColors.border,
                               ),
-                              title: Text(
-                                owner.displayName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '${esEmpresa ? 'Empresa' : 'Particular'} • ${owner.documentId} • $vesselCount embarcación(es)',
-                              ),
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _editOwner(owner);
-                                  }
-                                  if (value == 'delete') {
-                                    _deleteOwner(owner);
-                                  }
-                                },
-                                itemBuilder: (context) => const [
-                                  PopupMenuItem<String>(
-                                    value: 'edit',
-                                    child: Text('Editar'),
+                            ),
+                            child: Column(
+                              children: [
+                                ListTile(
+                                  onTap: () => _toggleOwnerSelection(owner),
+                                  leading: CircleAvatar(
+                                    backgroundColor: esEmpresa
+                                        ? NavalgoColors.mist
+                                        : NavalgoColors.foam,
+                                    child: Icon(
+                                      _ownerIcon(owner),
+                                      color: accent,
+                                    ),
                                   ),
-                                  PopupMenuItem<String>(
-                                    value: 'delete',
-                                    child: Text('Eliminar'),
+                                  title: Text(
+                                    owner.displayName,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  subtitle: Text(
+                                    '${esEmpresa ? 'Empresa' : 'Particular'} • ${owner.documentId} • $vesselCount embarcación(es)',
+                                  ),
+                                  trailing: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      if (vesselCount > 0)
+                                        Icon(
+                                          isSelected
+                                              ? Icons.expand_less_rounded
+                                              : Icons.expand_more_rounded,
+                                          color: accent,
+                                        ),
+                                      PopupMenuButton<String>(
+                                        onSelected: (value) {
+                                          if (value == 'edit') {
+                                            _editOwner(owner);
+                                          }
+                                          if (value == 'delete') {
+                                            _deleteOwner(owner);
+                                          }
+                                        },
+                                        itemBuilder: (context) => const [
+                                          PopupMenuItem<String>(
+                                            value: 'edit',
+                                            child: Text('Editar'),
+                                          ),
+                                          PopupMenuItem<String>(
+                                            value: 'delete',
+                                            child: Text('Eliminar'),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                if (isSelected) ...[
+                                  const Divider(height: 1),
+                                  Padding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      16,
+                                      14,
+                                      16,
+                                      16,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Embarcaciones asociadas',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                                color: NavalgoColors.deepSea,
+                                              ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          ownerVessels.isEmpty
+                                              ? 'Este cliente todavía no tiene embarcaciones registradas.'
+                                              : 'Pulsa una embarcación para ver su ficha técnica.',
+                                          style: Theme.of(context)
+                                              .textTheme
+                                              .bodyMedium
+                                              ?.copyWith(
+                                                color: NavalgoColors.storm,
+                                              ),
+                                        ),
+                                        if (ownerVessels.isNotEmpty) ...[
+                                          const SizedBox(height: 12),
+                                          ...ownerVessels.map(
+                                            (vessel) => Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 10,
+                                              ),
+                                              child: Material(
+                                                color: Colors.transparent,
+                                                child: InkWell(
+                                                  borderRadius:
+                                                      BorderRadius.circular(18),
+                                                  onTap: () =>
+                                                      _showVesselDetails(
+                                                        vessel,
+                                                      ),
+                                                  child: Container(
+                                                    padding:
+                                                        const EdgeInsets.all(
+                                                          14,
+                                                        ),
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            18,
+                                                          ),
+                                                      border: Border.all(
+                                                        color: NavalgoColors
+                                                            .border,
+                                                      ),
+                                                    ),
+                                                    child: Row(
+                                                      children: [
+                                                        Container(
+                                                          width: 40,
+                                                          height: 40,
+                                                          decoration: BoxDecoration(
+                                                            color: NavalgoColors
+                                                                .foam,
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  14,
+                                                                ),
+                                                          ),
+                                                          child: const Icon(
+                                                            Icons
+                                                                .directions_boat_outlined,
+                                                            color: NavalgoColors
+                                                                .sand,
+                                                          ),
+                                                        ),
+                                                        const SizedBox(
+                                                          width: 12,
+                                                        ),
+                                                        Expanded(
+                                                          child: Column(
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
+                                                            children: [
+                                                              Text(
+                                                                vessel.name,
+                                                                style: const TextStyle(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w800,
+                                                                ),
+                                                              ),
+                                                              const SizedBox(
+                                                                height: 4,
+                                                              ),
+                                                              Text(
+                                                                '${vessel.registrationNumber} • ${vessel.model ?? 'Modelo no indicado'}',
+                                                                style: Theme.of(
+                                                                  context,
+                                                                ).textTheme.bodyMedium,
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        ),
+                                                        const Icon(
+                                                          Icons.chevron_right,
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
                                   ),
                                 ],
-                              ),
+                              ],
                             ),
                           );
                         }).toList(),
@@ -458,12 +662,61 @@ class _FlotaScreenState extends State<FlotaScreen> {
                       labelText: 'Filtrar por embarcación o propietario',
                     ),
                   ),
+                  if (selectedOwner != null) ...[
+                    const SizedBox(height: 10),
+                    NavalgoPanel(
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: _ownerAccent(
+                              selectedOwner,
+                            ).withValues(alpha: 0.12),
+                            child: Icon(
+                              _ownerIcon(selectedOwner),
+                              color: _ownerAccent(selectedOwner),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Mostrando la flota de ${selectedOwner.displayName}',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Pulsa "Ver todas" para quitar el filtro por cliente.',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _selectedOwnerId = null;
+                              });
+                            },
+                            child: const Text('Ver todas'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   ValueListenableBuilder<TextEditingValue>(
                     valueListenable: _vesselSearchCtrl,
                     builder: (context, value, _) {
                       final vesselQuery = value.text.trim().toLowerCase();
                       final filteredVessels = vm.vessels.where((vessel) {
+                        if (selectedOwner != null &&
+                            vessel.ownerId != selectedOwner.id) {
+                          return false;
+                        }
                         if (vesselQuery.isEmpty) {
                           return true;
                         }
@@ -490,6 +743,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
                               (vessel) => Card(
                                 margin: const EdgeInsets.only(bottom: 10),
                                 child: ListTile(
+                                  onTap: () => _showVesselDetails(vessel),
                                   leading: CircleAvatar(
                                     backgroundColor: NavalgoColors.foam,
                                     child: const Icon(
@@ -891,7 +1145,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Nombre',
-                  prefixIcon: const Icon(Icons.directions_boat_outlined),
+                  prefixIcon: const Icon(Icons.sailing_outlined),
                 ),
                 validator: (value) {
                   if ((value?.trim() ?? '').isEmpty) {
@@ -910,7 +1164,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Matrícula',
-                  prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                  prefixIcon: const Icon(Icons.badge_outlined),
                 ),
               ),
             ),
@@ -923,7 +1177,9 @@ class _VesselDialogState extends State<_VesselDialog> {
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Modelo',
-                  prefixIcon: const Icon(Icons.inventory_2_outlined),
+                  prefixIcon: const Icon(
+                    Icons.precision_manufacturing_outlined,
+                  ),
                 ),
               ),
             ),
@@ -937,9 +1193,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Número de motores',
-                  prefixIcon: const Icon(
-                    Icons.settings_input_component_outlined,
-                  ),
+                  prefixIcon: const Icon(Icons.speed_outlined),
                 ),
                 validator: (value) {
                   final trimmed = value?.trim() ?? '';
@@ -976,13 +1230,25 @@ class _VesselDialogState extends State<_VesselDialog> {
                         decoration: NavalgoFormStyles.inputDecoration(
                           context,
                           label: 'Motor ${index + 1}',
-                          prefixIcon: const Icon(Icons.tune_outlined),
+                          prefixIcon: Icon(
+                            _engineOptionIcon(_enginePositions[index]),
+                          ),
                         ),
                         items: _FlotaScreenState._enginePositionOptions
                             .map(
                               (position) => DropdownMenuItem(
                                 value: position,
-                                child: Text(position),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      _engineOptionIcon(position),
+                                      size: 18,
+                                      color: NavalgoColors.tide,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(position),
+                                  ],
+                                ),
                               ),
                             )
                             .toList(),
@@ -1022,13 +1288,27 @@ class _VesselDialogState extends State<_VesselDialog> {
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Propietario',
-                  prefixIcon: const Icon(Icons.person_pin_outlined),
+                  prefixIcon: const Icon(Icons.business_outlined),
                 ),
                 items: widget.owners
                     .map(
                       (o) => DropdownMenuItem(
                         value: o.id,
-                        child: Text(o.displayName),
+                        child: Row(
+                          children: [
+                            Icon(
+                              o.type == 'COMPANY'
+                                  ? Icons.business
+                                  : Icons.person,
+                              size: 18,
+                              color: o.type == 'COMPANY'
+                                  ? NavalgoColors.tide
+                                  : NavalgoColors.kelp,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(child: Text(o.displayName)),
+                          ],
+                        ),
                       ),
                     )
                     .toList(),
@@ -1093,5 +1373,122 @@ class _VesselDialogState extends State<_VesselDialog> {
       ...list,
       ...List<String>.filled(count - list.length, 'Fuera borda'),
     ];
+  }
+}
+
+class _VesselDetailsDialog extends StatelessWidget {
+  const _VesselDetailsDialog({required this.vessel});
+
+  final Vessel vessel;
+
+  @override
+  Widget build(BuildContext context) {
+    final engineSummary = vessel.engineLabels.isEmpty
+        ? 'Sin posiciones definidas'
+        : vessel.engineLabels.join(', ');
+
+    return NavalgoFormDialog(
+      eyebrow: 'EMBARCACIÓN',
+      title: vessel.name,
+      subtitle:
+          'Consulta la ficha técnica completa y los datos del cliente asociado.',
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          NavalgoFormFieldBlock(
+            label: 'Propietario',
+            child: _VesselDetailValue(
+              icon: Icons.person_outline,
+              value: vessel.ownerName,
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Matrícula',
+            child: _VesselDetailValue(
+              icon: Icons.badge_outlined,
+              value: vessel.registrationNumber,
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Modelo',
+            child: _VesselDetailValue(
+              icon: Icons.precision_manufacturing_outlined,
+              value: vessel.model ?? 'No indicado',
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Eslora',
+            child: _VesselDetailValue(
+              icon: Icons.straighten_outlined,
+              value: vessel.lengthMeters == null
+                  ? 'No indicada'
+                  : '${vessel.lengthMeters!.toStringAsFixed(1)} m',
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Motores',
+            child: _VesselDetailValue(
+              icon: Icons.speed_outlined,
+              value: '${vessel.engineCount ?? 0} configurado(s)',
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Posiciones / tipología',
+            child: _VesselDetailValue(
+              icon: Icons.tune_outlined,
+              value: engineSummary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VesselDetailValue extends StatelessWidget {
+  const _VesselDetailValue({required this.icon, required this.value});
+
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: NavalgoColors.tide),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: NavalgoColors.deepSea,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -42,6 +42,7 @@ public class WorkerService {
         return WorkerDto.from(worker);
     }
 
+    @Transactional
     public CreateWorkerResponse create(CreateWorkerRequest request) {
         workerRepository.findByEmailIgnoreCase(request.email()).ifPresent(existing -> {
             throw new IllegalArgumentException("Ya existe un trabajador con ese email");
