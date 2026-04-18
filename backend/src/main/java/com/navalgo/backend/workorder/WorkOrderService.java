@@ -428,15 +428,18 @@ public class WorkOrderService {
             ? Collections.emptySet()
             : w.getAssignedWorkers();
 
-        List<Long> workerIds = assignedWorkers.stream()
-            .map(Worker::getId)
-            .filter(Objects::nonNull)
-            .toList();
-
-        List<String> workerNames = assignedWorkers.stream()
-            .map(Worker::getFullName)
-            .filter(Objects::nonNull)
-            .toList();
+        List<Long> workerIds = new java.util.ArrayList<>();
+        List<String> workerNames = new java.util.ArrayList<>();
+        for (Worker worker : assignedWorkers) {
+            try {
+                Long wid = worker.getId();
+                String name = worker.getFullName();
+                if (wid != null) workerIds.add(wid);
+                if (name != null) workerNames.add(name);
+            } catch (jakarta.persistence.EntityNotFoundException ignored) {
+                // Worker was deleted but still referenced in join table — skip silently
+            }
+        }
 
         List<EngineHourRequest> engineHours = w.getEngineHourLogs() == null
             ? List.of()

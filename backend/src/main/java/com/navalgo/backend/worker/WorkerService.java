@@ -2,6 +2,7 @@ package com.navalgo.backend.worker;
 
 import com.navalgo.backend.auth.RefreshTokenService;
 import com.navalgo.backend.common.InputSanitizer;
+import com.navalgo.backend.workorder.WorkOrderRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ public class WorkerService {
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final WorkOrderRepository workOrderRepository;
     private final InputSanitizer inputSanitizer;
     private final SecureRandom secureRandom = new SecureRandom();
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
@@ -25,10 +27,12 @@ public class WorkerService {
     public WorkerService(WorkerRepository workerRepository,
                          PasswordEncoder passwordEncoder,
                          RefreshTokenService refreshTokenService,
+                         WorkOrderRepository workOrderRepository,
                          InputSanitizer inputSanitizer) {
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
+        this.workOrderRepository = workOrderRepository;
         this.inputSanitizer = inputSanitizer;
     }
 
@@ -115,6 +119,8 @@ public class WorkerService {
             throw new EntityNotFoundException("Trabajador no encontrado");
         }
         refreshTokenService.revokeAllForWorker(workerId);
+        workOrderRepository.removeWorkerFromAllWorkOrders(workerId);
+        workOrderRepository.clearSignedByWorker(workerId);
         workerRepository.deleteById(workerId);
     }
 
