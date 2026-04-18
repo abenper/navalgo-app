@@ -24,20 +24,28 @@ public class MediaProxyService {
     }
 
     public MediaStream loadFromPublicUrl(String fileUrl) {
+        return loadFromPublicUrl(fileUrl, null);
+    }
+
+    public MediaStream loadFromPublicUrl(String fileUrl, String rangeHeader) {
         String objectKey = extractObjectKey(fileUrl);
-        ResponseInputStream<GetObjectResponse> stream = s3Client.getObject(
-                GetObjectRequest.builder()
-                        .bucket(mediaProperties.spacesBucket())
-                        .key(objectKey)
-                        .build()
-        );
+        GetObjectRequest.Builder requestBuilder = GetObjectRequest.builder()
+                .bucket(mediaProperties.spacesBucket())
+                .key(objectKey);
+
+        if (rangeHeader != null && !rangeHeader.isBlank()) {
+            requestBuilder.range(rangeHeader);
+        }
+
+        ResponseInputStream<GetObjectResponse> stream = s3Client.getObject(requestBuilder.build());
 
         GetObjectResponse response = stream.response();
         return new MediaStream(
                 stream,
                 response.contentType(),
                 response.contentLength(),
-                objectKey
+                objectKey,
+                response.contentRange()
         );
     }
 
@@ -111,7 +119,8 @@ public class MediaProxyService {
             ResponseInputStream<GetObjectResponse> stream,
             String contentType,
             Long contentLength,
-            String objectKey
+            String objectKey,
+            String contentRange
     ) {
     }
 }

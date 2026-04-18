@@ -2,9 +2,12 @@ package com.navalgo.backend.media;
 
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -22,8 +25,11 @@ public class MediaProxyController {
     }
 
     @GetMapping("/proxy")
-    public ResponseEntity<InputStreamResource> proxy(@RequestParam("url") String fileUrl) {
-        MediaProxyService.MediaStream media = mediaProxyService.loadFromPublicUrl(fileUrl);
+    public ResponseEntity<InputStreamResource> proxy(
+            @RequestParam("url") String fileUrl,
+            @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+
+        MediaProxyService.MediaStream media = mediaProxyService.loadFromPublicUrl(fileUrl, rangeHeader);
 
         MediaType contentType;
         try {
@@ -34,12 +40,20 @@ public class MediaProxyController {
             contentType = MediaType.APPLICATION_OCTET_STREAM;
         }
 
-        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity.ok()
+        boolean isRangeRequest = rangeHeader != null && !rangeHeader.isBlank();
+
+        ResponseEntity.BodyBuilder responseBuilder = ResponseEntity
+                .status(isRangeRequest ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
+                .header(HttpHeaders.ACCEPT_RANGES, "bytes")
                 .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
                 .contentType(contentType);
 
         if (media.contentLength() != null && media.contentLength() > 0) {
             responseBuilder.contentLength(media.contentLength());
+        }
+
+        if (isRangeRequest && media.contentRange() != null && !media.contentRange().isBlank()) {
+            responseBuilder.header(HttpHeaders.CONTENT_RANGE, media.contentRange());
         }
 
         return responseBuilder.body(new InputStreamResource(media.stream()));

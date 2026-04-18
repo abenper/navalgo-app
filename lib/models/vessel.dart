@@ -1,3 +1,23 @@
+class EngineHourSummary {
+  const EngineHourSummary({
+    required this.engineLabel,
+    required this.hours,
+    required this.recordedAt,
+  });
+
+  final String engineLabel;
+  final int hours;
+  final DateTime recordedAt;
+
+  factory EngineHourSummary.fromJson(Map<String, dynamic> json) {
+    return EngineHourSummary(
+      engineLabel: json['engineLabel'] as String,
+      hours: (json['hours'] as num).toInt(),
+      recordedAt: DateTime.parse(json['recordedAt'] as String),
+    );
+  }
+}
+
 class Vessel {
   const Vessel({
     required this.id,

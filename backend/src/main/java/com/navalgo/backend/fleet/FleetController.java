@@ -3,6 +3,10 @@ package com.navalgo.backend.fleet;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.company.Company;
 import com.navalgo.backend.company.CompanyRepository;
+import com.navalgo.backend.workorder.EngineHourLog;
+import com.navalgo.backend.workorder.EngineHourSummaryDto;
+import com.navalgo.backend.workorder.WorkOrder;
+import com.navalgo.backend.workorder.WorkOrderRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -10,7 +14,10 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/fleet")
@@ -20,15 +27,18 @@ public class FleetController {
     private final OwnerRepository ownerRepository;
     private final VesselRepository vesselRepository;
     private final CompanyRepository companyRepository;
+    private final WorkOrderRepository workOrderRepository;
     private final InputSanitizer inputSanitizer;
 
     public FleetController(OwnerRepository ownerRepository,
                            VesselRepository vesselRepository,
                            CompanyRepository companyRepository,
+                           WorkOrderRepository workOrderRepository,
                            InputSanitizer inputSanitizer) {
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.companyRepository = companyRepository;
+        this.workOrderRepository = workOrderRepository;
         this.inputSanitizer = inputSanitizer;
     }
 
@@ -147,6 +157,23 @@ public class FleetController {
         }
         vesselRepository.deleteById(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/vessels/{vesselId}/last-engine-hours")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<EngineHourSummaryDto>> lastEngineHours(@PathVariable Long vesselId) {
+        if (!vesselRepository.existsById(vesselId)) {
+            throw new EntityNotFoundException("Embarcacion no encontrada");
+        }
+        List<WorkOrder> orders = workOrderRepository.findByVesselIdOrderByCreatedAtDesc(vesselId);
+        Map<String, EngineHourSummaryDto> latestByLabel = new LinkedHashMap<>();
+        for (WorkOrder wo : orders) {
+            for (EngineHourLog log : wo.getEngineHourLogs()) {
+                latestByLabel.putIfAbsent(log.getEngineLabel(),
+                        new EngineHourSummaryDto(log.getEngineLabel(), log.getHours(), wo.getCreatedAt()));
+            }
+        }
+        return ResponseEntity.ok(new ArrayList<>(latestByLabel.values()));
     }
 
     private Vessel buildVesselFromCreateRequest(Vessel vessel, CreateVesselRequest request) {

@@ -155,4 +155,22 @@ class FleetService {
       headers: {'Authorization': 'Bearer $token'},
     );
   }
+
+  Future<List<EngineHourSummary>> getVesselLastEngineHours(
+    String token, {
+    required int vesselId,
+  }) async {
+    final data = await _apiClient.get(
+      '/fleet/vessels/$vesselId/last-engine-hours',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (data is! List) {
+      return <EngineHourSummary>[];
+    }
+
+    return data
+        .map((e) => EngineHourSummary.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 }

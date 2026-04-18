@@ -10,4 +10,5 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     List<WorkOrder> findAllByOrderByCreatedAtDesc();
     List<WorkOrder> findByAssignedWorkersIdOrderByCreatedAtDesc(Long workerId);
+    List<WorkOrder> findByVesselIdOrderByCreatedAtDesc(Long vesselId);
 }

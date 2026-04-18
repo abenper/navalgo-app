@@ -1374,13 +1374,45 @@ class _VesselDialogState extends State<_VesselDialog> {
   }
 }
 
-class _VesselDetailsDialog extends StatelessWidget {
+class _VesselDetailsDialog extends StatefulWidget {
   const _VesselDetailsDialog({required this.vessel});
 
   final Vessel vessel;
 
   @override
+  State<_VesselDetailsDialog> createState() => _VesselDetailsDialogState();
+}
+
+class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
+  List<EngineHourSummary>? _engineHours;
+  bool _loadingHours = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadEngineHours();
+  }
+
+  Future<void> _loadEngineHours() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) return;
+    setState(() => _loadingHours = true);
+    try {
+      final hours = await context.read<FleetService>().getVesselLastEngineHours(
+            token,
+            vesselId: widget.vessel.id,
+          );
+      if (mounted) setState(() => _engineHours = hours);
+    } catch (_) {
+      if (mounted) setState(() => _engineHours = const []);
+    } finally {
+      if (mounted) setState(() => _loadingHours = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final vessel = widget.vessel;
     final engineSummary = vessel.engineLabels.isEmpty
         ? 'Sin posiciones definidas'
         : vessel.engineLabels.join(', ');
@@ -1448,6 +1480,34 @@ class _VesselDetailsDialog extends StatelessWidget {
               icon: Icons.tune_outlined,
               value: engineSummary,
             ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Últimas horas registradas',
+            child: _loadingHours
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : (_engineHours == null || _engineHours!.isEmpty)
+                    ? _VesselDetailValue(
+                        icon: Icons.hourglass_empty_outlined,
+                        value: 'Sin horas registradas',
+                      )
+                    : Column(
+                        children: _engineHours!
+                            .map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _VesselDetailValue(
+                                  icon: Icons.speed_outlined,
+                                  value:
+                                      '${e.engineLabel}: ${e.hours} h',
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
           ),
         ],
       ),
