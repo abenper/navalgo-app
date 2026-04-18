@@ -13,6 +13,7 @@ import '../../models/worker_profile.dart';
 import '../../models/work_order.dart';
 import '../../services/work_order_media_service.dart';
 import '../../utils/app_toast.dart';
+import '../../utils/media_url.dart';
 import '../../services/work_order_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/fleet_view_model.dart';
@@ -224,335 +225,308 @@ class _PartesScreenState extends State<PartesScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7FA),
-      body: vm.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : vm.error != null
-          ? Center(child: Text(vm.error!))
-          : RefreshIndicator(
-              onRefresh: () async {
-                final session = context.read<SessionViewModel>();
-                await vm.loadWorkOrders(
-                  workerId: session.user?.role == 'ADMIN'
-                      ? null
-                      : session.user?.id,
-                );
-              },
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
-                itemCount: workOrders.isEmpty ? 1 : workOrders.length + 1,
-                itemBuilder: (context, index) {
-                  if (index == 0) {
-                    return Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 1240),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(28),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(28),
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF0B2D3A),
-                                    Color(0xFF124B61),
-                                    Color(0xFF1F6A7D),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF0B2D3A,
-                                    ).withValues(alpha: 0.22),
-                                    blurRadius: 32,
-                                    offset: const Offset(0, 16),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Cuaderno de Taller Naval',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .headlineMedium
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: -0.8,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    'Gestiona partes, firmas y evidencias con una vista más clara para operaciones de muelle y mantenimiento.',
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: Colors.white.withValues(
-                                            alpha: 0.84,
-                                          ),
-                                        ),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  Wrap(
+      backgroundColor: Colors.transparent,
+      body: NavalgoPageBackground(
+        child: vm.isLoading
+            ? const SafeArea(child: Center(child: CircularProgressIndicator()))
+            : vm.error != null
+            ? SafeArea(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: NavalgoPanel(
+                        child: Text(
+                          vm.error!,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            : SafeArea(
+                child: RefreshIndicator(
+                  onRefresh: () async {
+                    final session = context.read<SessionViewModel>();
+                    await vm.loadWorkOrders(
+                      workerId: session.user?.role == 'ADMIN'
+                          ? null
+                          : session.user?.id,
+                    );
+                  },
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
+                    itemCount: workOrders.isEmpty ? 1 : workOrders.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Center(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 1240),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                NavalgoPageIntro(
+                                  eyebrow: 'OPERACIONES',
+                                  title: 'Cuaderno de Taller Naval',
+                                  subtitle:
+                                      'Gestiona partes, firmas y evidencias con una vista alineada con el resto de formularios del sistema.',
+                                  trailing: Wrap(
                                     spacing: 14,
                                     runSpacing: 14,
                                     children: [
-                                      _FleetMetricCard(
+                                      NavalgoMetricCard(
                                         label: 'Firmados',
                                         value: '$signedCount',
-                                        tone: const Color(0xFF3BAA6E),
+                                        icon: Icons.verified_outlined,
+                                        accent: const Color(0xFF3BAA6E),
                                       ),
-                                      _FleetMetricCard(
+                                      NavalgoMetricCard(
                                         label: 'Pendientes de firma',
                                         value: '$pendingSignatureCount',
-                                        tone: const Color(0xFFD55A4E),
+                                        icon: Icons.draw_outlined,
+                                        accent: const Color(0xFFD55A4E),
                                       ),
-                                      _FleetMetricCard(
+                                      NavalgoMetricCard(
                                         label: 'Prioridad alta',
                                         value: '$highPriorityCount',
-                                        tone: const Color(0xFFD5A021),
+                                        icon: Icons.priority_high_rounded,
+                                        accent: const Color(0xFFD5A021),
                                       ),
                                     ],
                                   ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(height: 26),
-                            Text(
-                              'Partes activos',
-                              style: Theme.of(context).textTheme.headlineSmall
-                                  ?.copyWith(
-                                    color: const Color(0xFF102B36),
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Verde para firmados, rojo para pendientes de firma y etiqueta amarilla para prioridad alta.',
-                              style: Theme.of(context).textTheme.bodyMedium
-                                  ?.copyWith(color: const Color(0xFF5A707A)),
-                            ),
-                            const SizedBox(height: 18),
-                            if (workOrders.isEmpty)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(18),
-                                  border: Border.all(
-                                    color: const Color(0xFFDAE5EA),
-                                  ),
                                 ),
-                                child: const Text(
-                                  'No hay partes para mostrar. Crea un nuevo parte para comenzar.',
-                                  style: TextStyle(
-                                    color: Color(0xFF48626D),
-                                    fontWeight: FontWeight.w600,
-                                  ),
+                                const SizedBox(height: 26),
+                                const NavalgoSectionHeader(
+                                  title: 'Partes activos',
+                                  subtitle:
+                                      'Verde para firmados, rojo para pendientes de firma y amarillo para prioridad alta.',
                                 ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  final parte = workOrders[index - 1];
-                  final bool isSigned = parte.signatureUrl?.isNotEmpty ?? false;
-                  final bool isHighPriority = _isHighPriority(parte.priority);
-                  final Color accentColor = isSigned
-                      ? const Color(0xFF3BAA6E)
-                      : const Color(0xFFD55A4E);
-                  final Color surfaceColor = isSigned
-                      ? const Color(0xFFF2FBF6)
-                      : const Color(0xFFFFF4F3);
-
-                  return Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 1240),
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(24),
-                            onTap: () => _openPartDetails(parte),
-                            child: Ink(
-                              decoration: BoxDecoration(
-                                color: surfaceColor,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(
-                                  color: accentColor.withValues(alpha: 0.28),
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: accentColor.withValues(alpha: 0.08),
-                                    blurRadius: 24,
-                                    offset: const Offset(0, 12),
-                                  ),
-                                ],
-                              ),
-                              child: Stack(
-                                children: [
-                                  Positioned(
-                                    left: 0,
-                                    top: 0,
-                                    bottom: 0,
-                                    child: Container(
-                                      width: 8,
-                                      decoration: BoxDecoration(
-                                        color: accentColor,
-                                        borderRadius:
-                                            const BorderRadius.horizontal(
-                                              left: Radius.circular(24),
-                                            ),
+                                const SizedBox(height: 18),
+                                if (workOrders.isEmpty)
+                                  const NavalgoPanel(
+                                    child: Text(
+                                      'No hay partes para mostrar. Crea un nuevo parte para comenzar.',
+                                      style: TextStyle(
+                                        color: Color(0xFF48626D),
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
-                                  Padding(
-                                    padding: const EdgeInsets.only(left: 8),
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        22,
-                                        20,
-                                        22,
-                                        20,
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      final parte = workOrders[index - 1];
+                      final isSigned = parte.signatureUrl?.isNotEmpty ?? false;
+                      final isHighPriority = _isHighPriority(parte.priority);
+                      final accentColor = isSigned
+                          ? const Color(0xFF3BAA6E)
+                          : const Color(0xFFD55A4E);
+                      final surfaceColor = isSigned
+                          ? const Color(0xFFF2FBF6)
+                          : const Color(0xFFFFF4F3);
+
+                      return Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 1240),
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(24),
+                                onTap: () => _openPartDetails(parte),
+                                child: Ink(
+                                  decoration: BoxDecoration(
+                                    color: surfaceColor,
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                      color: accentColor.withValues(
+                                        alpha: 0.28,
                                       ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: accentColor.withValues(
+                                          alpha: 0.08,
+                                        ),
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 12),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Stack(
+                                    children: [
+                                      Positioned(
+                                        left: 0,
+                                        top: 0,
+                                        bottom: 0,
+                                        child: Container(
+                                          width: 8,
+                                          decoration: BoxDecoration(
+                                            color: accentColor,
+                                            borderRadius:
+                                                const BorderRadius.horizontal(
+                                                  left: Radius.circular(24),
+                                                ),
+                                          ),
+                                        ),
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.only(left: 8),
+                                        child: Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                            22,
+                                            20,
+                                            22,
+                                            20,
+                                          ),
+                                          child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(
-                                                      parte.title,
-                                                      style: const TextStyle(
-                                                        fontSize: 20,
-                                                        fontWeight:
-                                                            FontWeight.w800,
-                                                        color: Color(
-                                                          0xFF0F2530,
+                                              Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          parte.title,
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 20,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w800,
+                                                                color: Color(
+                                                                  0xFF0F2530,
+                                                                ),
+                                                              ),
                                                         ),
+                                                        const SizedBox(
+                                                          height: 6,
+                                                        ),
+                                                        Text(
+                                                          parte.ownerName,
+                                                          style:
+                                                              const TextStyle(
+                                                                fontSize: 15,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .w600,
+                                                                color: Color(
+                                                                  0xFF40606C,
+                                                                ),
+                                                              ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ),
+                                                  if (isAdmin)
+                                                    IconButton(
+                                                      tooltip: 'Borrar parte',
+                                                      onPressed: () =>
+                                                          _deleteWorkOrderFromList(
+                                                            parte,
+                                                          ),
+                                                      icon: const Icon(
+                                                        Icons.delete_outline,
+                                                      ),
+                                                      color: const Color(
+                                                        0xFF9B2C20,
                                                       ),
                                                     ),
-                                                    const SizedBox(height: 6),
-                                                    Text(
-                                                      parte.ownerName,
-                                                      style: const TextStyle(
-                                                        fontSize: 15,
-                                                        fontWeight:
-                                                            FontWeight.w600,
-                                                        color: Color(
-                                                          0xFF40606C,
+                                                  const SizedBox(width: 8),
+                                                  const Icon(
+                                                    Icons.arrow_forward_ios,
+                                                    size: 16,
+                                                    color: Color(0xFF64808B),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 16),
+                                              Wrap(
+                                                spacing: 8,
+                                                runSpacing: 8,
+                                                children: [
+                                                  _PartBadge(
+                                                    label: isSigned
+                                                        ? 'Firmado'
+                                                        : 'Pendiente de firma',
+                                                    textColor: accentColor,
+                                                    backgroundColor: accentColor
+                                                        .withValues(
+                                                          alpha: 0.12,
                                                         ),
+                                                  ),
+                                                  if (isHighPriority)
+                                                    const _PartBadge(
+                                                      label: 'Prioridad alta',
+                                                      textColor: Color(
+                                                        0xFF8A6200,
+                                                      ),
+                                                      backgroundColor: Color(
+                                                        0xFFFFF2CC,
                                                       ),
                                                     ),
-                                                  ],
+                                                  if (parte.vesselName !=
+                                                          null &&
+                                                      parte.vesselName!
+                                                          .trim()
+                                                          .isNotEmpty)
+                                                    _PartBadge(
+                                                      label: parte.vesselName!,
+                                                      textColor: const Color(
+                                                        0xFF1E5166,
+                                                      ),
+                                                      backgroundColor:
+                                                          const Color(
+                                                            0xFFDDF0F6,
+                                                          ),
+                                                    ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 14),
+                                              Text(
+                                                'Mecánicos: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF4F6771),
+                                                  fontWeight: FontWeight.w500,
                                                 ),
                                               ),
-                                              if (isAdmin)
-                                                IconButton(
-                                                  tooltip: 'Borrar parte',
-                                                  onPressed: () =>
-                                                      _deleteWorkOrderFromList(
-                                                        parte,
-                                                      ),
-                                                  icon: const Icon(
-                                                    Icons.delete_outline,
-                                                  ),
-                                                  color: const Color(
-                                                    0xFF9B2C20,
-                                                  ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'Creado: ${_formatDateTime(parte.createdAt)}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF738892),
                                                 ),
-                                              const SizedBox(width: 8),
-                                              const Icon(
-                                                Icons.arrow_forward_ios,
-                                                size: 16,
-                                                color: Color(0xFF64808B),
                                               ),
                                             ],
                                           ),
-                                          const SizedBox(height: 16),
-                                          Wrap(
-                                            spacing: 8,
-                                            runSpacing: 8,
-                                            children: [
-                                              _PartBadge(
-                                                label: isSigned
-                                                    ? 'Firmado'
-                                                    : 'Pendiente de firma',
-                                                textColor: accentColor,
-                                                backgroundColor: accentColor
-                                                    .withValues(alpha: 0.12),
-                                              ),
-                                              if (isHighPriority)
-                                                const _PartBadge(
-                                                  label: 'Prioridad alta',
-                                                  textColor: Color(0xFF8A6200),
-                                                  backgroundColor: Color(
-                                                    0xFFFFF2CC,
-                                                  ),
-                                                ),
-                                              if (parte.vesselName != null &&
-                                                  parte.vesselName!
-                                                      .trim()
-                                                      .isNotEmpty)
-                                                _PartBadge(
-                                                  label: parte.vesselName!,
-                                                  textColor: const Color(
-                                                    0xFF1E5166,
-                                                  ),
-                                                  backgroundColor: const Color(
-                                                    0xFFDDF0F6,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 14),
-                                          Text(
-                                            'Mecánicos: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}',
-                                            style: const TextStyle(
-                                              color: Color(0xFF4F6771),
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            'Creado: ${_formatDateTime(parte.createdAt)}',
-                                            style: const TextStyle(
-                                              color: Color(0xFF738892),
-                                            ),
-                                          ),
-                                        ],
+                                        ),
                                       ),
-                                    ),
+                                    ],
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
-                  );
-                },
+                      );
+                    },
+                  ),
+                ),
               ),
-            ),
+      ),
       bottomNavigationBar: isAdmin
           ? SafeArea(
               top: false,
@@ -561,21 +535,11 @@ class _PartesScreenState extends State<PartesScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: FilledButton.icon(
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF0E4457),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 22,
-                            vertical: 18,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
+                      child: NavalgoGradientButton(
+                        label: 'Nuevo parte',
                         onPressed: _openCreateDialog,
-                        icon: const Icon(Icons.assignment_add),
-                        label: const Text('Nuevo parte'),
+                        icon: Icons.note_add_outlined,
+                        expand: true,
                       ),
                     ),
                   ],
@@ -655,7 +619,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
   bool get _canUpdateWorkLog => _isAdmin || _isWorker;
   bool get _isSigned =>
       _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
-  bool get _canSign => _isWorker && !_isSigned;
+  bool get _canSign => (_isWorker || _isAdmin) && !_isSigned;
 
   bool get _canDeleteMedia {
     if (_isAdmin || _canEditPart) {
@@ -792,51 +756,44 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TextField(
-            controller: _observationsCtrl,
-            readOnly: !_canUpdateWorkLog || _busy,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
-              hintText: 'Añadir observaciones del trabajo',
+          NavalgoFormFieldBlock(
+            label: 'Observaciones',
+            caption: 'Resume el avance real, incidencias y material pendiente.',
+            child: TextField(
+              controller: _observationsCtrl,
+              readOnly: !_canUpdateWorkLog || _busy,
+              maxLines: 4,
+              decoration: NavalgoFormStyles.inputDecoration(
+                context,
+                label: 'Observaciones del trabajo',
+                hint: 'Añadir observaciones del trabajo',
+                prefixIcon: const Icon(Icons.notes_outlined),
+              ),
             ),
           ),
           const SizedBox(height: 14),
-          Text(
-            'Horas de motor',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Cada campo deja claro a qué motor corresponde el registro: central, auxiliar u otro.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
-          ),
-          const SizedBox(height: 8),
-          if (_engineHoursControllers.isEmpty)
-            Text(
-              'Sin motores disponibles para este parte.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            )
-          else
-            ..._engineHoursControllers.entries.map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: TextField(
-                  controller: entry.value,
-                  readOnly: !_canUpdateWorkLog || _busy,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: _formatEngineLabel(entry.key),
-                    border: const OutlineInputBorder(),
-                    hintText: 'Horas actuales',
+          NavalgoFormFieldBlock(
+            label: 'Horas de motor',
+            caption:
+                'Cada bloque identifica el motor al que se le imputan las horas: babor, estribor, auxiliar, central u otro.',
+            child: _engineHoursControllers.isEmpty
+                ? Text(
+                    'Sin motores disponibles para este parte.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  )
+                : Column(
+                    children: _engineHoursControllers.entries.map((entry) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _EngineHourInputCard(
+                          engineLabel: entry.key,
+                          controller: entry.value,
+                          readOnly: !_canUpdateWorkLog || _busy,
+                        ),
+                      );
+                    }).toList(),
                   ),
-                ),
-              ),
-            ),
+          ),
           if (_workOrder.engineHours.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -884,7 +841,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Image.network(
-                  _workOrder.signatureUrl!,
+                  resolveMediaUrl(_workOrder.signatureUrl),
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) =>
                       const Center(child: Text('No se pudo cargar la firma')),
@@ -930,7 +887,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Solo el trabajador asignado puede firmar el parte cuando esté pendiente de cierre.',
+              'Solo un trabajador o un administrador pueden firmar el parte cuando esté pendiente de cierre.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -1149,8 +1106,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
   }
 
   Future<void> _openExternal(String url) async {
+    final resolvedUrl = resolveMediaUrl(url);
     final opened = await launchUrl(
-      Uri.parse(url),
+      Uri.parse(resolvedUrl.isEmpty ? url : resolvedUrl),
       mode: LaunchMode.externalApplication,
     );
     if (!opened && mounted) {
@@ -1644,6 +1602,118 @@ String _formatEngineLabel(String rawLabel) {
   return 'Motor: $label';
 }
 
+IconData _engineIconForLabel(String rawLabel) {
+  final label = rawLabel.toLowerCase();
+  if (label.contains('babor') || label.contains('port')) {
+    return Icons.keyboard_double_arrow_left_rounded;
+  }
+  if (label.contains('estribor') || label.contains('starboard')) {
+    return Icons.keyboard_double_arrow_right_rounded;
+  }
+  if (label.contains('central') || label.contains('main')) {
+    return Icons.tune_rounded;
+  }
+  if (label.contains('aux')) {
+    return Icons.settings_input_component_outlined;
+  }
+  if (label.contains('proa')) {
+    return Icons.north_rounded;
+  }
+  if (label.contains('popa')) {
+    return Icons.south_rounded;
+  }
+  return Icons.precision_manufacturing_outlined;
+}
+
+String _engineCaptionForLabel(String rawLabel) {
+  final label = rawLabel.toLowerCase();
+  if (label.contains('babor')) {
+    return 'Registro del motor de babor';
+  }
+  if (label.contains('estribor')) {
+    return 'Registro del motor de estribor';
+  }
+  if (label.contains('aux')) {
+    return 'Registro del motor auxiliar';
+  }
+  if (label.contains('central')) {
+    return 'Registro del motor principal';
+  }
+  return 'Registro asociado a este motor';
+}
+
+class _EngineHourInputCard extends StatelessWidget {
+  const _EngineHourInputCard({
+    required this.engineLabel,
+    required this.controller,
+    required this.readOnly,
+  });
+
+  final String engineLabel;
+  final TextEditingController controller;
+  final bool readOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = _engineIconForLabel(engineLabel);
+    return NavalgoPanel(
+      padding: const EdgeInsets.all(14),
+      tint: Colors.white.withValues(alpha: 0.96),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: NavalgoColors.deepSea.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: NavalgoColors.deepSea),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _formatEngineLabel(engineLabel),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _engineCaptionForLabel(engineLabel),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: NavalgoColors.storm,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: controller,
+            readOnly: readOnly,
+            keyboardType: TextInputType.number,
+            decoration: NavalgoFormStyles.inputDecoration(
+              context,
+              label: 'Horas actuales',
+              hint: 'Introduce el contador actual',
+              prefixIcon: const Icon(Icons.av_timer_outlined),
+            ).copyWith(suffixText: 'h'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WorkerAssignmentList extends StatelessWidget {
   const _WorkerAssignmentList({
     required this.workers,
@@ -1701,11 +1771,12 @@ class _WorkerAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final photoUrl = worker.photoUrl?.trim();
+    final resolvedPhotoUrl = resolveMediaUrl(photoUrl);
     return CircleAvatar(
       radius: 22,
       backgroundColor: NavalgoColors.mist,
-      foregroundImage: photoUrl != null && photoUrl.isNotEmpty
-          ? NetworkImage(photoUrl)
+      foregroundImage: resolvedPhotoUrl.isNotEmpty
+          ? NetworkImage(resolvedPhotoUrl)
           : null,
       child: Text(
         _workerInitials(worker.fullName),
@@ -2175,16 +2246,11 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                 child: Column(
                   children: _engineHoursControllers.entries.map((entry) {
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: TextField(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _EngineHourInputCard(
+                        engineLabel: entry.key,
                         controller: entry.value,
-                        keyboardType: TextInputType.number,
-                        decoration: NavalgoFormStyles.inputDecoration(
-                          context,
-                          label: _formatEngineLabel(entry.key),
-                          hint: 'Horas actuales',
-                          prefixIcon: const Icon(Icons.av_timer_outlined),
-                        ),
+                        readOnly: false,
                       ),
                     );
                   }).toList(),
@@ -2321,58 +2387,6 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
 
     final count = vessel.engineCount ?? 0;
     return List<String>.generate(count, (index) => 'Motor ${index + 1}');
-  }
-}
-
-class _FleetMetricCard extends StatelessWidget {
-  const _FleetMetricCard({
-    required this.label,
-    required this.value,
-    required this.tone,
-  });
-
-  final String label;
-  final String value;
-  final Color tone;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 180),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(color: tone, shape: BoxShape.circle),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.78),
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

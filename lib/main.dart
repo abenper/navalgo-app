@@ -1,5 +1,7 @@
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:navalgo/app/app_globals.dart';
+import 'package:navalgo/services/network/api_client.dart';
 import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
 import 'package:navalgo/services/leave_service.dart';
@@ -23,6 +25,19 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final sessionViewModel = SessionViewModel();
   await sessionViewModel.restoreSession();
+  ApiClient.configureSessionExpiredHandler((message) async {
+    await sessionViewModel.expireSession(message: message);
+
+    final navigator = appNavigatorKey.currentState;
+    if (navigator == null) {
+      return;
+    }
+
+    navigator.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  });
 
   runApp(
     MultiProvider(
@@ -82,6 +97,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'NavalGO',
       debugShowCheckedModeBanner: false, // Oculta la etiqueta roja de "DEBUG"
+      navigatorKey: appNavigatorKey,
       theme: buildNavalgoTheme(),
       locale: const Locale('es'),
       localizationsDelegates: const [

@@ -13,6 +13,7 @@ class SessionViewModel extends ChangeNotifier {
   bool _isReady = false;
   bool _rememberMeEnabled = false;
   String _rememberedEmail = '';
+  String? _pendingNotice;
 
   User? get user => _user;
   String? get token => _user?.token;
@@ -20,6 +21,12 @@ class SessionViewModel extends ChangeNotifier {
   bool get isReady => _isReady;
   bool get rememberMeEnabled => _rememberMeEnabled;
   String get rememberedEmail => _rememberedEmail;
+
+  String? consumePendingNotice() {
+    final notice = _pendingNotice;
+    _pendingNotice = null;
+    return notice;
+  }
 
   Future<void> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
@@ -32,8 +39,14 @@ class SessionViewModel extends ChangeNotifier {
         try {
           final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
           _user = User.fromJson(decoded);
+          if (_isJwtExpired(_user?.token)) {
+            _user = null;
+            _pendingNotice = 'Tu sesión ha expirado. Inicia sesión de nuevo.';
+            await prefs.remove(_userSessionKey);
+          }
         } catch (_) {
           _user = null;
+          await prefs.remove(_userSessionKey);
         }
       }
     }
@@ -46,6 +59,7 @@ class SessionViewModel extends ChangeNotifier {
     _user = user;
     _rememberMeEnabled = rememberMe;
     _rememberedEmail = user.email;
+    _pendingNotice = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_rememberMeKey, rememberMe);
@@ -62,6 +76,7 @@ class SessionViewModel extends ChangeNotifier {
 
   Future<void> clearSession() async {
     _user = null;
+    _pendingNotice = null;
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userSessionKey);
@@ -70,6 +85,17 @@ class SessionViewModel extends ChangeNotifier {
 
     _rememberMeEnabled = false;
     _rememberedEmail = '';
+    notifyListeners();
+  }
+
+  Future<void> expireSession({String? message}) async {
+    _user = null;
+    _pendingNotice =
+        message ?? 'Tu sesión ha expirado. Inicia sesión de nuevo.';
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_userSessionKey);
+
     notifyListeners();
   }
 
@@ -84,5 +110,42 @@ class SessionViewModel extends ChangeNotifier {
 
     _rememberedEmail = user.email;
     notifyListeners();
+  }
+
+  bool _isJwtExpired(String? token) {
+    if (token == null || token.isEmpty) {
+      return false;
+    }
+
+    try {
+      final parts = token.split('.');
+      if (parts.length < 2) {
+        return false;
+      }
+
+      final payload = utf8.decode(
+        base64Url.decode(base64Url.normalize(parts[1])),
+      );
+      final decoded = jsonDecode(payload);
+      if (decoded is! Map<String, dynamic>) {
+        return false;
+      }
+
+      final rawExp = decoded['exp'];
+      final expSeconds = rawExp is num
+          ? rawExp.toInt()
+          : int.tryParse('$rawExp');
+      if (expSeconds == null) {
+        return false;
+      }
+
+      final expiry = DateTime.fromMillisecondsSinceEpoch(
+        expSeconds * 1000,
+        isUtc: true,
+      );
+      return !expiry.isAfter(DateTime.now().toUtc());
+    } catch (_) {
+      return false;
+    }
   }
 }

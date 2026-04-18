@@ -9,7 +9,9 @@ import '../services/worker_photo_service.dart';
 import '../services/worker_service.dart';
 import '../theme/navalgo_theme.dart';
 import '../utils/app_toast.dart';
+import '../utils/media_url.dart';
 import '../viewmodels/session_view_model.dart';
+import 'profile_photo_crop_dialog.dart';
 import 'navalgo_ui.dart';
 
 Future<void> showProfileEditorDialog(BuildContext context) async {
@@ -198,6 +200,21 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
 
     final photoService = context.read<WorkerPhotoService>();
     final bytes = await picked.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+
+    final croppedBytes = await showProfilePhotoCropDialog(
+      context,
+      imageBytes: bytes,
+    );
+    if (croppedBytes == null) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() => _isUploadingPhoto = true);
 
@@ -206,7 +223,7 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
         token,
         workerId: currentUser.id,
         fileName: picked.name,
-        bytes: bytes,
+        bytes: croppedBytes,
         mimeType: picked.mimeType ?? 'image/jpeg',
       );
 
@@ -400,11 +417,12 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
   }
 
   Widget _buildProfileAvatar(BuildContext context, String initials) {
+    final resolvedPhotoUrl = resolveMediaUrl(_photoUrl);
     return CircleAvatar(
       radius: 32,
       backgroundColor: Colors.white,
-      backgroundImage: _photoUrl != null && _photoUrl!.isNotEmpty
-          ? NetworkImage(_photoUrl!)
+      backgroundImage: resolvedPhotoUrl.isNotEmpty
+          ? NetworkImage(resolvedPhotoUrl)
           : null,
       child: _photoUrl == null || _photoUrl!.isEmpty
           ? Text(

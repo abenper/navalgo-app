@@ -103,6 +103,8 @@ docker compose ps
 docker compose logs -f backend
 ```
 
+Por defecto el compose publica `8080` solo en `127.0.0.1` para que Nginx sea la unica entrada publica del backend. Si necesitas exponerlo temporalmente por IP, define `BACKEND_BIND_ADDRESS=0.0.0.0` en `.env` y vuelve a desplegar.
+
 Prueba local en VPS:
 
 ```bash
@@ -148,8 +150,11 @@ flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=https://
 Si aun no tienes dominio:
 
 ```bash
+BACKEND_BIND_ADDRESS=0.0.0.0 docker compose up -d
 flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://104.248.22.99:8080/api
 ```
+
+No uses `https://IP:8080`: ese puerto habla HTTP plano. Si necesitas HTTPS, publícalo por Nginx en `443`.
 
 ## 11) Verificacion final
 

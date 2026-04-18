@@ -39,6 +39,9 @@ El script `deploy.sh` hace automáticamente:
 - ✅ Valida que existan secretos configurados
 - ✅ Reconstruye y despliega el contenedor Docker
 
+En produccion, el `docker-compose.yml` deja el puerto `8080` ligado a `127.0.0.1` por defecto para que la entrada publica sea Nginx (`80/443`).
+Si necesitas acceso directo temporal por `IP:8080`, define `BACKEND_BIND_ADDRESS=0.0.0.0` en `.env` antes de desplegar.
+
 ## Comandos útiles
 
 ```bash
@@ -54,6 +57,8 @@ docker compose down
 # Verificar que está funcionando
 curl http://localhost:8080/api/health
 ```
+
+Si en los logs ves `Invalid character found in method name [0x16 0x03 ...]`, no suele ser una caida del backend: normalmente es trafico HTTPS entrando por error al puerto HTTP `8080`.
 
 ## ⚠️ Seguridad
 

@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
+import '../../utils/media_url.dart';
 import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/profile_dialogs.dart';
@@ -549,10 +550,11 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
   }
 
   Widget _buildAvatarWidget(String? photoUrl) {
-    if (photoUrl != null && photoUrl.isNotEmpty) {
+    final resolvedPhotoUrl = resolveMediaUrl(photoUrl);
+    if (resolvedPhotoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: 16,
-        backgroundImage: NetworkImage(photoUrl),
+        backgroundImage: NetworkImage(resolvedPhotoUrl),
         backgroundColor: NavalgoColors.mist,
       );
     }

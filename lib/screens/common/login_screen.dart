@@ -35,6 +35,15 @@ class _LoginScreenState extends State<LoginScreen> {
       _emailController.text = session.rememberedEmail;
     }
 
+    final pendingNotice = session.consumePendingNotice();
+    if (pendingNotice != null && pendingNotice.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          AppToast.warning(context, pendingNotice);
+        }
+      });
+    }
+
     // If session was restored via remember-me, skip the login form
     // and navigate directly to the appropriate shell screen.
     if (session.isAuthenticated && session.user != null) {

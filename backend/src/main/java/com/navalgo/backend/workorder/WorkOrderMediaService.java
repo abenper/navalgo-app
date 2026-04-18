@@ -29,7 +29,9 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.text.Normalizer;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -281,21 +283,114 @@ public class WorkOrderMediaService {
 
     private void drawWatermark(Graphics2D g2, int width, int height, String text) {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-        int fontSize = Math.max(16, width / 45);
-        g2.setFont(new Font("SansSerif", Font.BOLD, fontSize));
+        g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        FontMetrics fm = g2.getFontMetrics();
-        int textWidth = fm.stringWidth(text);
-        int textHeight = fm.getHeight();
+        int outerMargin = Math.max(8, Math.min(width, height) / 28);
+        int horizontalPadding = Math.max(10, Math.min(width, height) / 34);
+        int verticalPadding = Math.max(8, Math.min(width, height) / 40);
+        int maxBoxWidth = Math.max(120, (int) Math.round(width * 0.72));
+        int maxBoxHeight = Math.max(44, (int) Math.round(height * 0.34));
 
-        int x = width - textWidth - 24;
-        int y = height - 24;
+        int fontSize = Math.max(10, Math.min(24, Math.min(width, height) / 12));
+        FontMetrics metrics = null;
+        List<String> lines = List.of(text);
+
+        while (fontSize >= 9) {
+            g2.setFont(new Font("SansSerif", Font.BOLD, fontSize));
+            metrics = g2.getFontMetrics();
+            lines = wrapWatermarkLines(text, metrics, maxBoxWidth - (horizontalPadding * 2));
+
+            int lineHeight = metrics.getHeight();
+            int contentHeight = lineHeight * lines.size();
+            if (contentHeight <= maxBoxHeight - (verticalPadding * 2)) {
+                break;
+            }
+            fontSize--;
+        }
+
+        if (metrics == null) {
+            return;
+        }
+
+        int textWidth = lines.stream().mapToInt(metrics::stringWidth).max().orElse(0);
+        int lineHeight = metrics.getHeight();
+        int boxWidth = Math.min(maxBoxWidth, textWidth + (horizontalPadding * 2));
+        int boxHeight = Math.min(
+                height - (outerMargin * 2),
+                (lineHeight * lines.size()) + (verticalPadding * 2)
+        );
+
+        int x = Math.max(outerMargin, width - boxWidth - outerMargin);
+        int y = Math.max(outerMargin, height - boxHeight - outerMargin);
 
         g2.setColor(new Color(0, 0, 0, 150));
-        g2.fillRoundRect(x - 12, y - textHeight, textWidth + 20, textHeight + 8, 12, 12);
+        g2.fillRoundRect(x, y, boxWidth, boxHeight, 14, 14);
 
         g2.setColor(new Color(255, 255, 255, 220));
-        g2.drawString(text, x, y);
+        int textX = x + horizontalPadding;
+        int textY = y + verticalPadding + metrics.getAscent();
+        for (String line : lines) {
+            g2.drawString(line, textX, textY);
+            textY += lineHeight;
+        }
+    }
+
+    private List<String> wrapWatermarkLines(String text, FontMetrics metrics, int maxWidth) {
+        List<String> lines = new ArrayList<>();
+        for (String segment : text.split("\\|")) {
+            String trimmed = segment.trim();
+            if (trimmed.isBlank()) {
+                continue;
+            }
+            appendWrappedLine(lines, trimmed, metrics, maxWidth);
+        }
+
+        if (lines.isEmpty()) {
+            lines.add(text);
+        }
+        return lines;
+    }
+
+    private void appendWrappedLine(List<String> lines, String text, FontMetrics metrics, int maxWidth) {
+        if (metrics.stringWidth(text) <= maxWidth) {
+            lines.add(text);
+            return;
+        }
+
+        String[] words = text.split("\\s+");
+        if (words.length == 1) {
+            lines.add(truncateToWidth(text, metrics, maxWidth));
+            return;
+        }
+
+        StringBuilder currentLine = new StringBuilder();
+        for (String word : words) {
+            String candidate = currentLine.isEmpty() ? word : currentLine + " " + word;
+            if (currentLine.isEmpty() || metrics.stringWidth(candidate) <= maxWidth) {
+                currentLine = new StringBuilder(candidate);
+            } else {
+                lines.add(currentLine.toString());
+                currentLine = new StringBuilder(word);
+            }
+        }
+
+        if (!currentLine.isEmpty()) {
+            lines.add(currentLine.toString());
+        }
+    }
+
+    private String truncateToWidth(String text, FontMetrics metrics, int maxWidth) {
+        if (metrics.stringWidth(text) <= maxWidth) {
+            return text;
+        }
+
+        String ellipsis = "...";
+        StringBuilder builder = new StringBuilder(text);
+        while (builder.length() > 1
+                && metrics.stringWidth(builder + ellipsis) > maxWidth) {
+            builder.deleteCharAt(builder.length() - 1);
+        }
+        return builder + ellipsis;
     }
 
     private void writeCompressedJpeg(BufferedImage image, OutputStream output) throws IOException {
