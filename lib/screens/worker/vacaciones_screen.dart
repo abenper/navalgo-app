@@ -469,14 +469,16 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     );
     final selectedItems = _requestsForDay(_selectedCalendarDay);
 
-    return NavalgoPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 700;
+
+        return NavalgoPanel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
+              if (compact)
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
@@ -488,248 +490,600 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                       'Visualiza de un vistazo qué días tienen ausencias pendientes o confirmadas y quién está fuera cada jornada.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        IconButton(
+                          tooltip: 'Mes anterior',
+                          onPressed: () {
+                            setState(() {
+                              _calendarMonth = DateTime(
+                                month.year,
+                                month.month - 1,
+                              );
+                            });
+                          },
+                          icon: const Icon(Icons.chevron_left_rounded),
+                        ),
+                        Expanded(
+                          child: Text(
+                            _formatMonthLabel(month),
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: 'Mes siguiente',
+                          onPressed: () {
+                            setState(() {
+                              _calendarMonth = DateTime(
+                                month.year,
+                                month.month + 1,
+                              );
+                            });
+                          },
+                          icon: const Icon(Icons.chevron_right_rounded),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Calendario de ausencias',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'Visualiza de un vistazo qué días tienen ausencias pendientes o confirmadas y quién está fuera cada jornada.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Mes anterior',
+                      onPressed: () {
+                        setState(() {
+                          _calendarMonth = DateTime(
+                            month.year,
+                            month.month - 1,
+                          );
+                        });
+                      },
+                      icon: const Icon(Icons.chevron_left_rounded),
+                    ),
+                    Text(
+                      _formatMonthLabel(month),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Mes siguiente',
+                      onPressed: () {
+                        setState(() {
+                          _calendarMonth = DateTime(
+                            month.year,
+                            month.month + 1,
+                          );
+                        });
+                      },
+                      icon: const Icon(Icons.chevron_right_rounded),
+                    ),
+                  ],
+                ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: const [
+                  _CalendarLegendChip(
+                    label: 'Confirmadas',
+                    color: NavalgoColors.kelp,
+                  ),
+                  _CalendarLegendChip(
+                    label: 'Pendientes',
+                    color: NavalgoColors.sand,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: _calendarWeekdays
+                    .map(
+                      (label) => Expanded(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Text(
+                              label,
+                              style: Theme.of(context).textTheme.labelLarge
+                                  ?.copyWith(color: NavalgoColors.storm),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 8),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: 42,
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  mainAxisSpacing: compact ? 6 : 8,
+                  crossAxisSpacing: compact ? 6 : 8,
+                  childAspectRatio: compact ? 0.76 : 0.96,
+                ),
+                itemBuilder: (context, index) {
+                  final day = gridStart.add(Duration(days: index));
+                  final items = _requestsForDay(day);
+                  final approvedCount = items
+                      .where((item) => item.status == 'APPROVED')
+                      .length;
+                  final pendingCount = items
+                      .where((item) => item.status == 'PENDING')
+                      .length;
+                  final inMonth = day.month == month.month;
+                  final isSelected = DateUtils.isSameDay(
+                    day,
+                    _selectedCalendarDay,
+                  );
+                  final isToday = DateUtils.isSameDay(day, DateTime.now());
+
+                  return InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      setState(() {
+                        _selectedCalendarDay = day;
+                        _calendarMonth = DateTime(day.year, day.month);
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: EdgeInsets.all(compact ? 8 : 10),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? NavalgoColors.deepSea.withValues(alpha: 0.08)
+                            : inMonth
+                            ? NavalgoColors.shell
+                            : NavalgoColors.mist.withValues(alpha: 0.35),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isSelected
+                              ? NavalgoColors.harbor
+                              : isToday
+                              ? NavalgoColors.sand
+                              : NavalgoColors.border,
+                          width: isSelected || isToday ? 1.4 : 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${day.day}',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: inMonth
+                                      ? NavalgoColors.deepSea
+                                      : NavalgoColors.storm,
+                                ),
+                          ),
+                          const Spacer(),
+                          if (approvedCount > 0 || pendingCount > 0)
+                            Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children: [
+                                if (approvedCount > 0)
+                                  _CalendarCountBadge(
+                                    label: '$approvedCount C',
+                                    color: NavalgoColors.kelp,
+                                  ),
+                                if (pendingCount > 0)
+                                  _CalendarCountBadge(
+                                    label: '$pendingCount P',
+                                    color: NavalgoColors.sand,
+                                  ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 18),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: NavalgoColors.shell,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: NavalgoColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Ausencias del ${_formatLongDay(_selectedCalendarDay)}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (selectedItems.isEmpty)
+                      Text(
+                        'No hay ausencias pendientes ni confirmadas para este día.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      )
+                    else
+                      ...selectedItems.map(_buildSelectedDayItem),
                   ],
                 ),
               ),
-              IconButton(
-                tooltip: 'Mes anterior',
-                onPressed: () {
-                  setState(() {
-                    _calendarMonth = DateTime(month.year, month.month - 1);
-                  });
-                },
-                icon: const Icon(Icons.chevron_left_rounded),
-              ),
-              Text(
-                _formatMonthLabel(month),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              IconButton(
-                tooltip: 'Mes siguiente',
-                onPressed: () {
-                  setState(() {
-                    _calendarMonth = DateTime(month.year, month.month + 1);
-                  });
-                },
-                icon: const Icon(Icons.chevron_right_rounded),
-              ),
             ],
           ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: const [
-              _CalendarLegendChip(
-                label: 'Confirmadas',
-                color: NavalgoColors.kelp,
-              ),
-              _CalendarLegendChip(
-                label: 'Pendientes',
-                color: NavalgoColors.sand,
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: _calendarWeekdays
-                .map(
-                  (label) => Expanded(
-                    child: Center(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 6),
-                        child: Text(
-                          label,
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(color: NavalgoColors.storm),
-                        ),
-                      ),
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: 42,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 7,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 0.96,
-            ),
-            itemBuilder: (context, index) {
-              final day = gridStart.add(Duration(days: index));
-              final items = _requestsForDay(day);
-              final approvedCount = items
-                  .where((item) => item.status == 'APPROVED')
-                  .length;
-              final pendingCount = items
-                  .where((item) => item.status == 'PENDING')
-                  .length;
-              final inMonth = day.month == month.month;
-              final isSelected = DateUtils.isSameDay(day, _selectedCalendarDay);
-              final isToday = DateUtils.isSameDay(day, DateTime.now());
+        );
+      },
+    );
+  }
 
-              return InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () {
-                  setState(() {
-                    _selectedCalendarDay = day;
-                    _calendarMonth = DateTime(day.year, day.month);
-                  });
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? NavalgoColors.deepSea.withValues(alpha: 0.08)
-                        : inMonth
-                        ? NavalgoColors.shell
-                        : NavalgoColors.mist.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: isSelected
-                          ? NavalgoColors.harbor
-                          : isToday
-                          ? NavalgoColors.sand
-                          : NavalgoColors.border,
-                      width: isSelected || isToday ? 1.4 : 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${day.day}',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: inMonth
-                                  ? NavalgoColors.deepSea
-                                  : NavalgoColors.storm,
-                            ),
-                      ),
-                      const Spacer(),
-                      if (approvedCount > 0 || pendingCount > 0)
-                        Wrap(
-                          spacing: 4,
-                          runSpacing: 4,
-                          children: [
-                            if (approvedCount > 0)
-                              _CalendarCountBadge(
-                                label: '$approvedCount C',
-                                color: NavalgoColors.kelp,
-                              ),
-                            if (pendingCount > 0)
-                              _CalendarCountBadge(
-                                label: '$pendingCount P',
-                                color: NavalgoColors.sand,
-                              ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 18),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(18),
+  Widget _buildSelectedDayItem(LeaveRequestModel item) {
+    final color = _statusColor(item.status);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 520;
+
+          return Container(
+            padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: NavalgoColors.shell,
-              borderRadius: BorderRadius.circular(22),
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: NavalgoColors.border),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Ausencias del ${_formatLongDay(_selectedCalendarDay)}',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                if (selectedItems.isEmpty)
-                  Text(
-                    'No hay ausencias pendientes ni confirmadas para este día.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+            child: compact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: color.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Icon(
+                              Icons.event_busy_outlined,
+                              color: color,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.workerName,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(item.reason),
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${_formatShortDate(item.startDate)} - ${_formatShortDate(item.endDate)}',
+                                  style: Theme.of(context).textTheme.bodyMedium,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      NavalgoStatusChip(
+                        label: _statusLabel(item.status),
+                        color: color,
+                      ),
+                    ],
                   )
-                else
-                  ...selectedItems.map(
-                    (item) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: NavalgoColors.border),
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        child: Row(
+                        child: Icon(Icons.event_busy_outlined, color: color),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              width: 42,
-                              height: 42,
-                              decoration: BoxDecoration(
-                                color: _statusColor(
-                                  item.status,
-                                ).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              child: Icon(
-                                Icons.event_busy_outlined,
-                                color: _statusColor(item.status),
-                              ),
+                            Text(
+                              item.workerName,
+                              style: Theme.of(context).textTheme.titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    item.workerName,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(fontWeight: FontWeight.w800),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(item.reason),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    '${_formatShortDate(item.startDate)} - ${_formatShortDate(item.endDate)}',
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodyMedium,
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            NavalgoStatusChip(
-                              label: _statusLabel(item.status),
-                              color: _statusColor(item.status),
+                            const SizedBox(height: 4),
+                            Text(item.reason),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${_formatShortDate(item.startDate)} - ${_formatShortDate(item.endDate)}',
+                              style: Theme.of(context).textTheme.bodyMedium,
                             ),
                           ],
                         ),
                       ),
-                    ),
+                      const SizedBox(width: 12),
+                      NavalgoStatusChip(
+                        label: _statusLabel(item.status),
+                        color: color,
+                      ),
+                    ],
                   ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget? _buildRequestActionsMenu({
+    required LeaveRequestModel request,
+    required bool workerCanEditOrCancel,
+    required bool adminCanChangeStatus,
+  }) {
+    if (!workerCanEditOrCancel && !adminCanChangeStatus) {
+      return null;
+    }
+
+    return PopupMenuButton<String>(
+      tooltip: 'Acciones',
+      onSelected: (value) {
+        if (value == 'EDIT') {
+          _editRequest(request);
+          return;
+        }
+        if (value == 'CANCEL') {
+          _cancelRequest(request);
+          return;
+        }
+        _updateStatus(request.id, value);
+      },
+      itemBuilder: (_) {
+        final items = <PopupMenuEntry<String>>[];
+        if (workerCanEditOrCancel) {
+          items.add(
+            const PopupMenuItem(
+              value: 'EDIT',
+              child: Text('Editar (volver a pendiente)'),
+            ),
+          );
+          items.add(
+            const PopupMenuItem(
+              value: 'CANCEL',
+              child: Text('Cancelar solicitud'),
+            ),
+          );
+        }
+        if (adminCanChangeStatus) {
+          if (request.status != 'PENDING') {
+            items.add(
+              const PopupMenuItem(
+                value: 'PENDING',
+                child: Text('Marcar pendiente'),
+              ),
+            );
+          }
+          if (request.status != 'APPROVED') {
+            items.add(
+              const PopupMenuItem(
+                value: 'APPROVED',
+                child: Text('Marcar aceptada'),
+              ),
+            );
+          }
+          if (request.status != 'REJECTED') {
+            items.add(
+              const PopupMenuItem(
+                value: 'REJECTED',
+                child: Text('Marcar rechazada'),
+              ),
+            );
+          }
+          if (request.status != 'CANCELLED') {
+            items.add(
+              const PopupMenuItem(
+                value: 'CANCELLED',
+                child: Text('Marcar cancelada'),
+              ),
+            );
+          }
+        }
+        return items;
+      },
+      icon: const Icon(Icons.more_horiz, size: 20),
+    );
+  }
+
+  Widget _buildRequestCard(LeaveRequestModel req) {
+    final color = _statusColor(req.status);
+    final statusLabel = _statusLabel(req.status);
+    final workerCanEditOrCancel = !_isAdmin && req.status == 'APPROVED';
+    final adminCanChangeStatus = _isAdmin;
+    final actionsMenu = _buildRequestActionsMenu(
+      request: req,
+      workerCanEditOrCancel: workerCanEditOrCancel,
+      adminCanChangeStatus: adminCanChangeStatus,
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 560;
+          final details = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${_fmt(req.startDate)} - ${_fmt(req.endDate)} (${req.requestedDays} días)',
+                maxLines: compact ? 3 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              if (_isAdmin) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Trabajador: ${req.workerName}',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
+              const SizedBox(height: 2),
+              Text(
+                'Motivo: ${req.reason}',
+                maxLines: compact ? 4 : 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          );
+
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: compact
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          CircleAvatar(
+                            backgroundColor: color.withValues(alpha: 0.12),
+                            child: Icon(Icons.event_note, color: color),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: details),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: NavalgoStatusChip(
+                                label: statusLabel,
+                                color: color,
+                              ),
+                            ),
+                          ),
+                          ...?(actionsMenu == null
+                              ? null
+                              : <Widget>[actionsMenu]),
+                        ],
+                      ),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        backgroundColor: color.withValues(alpha: 0.12),
+                        child: Icon(Icons.event_note, color: color),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: details),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          NavalgoStatusChip(label: statusLabel, color: color),
+                          ...?(actionsMenu == null
+                              ? null
+                              : <Widget>[actionsMenu]),
+                        ],
+                      ),
+                    ],
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildBottomBarActions() {
+    final compact = MediaQuery.sizeOf(context).width < 520;
+    if (_isAdmin) {
+      if (compact) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            OutlinedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Actualizar'),
+            ),
+            const SizedBox(height: 10),
+            FilledButton.icon(
+              onPressed: _adminAssignRequest,
+              icon: const Icon(Icons.event_available),
+              label: const Text('Asignar ausencia'),
+            ),
+          ],
+        );
+      }
+
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _loadData,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Actualizar'),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: _adminAssignRequest,
+              icon: const Icon(Icons.event_available),
+              label: const Text('Asignar ausencia'),
             ),
           ),
         ],
-      ),
+      );
+    }
+
+    return FilledButton.icon(
+      onPressed: _createRequest,
+      icon: const Icon(Icons.add),
+      label: const Text('Solicitar ausencia'),
     );
   }
 
@@ -803,138 +1157,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                   ),
                 ),
               ),
-            ..._requests.map((req) {
-              final color = _statusColor(req.status);
-              final statusLabel = _statusLabel(req.status);
-              final workerCanEditOrCancel =
-                  !_isAdmin && req.status == 'APPROVED';
-              final adminCanChangeStatus = _isAdmin;
-
-              return Card(
-                margin: const EdgeInsets.only(bottom: 12),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: color.withValues(alpha: 0.12),
-                        child: Icon(Icons.event_note, color: color),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${_fmt(req.startDate)} - ${_fmt(req.endDate)} (${req.requestedDays} días)',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            if (_isAdmin) ...[
-                              const SizedBox(height: 6),
-                              Text(
-                                'Trabajador: ${req.workerName}',
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                            const SizedBox(height: 2),
-                            Text(
-                              'Motivo: ${req.reason}',
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          NavalgoStatusChip(label: statusLabel, color: color),
-                          if (workerCanEditOrCancel || adminCanChangeStatus)
-                            PopupMenuButton<String>(
-                              tooltip: 'Acciones',
-                              onSelected: (value) {
-                                if (value == 'EDIT') {
-                                  _editRequest(req);
-                                  return;
-                                }
-                                if (value == 'CANCEL') {
-                                  _cancelRequest(req);
-                                  return;
-                                }
-                                _updateStatus(req.id, value);
-                              },
-                              itemBuilder: (_) {
-                                final items = <PopupMenuEntry<String>>[];
-                                if (workerCanEditOrCancel) {
-                                  items.add(
-                                    const PopupMenuItem(
-                                      value: 'EDIT',
-                                      child: Text(
-                                        'Editar (volver a pendiente)',
-                                      ),
-                                    ),
-                                  );
-                                  items.add(
-                                    const PopupMenuItem(
-                                      value: 'CANCEL',
-                                      child: Text('Cancelar solicitud'),
-                                    ),
-                                  );
-                                }
-                                if (adminCanChangeStatus) {
-                                  if (req.status != 'PENDING') {
-                                    items.add(
-                                      const PopupMenuItem(
-                                        value: 'PENDING',
-                                        child: Text('Marcar pendiente'),
-                                      ),
-                                    );
-                                  }
-                                  if (req.status != 'APPROVED') {
-                                    items.add(
-                                      const PopupMenuItem(
-                                        value: 'APPROVED',
-                                        child: Text('Marcar aceptada'),
-                                      ),
-                                    );
-                                  }
-                                  if (req.status != 'REJECTED') {
-                                    items.add(
-                                      const PopupMenuItem(
-                                        value: 'REJECTED',
-                                        child: Text('Marcar rechazada'),
-                                      ),
-                                    );
-                                  }
-                                  if (req.status != 'CANCELLED') {
-                                    items.add(
-                                      const PopupMenuItem(
-                                        value: 'CANCELLED',
-                                        child: Text('Marcar cancelada'),
-                                      ),
-                                    );
-                                  }
-                                }
-                                return items;
-                              },
-                              icon: const Icon(Icons.more_horiz, size: 20),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }),
+            ..._requests.map(_buildRequestCard),
           ],
         ),
       ),
@@ -944,31 +1167,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: NavalgoPanel(
             padding: const EdgeInsets.all(12),
-            child: _isAdmin
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: _loadData,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Actualizar'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _adminAssignRequest,
-                          icon: const Icon(Icons.event_available),
-                          label: const Text('Asignar ausencia'),
-                        ),
-                      ),
-                    ],
-                  )
-                : FilledButton.icon(
-                    onPressed: _createRequest,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Solicitar ausencia'),
-                  ),
+            child: _buildBottomBarActions(),
           ),
         ),
       ),

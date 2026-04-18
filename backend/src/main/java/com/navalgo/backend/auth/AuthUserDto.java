@@ -8,6 +8,7 @@ public record AuthUserDto(
         String email,
         Role role,
         boolean mustChangePassword,
-        boolean canEditWorkOrders
+        boolean canEditWorkOrders,
+        String photoUrl
 ) {
 }

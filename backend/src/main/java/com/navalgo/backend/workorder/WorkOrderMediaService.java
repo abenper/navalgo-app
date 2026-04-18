@@ -127,9 +127,9 @@ public class WorkOrderMediaService {
                                               Instant capturedAt,
                                               String uploaderEmail,
                                               boolean applyWatermark,
-                              boolean includeMetadata,
-                              String keyPrefix,
-                              boolean allowVideo) {
+                                              boolean includeMetadata,
+                                              String keyPrefix,
+                                              boolean allowVideo) {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("El archivo es obligatorio");
         }
@@ -150,7 +150,8 @@ public class WorkOrderMediaService {
 
         try {
             if (contentType.startsWith("image/")) {
-                String imageKey = buildObjectKey(keyPrefix, ".jpg");
+                boolean preserveLossless = !applyWatermark && !allowVideo;
+                String imageKey = buildObjectKey(keyPrefix, preserveLossless ? ".png" : ".jpg");
                 return processAndUploadImage(
                         file,
                         worker,
@@ -159,7 +160,8 @@ public class WorkOrderMediaService {
                         capturedInstant,
                         applyWatermark,
                         includeMetadata,
-                        imageKey
+                        imageKey,
+                        preserveLossless
                 );
             }
             if (contentType.startsWith("video/")) {
@@ -183,7 +185,8 @@ public class WorkOrderMediaService {
                                                         Instant capturedAt,
                                                         boolean applyWatermark,
                                                         boolean includeMetadata,
-                                                        String objectKey) throws IOException {
+                                                        String objectKey,
+                                                        boolean preserveLossless) throws IOException {
         BufferedImage original = ImageIO.read(file.getInputStream());
         if (original == null) {
             throw new IllegalArgumentException("Formato de imagen no soportado");
@@ -200,9 +203,13 @@ public class WorkOrderMediaService {
         g2.dispose();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
-        writeCompressedJpeg(rgbImage, output);
-
-        uploadToSpaces(objectKey, output.toByteArray(), "image/jpeg");
+        if (preserveLossless) {
+            ImageIO.write(rgbImage, "png", output);
+            uploadToSpaces(objectKey, output.toByteArray(), "image/png");
+        } else {
+            writeCompressedJpeg(rgbImage, output);
+            uploadToSpaces(objectKey, output.toByteArray(), "image/jpeg");
+        }
 
         return new UploadedAttachmentDto(
             buildPublicUrl(objectKey),

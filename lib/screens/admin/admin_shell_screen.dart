@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/worker_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/media_url.dart';
 import '../../utils/app_toast.dart';
@@ -67,6 +68,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _refreshCurrentUserProfile();
+      if (!mounted) {
+        return;
+      }
       final notificationsVm = context.read<NotificationsViewModel>();
       await notificationsVm.refresh();
       if (!mounted || _shownUnreadToast) {
@@ -80,6 +85,32 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         );
       }
     });
+  }
+
+  Future<void> _refreshCurrentUserProfile() async {
+    final session = context.read<SessionViewModel>();
+    final currentUser = session.user;
+    final token = session.token;
+    if (currentUser == null || token == null || token.isEmpty) {
+      return;
+    }
+
+    try {
+      final profile = await context.read<WorkerService>().getMyProfile(token);
+      if (!mounted) {
+        return;
+      }
+      await session.updateUser(
+        currentUser.copyWith(
+          name: profile.fullName,
+          email: profile.email,
+          role: profile.role,
+          mustChangePassword: profile.mustChangePassword,
+          canEditWorkOrders: profile.canEditWorkOrders,
+          photoUrl: profile.photoUrl,
+        ),
+      );
+    } catch (_) {}
   }
 
   void _onDestinationSelected(int index) {
@@ -437,7 +468,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                             color: Colors.white.withValues(alpha: 0.14),
                             borderRadius: BorderRadius.circular(18),
                           ),
-                          child: const Icon(Icons.person, color: Colors.white),
+                          child: Center(
+                            child: _buildAvatarWidget(
+                              user.photoUrl,
+                              radius: 22,
+                              iconSize: 22,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(

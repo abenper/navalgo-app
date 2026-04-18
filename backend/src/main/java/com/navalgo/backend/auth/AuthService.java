@@ -105,7 +105,8 @@ public class AuthService {
                 worker.getEmail(),
                 worker.getRole(),
                 worker.isMustChangePassword(),
-                worker.isCanEditWorkOrders()
+            worker.isCanEditWorkOrders(),
+            worker.getPhotoUrl()
         );
 
         return new LoginResponse(userDto, accessToken, "Bearer", jwtService.calculateExpiryInstant());

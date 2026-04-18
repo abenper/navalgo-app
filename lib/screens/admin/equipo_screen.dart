@@ -726,6 +726,7 @@ class _EditWorkerDialog extends StatefulWidget {
 }
 
 class _EditWorkerDialogState extends State<_EditWorkerDialog> {
+  final _formKey = GlobalKey<FormState>();
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _specialityCtrl;
@@ -756,89 +757,183 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Editar trabajador'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Nombre completo',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _emailCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Correo electrónico',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _specialityCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Especialidad',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _role,
-              decoration: const InputDecoration(
-                labelText: 'Rol',
-                border: OutlineInputBorder(),
-              ),
-              items: const [
-                DropdownMenuItem(value: 'WORKER', child: Text('WORKER')),
-                DropdownMenuItem(value: 'ADMIN', child: Text('ADMIN')),
-              ],
-              onChanged: (v) => setState(() => _role = v ?? 'WORKER'),
-            ),
-            const SizedBox(height: 8),
-            CheckboxListTile(
-              value: _canEditWorkOrders,
-              onChanged: (v) => setState(() => _canEditWorkOrders = v ?? false),
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Permitir editar partes'),
-            ),
-            const SizedBox(height: 8),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.calendar_today),
-              title: const Text('Fecha de contratación'),
-              subtitle: Text(_formatDate(_contractStartDate)),
-              onTap: _pickDate,
-            ),
-          ],
-        ),
-      ),
+    return NavalgoFormDialog(
+      title: 'Editar trabajador',
+      eyebrow: 'GESTIÓN DE EQUIPO',
+      subtitle:
+          'Ajusta los datos del trabajador con la misma estructura visual que el resto de formularios del panel.',
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
           child: const Text('Cancelar'),
         ),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(
-              context,
-              _EditWorkerInput(
-                fullName: _nameCtrl.text.trim(),
-                email: _emailCtrl.text.trim(),
-                speciality: _specialityCtrl.text.trim(),
-                role: _role,
-                canEditWorkOrders: _canEditWorkOrders,
-                contractStartDate: _contractStartDate,
-              ),
-            );
-          },
-          child: const Text('Guardar cambios'),
+        FilledButton.icon(
+          onPressed: _submit,
+          icon: const Icon(Icons.save_outlined),
+          label: const Text('Guardar cambios'),
         ),
       ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            NavalgoFormFieldBlock(
+              label: 'Nombre completo',
+              caption:
+                  'Usa el nombre visible con el que el trabajador aparecerá en partes, fichajes y ausencias.',
+              child: TextFormField(
+                controller: _nameCtrl,
+                textInputAction: TextInputAction.next,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Nombre completo',
+                  prefixIcon: const Icon(Icons.badge_outlined),
+                ),
+                validator: (value) {
+                  if ((value?.trim() ?? '').isEmpty) {
+                    return 'Indica el nombre del trabajador.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Correo electrónico',
+              child: TextFormField(
+                controller: _emailCtrl,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Correo electrónico',
+                  prefixIcon: const Icon(Icons.alternate_email_outlined),
+                ),
+                validator: (value) {
+                  final trimmed = value?.trim() ?? '';
+                  if (trimmed.isEmpty) {
+                    return 'Indica el correo del trabajador.';
+                  }
+                  if (!trimmed.contains('@') || !trimmed.contains('.')) {
+                    return 'Introduce un correo válido.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Especialidad',
+              caption:
+                  'Puedes dejarla vacía si todavía no quieres fijar la especialidad principal.',
+              child: TextFormField(
+                controller: _specialityCtrl,
+                textInputAction: TextInputAction.next,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Especialidad',
+                  prefixIcon: const Icon(Icons.handyman_outlined),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Rol',
+              child: DropdownButtonFormField<String>(
+                initialValue: _role,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Rol',
+                  prefixIcon: const Icon(Icons.admin_panel_settings_outlined),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'WORKER', child: Text('Trabajador')),
+                  DropdownMenuItem(
+                    value: 'ADMIN',
+                    child: Text('Administrador'),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() {
+                    _role = value ?? 'WORKER';
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Permisos',
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.94),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.28),
+                  ),
+                ),
+                child: CheckboxListTile(
+                  value: _canEditWorkOrders,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  activeColor: NavalgoColors.tide,
+                  title: const Text('Permitir editar partes'),
+                  subtitle: const Text(
+                    'Activa este permiso si podrá completar o modificar partes.',
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _canEditWorkOrders = value ?? false;
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Fecha de contratación',
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: _pickDate,
+                child: InputDecorator(
+                  decoration: NavalgoFormStyles.inputDecoration(
+                    context,
+                    label: 'Fecha de contratación',
+                    prefixIcon: const Icon(Icons.calendar_month_outlined),
+                  ),
+                  child: Text(
+                    _formatDate(_contractStartDate),
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: NavalgoColors.deepSea,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      _EditWorkerInput(
+        fullName: _nameCtrl.text.trim(),
+        email: _emailCtrl.text.trim(),
+        speciality: _specialityCtrl.text.trim(),
+        role: _role,
+        canEditWorkOrders: _canEditWorkOrders,
+        contractStartDate: _contractStartDate,
+      ),
     );
   }
 

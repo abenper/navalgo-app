@@ -272,29 +272,48 @@ class _PartesScreenState extends State<PartesScreen> {
                                   title: 'Cuaderno de Taller Naval',
                                   subtitle:
                                       'Gestiona partes, firmas y evidencias con una vista alineada con el resto de formularios del sistema.',
-                                  trailing: Wrap(
-                                    spacing: 14,
-                                    runSpacing: 14,
-                                    children: [
-                                      NavalgoMetricCard(
-                                        label: 'Firmados',
-                                        value: '$signedCount',
-                                        icon: Icons.verified_outlined,
-                                        accent: const Color(0xFF3BAA6E),
-                                      ),
-                                      NavalgoMetricCard(
-                                        label: 'Pendientes de firma',
-                                        value: '$pendingSignatureCount',
-                                        icon: Icons.draw_outlined,
-                                        accent: const Color(0xFFD55A4E),
-                                      ),
-                                      NavalgoMetricCard(
-                                        label: 'Prioridad alta',
-                                        value: '$highPriorityCount',
-                                        icon: Icons.priority_high_rounded,
-                                        accent: const Color(0xFFD5A021),
-                                      ),
-                                    ],
+                                  footer: LayoutBuilder(
+                                    builder: (context, constraints) {
+                                      final compact =
+                                          constraints.maxWidth < 720;
+                                      final metricWidth = compact
+                                          ? constraints.maxWidth
+                                          : (constraints.maxWidth - 28) / 3;
+
+                                      return Wrap(
+                                        spacing: 14,
+                                        runSpacing: 14,
+                                        children: [
+                                          SizedBox(
+                                            width: metricWidth,
+                                            child: NavalgoMetricCard(
+                                              label: 'Firmados',
+                                              value: '$signedCount',
+                                              icon: Icons.verified_outlined,
+                                              accent: const Color(0xFF3BAA6E),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: metricWidth,
+                                            child: NavalgoMetricCard(
+                                              label: 'Pendientes de firma',
+                                              value: '$pendingSignatureCount',
+                                              icon: Icons.draw_outlined,
+                                              accent: const Color(0xFFD55A4E),
+                                            ),
+                                          ),
+                                          SizedBox(
+                                            width: metricWidth,
+                                            child: NavalgoMetricCard(
+                                              label: 'Prioridad alta',
+                                              value: '$highPriorityCount',
+                                              icon: Icons.priority_high_rounded,
+                                              accent: const Color(0xFFD5A021),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    },
                                   ),
                                 ),
                                 const SizedBox(height: 26),
@@ -580,6 +599,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
   bool _busy = false;
   bool _signing = false;
   late final SignatureController _sigController;
+  final GlobalKey _signaturePadKey = GlobalKey();
   final List<_PickedProof> _proofFiles = <_PickedProof>[];
   late final TextEditingController _observationsCtrl;
   final Map<String, TextEditingController> _engineHoursControllers =
@@ -908,6 +928,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
+            key: _signaturePadKey,
             height: 180,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey.shade300),
@@ -1216,7 +1237,23 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
 
     final mediaService = context.read<WorkOrderMediaService>();
     try {
-      final signatureBytes = await _sigController.toPngBytes();
+      final renderObject = _signaturePadKey.currentContext?.findRenderObject();
+      final signatureSize = renderObject is RenderBox
+          ? renderObject.size
+          : null;
+      final exportScale = MediaQuery.of(
+        context,
+      ).devicePixelRatio.clamp(2.5, 4.0);
+      final exportWidth = signatureSize == null
+          ? 1600
+          : (signatureSize.width * exportScale).round();
+      final exportHeight = signatureSize == null
+          ? 720
+          : (signatureSize.height * exportScale).round();
+      final signatureBytes = await _sigController.toPngBytes(
+        width: exportWidth,
+        height: exportHeight,
+      );
       if (signatureBytes == null) {
         throw Exception('No se pudo exportar la firma');
       }
@@ -1614,7 +1651,7 @@ IconData _engineIconForLabel(String rawLabel) {
     return Icons.tune_rounded;
   }
   if (label.contains('aux')) {
-    return Icons.settings_input_component_outlined;
+    return Icons.power_outlined;
   }
   if (label.contains('proa')) {
     return Icons.north_rounded;
@@ -1622,7 +1659,7 @@ IconData _engineIconForLabel(String rawLabel) {
   if (label.contains('popa')) {
     return Icons.south_rounded;
   }
-  return Icons.precision_manufacturing_outlined;
+  return Icons.settings_outlined;
 }
 
 String _engineCaptionForLabel(String rawLabel) {
