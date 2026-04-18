@@ -100,12 +100,9 @@ public class WorkOrderMediaService {
         uploadValidationService.validateProfilePhoto(file);
         String emailFolder = sanitizeSegment(uploaderEmail == null ? "usuario" : uploaderEmail.toLowerCase(Locale.ROOT));
         String basePath = "usuarios/" + emailFolder + "/perfil";
-        String contentType = file.getContentType() == null
-                ? "image/jpeg"
-                : file.getContentType().trim().toLowerCase(Locale.ROOT);
-        String objectKey = buildObjectKey(basePath, resolveImageExtension(file, contentType));
+        String objectKey = buildObjectKey(basePath, ".png");
         try {
-            uploadToSpaces(objectKey, file.getBytes(), contentType);
+            uploadToSpaces(objectKey, processProfilePhoto(file), "image/png");
         } catch (IOException exception) {
             throw new IllegalStateException("No se pudo procesar la foto de perfil", exception);
         }
@@ -119,6 +116,27 @@ public class WorkOrderMediaService {
                 false,
                 false
         );
+    }
+
+    private byte[] processProfilePhoto(MultipartFile file) throws IOException {
+        BufferedImage original = ImageIO.read(file.getInputStream());
+        if (original == null) {
+            throw new IllegalArgumentException("Formato de imagen no soportado");
+        }
+
+        BufferedImage normalized = new BufferedImage(
+                original.getWidth(),
+                original.getHeight(),
+                BufferedImage.TYPE_INT_ARGB
+        );
+        Graphics2D graphics = normalized.createGraphics();
+        graphics.setComposite(AlphaComposite.Src);
+        graphics.drawImage(original, 0, 0, null);
+        graphics.dispose();
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(normalized, "png", output);
+        return output.toByteArray();
     }
 
     private UploadedAttachmentDto uploadMedia(MultipartFile file,

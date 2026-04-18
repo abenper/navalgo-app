@@ -472,6 +472,119 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 700;
+        final calendarGrid = Column(
+          children: [
+            Row(
+              children: _calendarWeekdays
+                  .map(
+                    (label) => Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Text(
+                            label,
+                            style: Theme.of(context).textTheme.labelLarge
+                                ?.copyWith(color: NavalgoColors.storm),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 8),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: 42,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 7,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+                childAspectRatio: 0.96,
+              ),
+              itemBuilder: (context, index) {
+                final day = gridStart.add(Duration(days: index));
+                final items = _requestsForDay(day);
+                final approvedCount = items
+                    .where((item) => item.status == 'APPROVED')
+                    .length;
+                final pendingCount = items
+                    .where((item) => item.status == 'PENDING')
+                    .length;
+                final inMonth = day.month == month.month;
+                final isSelected = DateUtils.isSameDay(
+                  day,
+                  _selectedCalendarDay,
+                );
+                final isToday = DateUtils.isSameDay(day, DateTime.now());
+
+                return InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () {
+                    setState(() {
+                      _selectedCalendarDay = day;
+                      _calendarMonth = DateTime(day.year, day.month);
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? NavalgoColors.deepSea.withValues(alpha: 0.08)
+                          : inMonth
+                          ? NavalgoColors.shell
+                          : NavalgoColors.mist.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(
+                        color: isSelected
+                            ? NavalgoColors.harbor
+                            : isToday
+                            ? NavalgoColors.sand
+                            : NavalgoColors.border,
+                        width: isSelected || isToday ? 1.4 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${day.day}',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: inMonth
+                                    ? NavalgoColors.deepSea
+                                    : NavalgoColors.storm,
+                              ),
+                        ),
+                        const Spacer(),
+                        if (approvedCount > 0 || pendingCount > 0)
+                          Wrap(
+                            spacing: 4,
+                            runSpacing: 4,
+                            children: [
+                              if (approvedCount > 0)
+                                _CalendarCountBadge(
+                                  label: '$approvedCount C',
+                                  color: NavalgoColors.kelp,
+                                ),
+                              if (pendingCount > 0)
+                                _CalendarCountBadge(
+                                  label: '$pendingCount P',
+                                  color: NavalgoColors.sand,
+                                ),
+                            ],
+                          ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
 
         return NavalgoPanel(
           child: Column(
@@ -596,115 +709,13 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                 ],
               ),
               const SizedBox(height: 18),
-              Row(
-                children: _calendarWeekdays
-                    .map(
-                      (label) => Expanded(
-                        child: Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Text(
-                              label,
-                              style: Theme.of(context).textTheme.labelLarge
-                                  ?.copyWith(color: NavalgoColors.storm),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-              const SizedBox(height: 8),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: 42,
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 7,
-                  mainAxisSpacing: compact ? 6 : 8,
-                  crossAxisSpacing: compact ? 6 : 8,
-                  childAspectRatio: compact ? 0.76 : 0.96,
-                ),
-                itemBuilder: (context, index) {
-                  final day = gridStart.add(Duration(days: index));
-                  final items = _requestsForDay(day);
-                  final approvedCount = items
-                      .where((item) => item.status == 'APPROVED')
-                      .length;
-                  final pendingCount = items
-                      .where((item) => item.status == 'PENDING')
-                      .length;
-                  final inMonth = day.month == month.month;
-                  final isSelected = DateUtils.isSameDay(
-                    day,
-                    _selectedCalendarDay,
-                  );
-                  final isToday = DateUtils.isSameDay(day, DateTime.now());
-
-                  return InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () {
-                      setState(() {
-                        _selectedCalendarDay = day;
-                        _calendarMonth = DateTime(day.year, day.month);
-                      });
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      padding: EdgeInsets.all(compact ? 8 : 10),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? NavalgoColors.deepSea.withValues(alpha: 0.08)
-                            : inMonth
-                            ? NavalgoColors.shell
-                            : NavalgoColors.mist.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: isSelected
-                              ? NavalgoColors.harbor
-                              : isToday
-                              ? NavalgoColors.sand
-                              : NavalgoColors.border,
-                          width: isSelected || isToday ? 1.4 : 1,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${day.day}',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: inMonth
-                                      ? NavalgoColors.deepSea
-                                      : NavalgoColors.storm,
-                                ),
-                          ),
-                          const Spacer(),
-                          if (approvedCount > 0 || pendingCount > 0)
-                            Wrap(
-                              spacing: 4,
-                              runSpacing: 4,
-                              children: [
-                                if (approvedCount > 0)
-                                  _CalendarCountBadge(
-                                    label: '$approvedCount C',
-                                    color: NavalgoColors.kelp,
-                                  ),
-                                if (pendingCount > 0)
-                                  _CalendarCountBadge(
-                                    label: '$pendingCount P',
-                                    color: NavalgoColors.sand,
-                                  ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+              if (compact)
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(width: 560, child: calendarGrid),
+                )
+              else
+                calendarGrid,
               const SizedBox(height: 18),
               Container(
                 width: double.infinity,

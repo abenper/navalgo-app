@@ -357,14 +357,16 @@ class NavalgoFormDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final compact = MediaQuery.sizeOf(context).width < 520;
+    final screenSize = MediaQuery.sizeOf(context);
+    final compact = screenSize.width < 520;
+    final maxHeight = screenSize.height * (compact ? 0.92 : 0.88);
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: compact
           ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
           : const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
       child: Container(
-        constraints: BoxConstraints(maxWidth: maxWidth),
+        constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
         decoration: BoxDecoration(
           gradient: NavalgoColors.heroGradient,
           borderRadius: BorderRadius.circular(compact ? 26 : 32),

@@ -420,8 +420,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     if (resolvedPhotoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
-        backgroundImage: NetworkImage(resolvedPhotoUrl),
         backgroundColor: NavalgoColors.mist,
+        foregroundImage: NetworkImage(resolvedPhotoUrl),
+        child: Icon(Icons.person, size: iconSize, color: NavalgoColors.tide),
       );
     }
 

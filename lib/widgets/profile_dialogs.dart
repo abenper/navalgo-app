@@ -219,12 +219,13 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
     setState(() => _isUploadingPhoto = true);
 
     try {
+      final normalizedFileName = _buildProfilePhotoFileName(picked.name);
       final uploaded = await photoService.uploadPhoto(
         token,
         workerId: currentUser.id,
-        fileName: picked.name,
+        fileName: normalizedFileName,
         bytes: croppedBytes,
-        mimeType: picked.mimeType ?? 'image/jpeg',
+        mimeType: 'image/png',
       );
 
       await session.updateUser(
@@ -254,6 +255,18 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
         setState(() => _isUploadingPhoto = false);
       }
     }
+  }
+
+  String _buildProfilePhotoFileName(String rawName) {
+    final trimmed = rawName.trim();
+    if (trimmed.isEmpty) {
+      return 'avatar.png';
+    }
+
+    final dotIndex = trimmed.lastIndexOf('.');
+    final baseName = dotIndex > 0 ? trimmed.substring(0, dotIndex) : trimmed;
+    final safeBaseName = baseName.trim().isEmpty ? 'avatar' : baseName.trim();
+    return '$safeBaseName.png';
   }
 
   @override
@@ -421,18 +434,16 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
     return CircleAvatar(
       radius: 32,
       backgroundColor: Colors.white,
-      backgroundImage: resolvedPhotoUrl.isNotEmpty
+      foregroundImage: resolvedPhotoUrl.isNotEmpty
           ? NetworkImage(resolvedPhotoUrl)
           : null,
-      child: _photoUrl == null || _photoUrl!.isEmpty
-          ? Text(
-              initials,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: NavalgoColors.deepSea,
-                fontWeight: FontWeight.w800,
-              ),
-            )
-          : null,
+      child: Text(
+        initials,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+          color: NavalgoColors.deepSea,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 

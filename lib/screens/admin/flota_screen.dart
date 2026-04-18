@@ -1177,9 +1177,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Modelo',
-                  prefixIcon: const Icon(
-                    Icons.precision_manufacturing_outlined,
-                  ),
+                  prefixIcon: const Icon(Icons.sailing_outlined),
                 ),
               ),
             ),
@@ -1421,7 +1419,7 @@ class _VesselDetailsDialog extends StatelessWidget {
           NavalgoFormFieldBlock(
             label: 'Modelo',
             child: _VesselDetailValue(
-              icon: Icons.precision_manufacturing_outlined,
+              icon: Icons.sailing_outlined,
               value: vessel.model ?? 'No indicado',
             ),
           ),
