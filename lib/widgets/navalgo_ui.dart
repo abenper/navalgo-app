@@ -358,8 +358,12 @@ class NavalgoFormDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final screenSize = MediaQuery.sizeOf(context);
+    final viewInsets = MediaQuery.viewInsetsOf(context);
     final compact = screenSize.width < 520;
-    final maxHeight = screenSize.height * (compact ? 0.92 : 0.88);
+    final padding = compact ? 20.0 : 28.0;
+    final maxHeight =
+        (screenSize.height - viewInsets.bottom) * (compact ? 0.92 : 0.88);
+    final hasActions = actions != null && actions!.isNotEmpty;
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: compact
@@ -379,51 +383,64 @@ class NavalgoFormDialog extends StatelessWidget {
             ),
           ],
         ),
-        child: SingleChildScrollView(
-          padding: EdgeInsets.all(compact ? 20 : 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (eyebrow != null) ...[
-                Text(
-                  eyebrow!,
-                  style: textTheme.labelLarge?.copyWith(
-                    color: NavalgoColors.sand,
-                    letterSpacing: 1.1,
-                  ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(
+                  padding,
+                  padding,
+                  padding,
+                  hasActions ? 0 : padding,
                 ),
-                const SizedBox(height: 10),
-              ],
-              Text(
-                title,
-                style: textTheme.headlineSmall?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w800,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (eyebrow != null) ...[
+                      Text(
+                        eyebrow!,
+                        style: textTheme.labelLarge?.copyWith(
+                          color: NavalgoColors.sand,
+                          letterSpacing: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    Text(
+                      title,
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        subtitle!,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Colors.white.withValues(alpha: 0.84),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    child,
+                  ],
                 ),
               ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  subtitle!,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: 0.84),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 24),
-              child,
-              if (actions != null && actions!.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Wrap(
+            ),
+            if (hasActions)
+              Padding(
+                padding: EdgeInsets.all(padding),
+                child: Wrap(
                   spacing: 12,
                   runSpacing: 12,
                   alignment: WrapAlignment.end,
                   children: actions!,
                 ),
-              ],
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );

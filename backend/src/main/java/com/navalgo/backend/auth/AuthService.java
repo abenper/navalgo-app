@@ -86,6 +86,7 @@ public class AuthService {
         authCookieService.extractRefreshToken(request).ifPresent(refreshTokenService::revoke);
     }
 
+    @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
         workerService.changeOwnPassword(email, request.currentPassword(), request.newPassword());
     }

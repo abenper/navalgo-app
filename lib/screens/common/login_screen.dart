@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:navalgo/services/auth_service.dart';
+import 'package:navalgo/services/network/api_exception.dart';
 import 'package:navalgo/theme/navalgo_theme.dart';
 import 'package:navalgo/utils/app_toast.dart';
 import 'package:navalgo/viewmodels/login_view_model.dart';
@@ -71,56 +72,37 @@ class _LoginScreenState extends State<LoginScreen> {
     final TextEditingController confirmPasswordController =
         TextEditingController();
 
+    bool isSaving = false;
+    String? errorMessage;
+
     try {
       final result = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Cambio obligatorio de contraseña'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'Tu cuenta requiere una nueva contraseña antes de continuar.',
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: newPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Nueva contraseña',
-                    prefixIcon: Icon(Icons.lock_outline_rounded),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: confirmPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirmar contraseña',
-                    prefixIcon: Icon(Icons.verified_user_outlined),
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () async {
+        builder: (dialogContext) {
+          return PopScope(
+            canPop: false,
+            child: StatefulBuilder(
+              builder: (context, setState) {
+                Future<void> submit() async {
                   final newPassword = newPasswordController.text.trim();
                   final confirmPassword = confirmPasswordController.text.trim();
+                  final validationMessage = _validateRequiredPasswordChange(
+                    newPassword,
+                    confirmPassword,
+                  );
 
-                  if (newPassword.length < 12) {
-                    AppToast.warning(
-                      context,
-                      'La nueva contraseña debe tener al menos 12 caracteres',
-                    );
+                  if (validationMessage != null) {
+                    setState(() {
+                      errorMessage = validationMessage;
+                    });
                     return;
                   }
-                  if (newPassword != confirmPassword) {
-                    AppToast.warning(context, 'Las contraseñas no coinciden');
-                    return;
-                  }
+
+                  setState(() {
+                    isSaving = true;
+                    errorMessage = null;
+                  });
 
                   try {
                     await context.read<AuthService>().changePassword(
@@ -131,18 +113,82 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (context.mounted) {
                       Navigator.of(context).pop(true);
                     }
-                  } catch (e) {
+                  } catch (error) {
                     if (context.mounted) {
-                      AppToast.error(
-                        context,
-                        'No se pudo cambiar la contraseña: $e',
-                      );
+                      setState(() {
+                        isSaving = false;
+                        errorMessage = _describePasswordChangeError(error);
+                      });
                     }
                   }
-                },
-                child: const Text('Guardar y continuar'),
-              ),
-            ],
+                }
+
+                return AlertDialog(
+                  title: const Text('Cambio obligatorio de contraseña'),
+                  content: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Tu cuenta requiere una nueva contraseña antes de continuar.',
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Usa al menos 12 caracteres con mayúsculas, minúsculas, números y un símbolo.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: newPasswordController,
+                          obscureText: true,
+                          enabled: !isSaving,
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            labelText: 'Nueva contraseña',
+                            prefixIcon: Icon(Icons.lock_outline_rounded),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: confirmPasswordController,
+                          obscureText: true,
+                          enabled: !isSaving,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) => isSaving ? null : submit(),
+                          decoration: const InputDecoration(
+                            labelText: 'Confirmar contraseña',
+                            prefixIcon: Icon(Icons.verified_user_outlined),
+                          ),
+                        ),
+                        if (errorMessage != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            errorMessage!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  actions: [
+                    FilledButton(
+                      onPressed: isSaving ? null : submit,
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Guardar y continuar'),
+                    ),
+                  ],
+                );
+              },
+            ),
           );
         },
       );
@@ -151,6 +197,37 @@ class _LoginScreenState extends State<LoginScreen> {
       newPasswordController.dispose();
       confirmPasswordController.dispose();
     }
+  }
+
+  String? _validateRequiredPasswordChange(
+    String newPassword,
+    String confirmPassword,
+  ) {
+    if (newPassword.length < 12) {
+      return 'La contraseña debe tener al menos 12 caracteres.';
+    }
+    if (!RegExp(r'[A-Z]').hasMatch(newPassword) ||
+        !RegExp(r'[a-z]').hasMatch(newPassword) ||
+        !RegExp(r'[0-9]').hasMatch(newPassword) ||
+        !RegExp(r'[^A-Za-z0-9]').hasMatch(newPassword)) {
+      return 'Debe incluir mayúsculas, minúsculas, números y un símbolo.';
+    }
+    if (newPassword != confirmPassword) {
+      return 'Las contraseñas no coinciden.';
+    }
+    return null;
+  }
+
+  String _describePasswordChangeError(Object error) {
+    if (error is ApiException) {
+      return error.serverMessage ?? 'No se pudo cambiar la contraseña.';
+    }
+
+    final message = error.toString();
+    if (message.startsWith('Exception: ')) {
+      return message.substring('Exception: '.length);
+    }
+    return 'No se pudo cambiar la contraseña.';
   }
 
   void _openShellForRole(String role) {
@@ -433,6 +510,14 @@ class _LoginScreenState extends State<LoginScreen> {
                             currentPassword: _passwordController.text,
                           );
                           if (!context.mounted || !changed) {
+                            return;
+                          }
+
+                          await context.read<SessionViewModel>().updateUser(
+                            currentUser.copyWith(mustChangePassword: false),
+                          );
+
+                          if (!context.mounted) {
                             return;
                           }
                         }
