@@ -25,6 +25,9 @@ public class Vessel {
     @Column(name = "engine_labels", length = 1000)
     private String engineLabels;
 
+    @Column(name = "engine_serial_number")
+    private String engineSerialNumber;
+
     private Double lengthMeters;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -65,6 +68,9 @@ public class Vessel {
                 .filter(label -> !label.isEmpty())
                 .collect(java.util.stream.Collectors.joining("|"));
     }
+
+    public String getEngineSerialNumber() { return engineSerialNumber; }
+    public void setEngineSerialNumber(String engineSerialNumber) { this.engineSerialNumber = engineSerialNumber; }
 
     public Double getLengthMeters() { return lengthMeters; }
     public void setLengthMeters(Double lengthMeters) { this.lengthMeters = lengthMeters; }

@@ -142,6 +142,7 @@ public class FleetController {
         vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
+        vessel.setEngineSerialNumber(inputSanitizer.optionalText(request.engineSerialNumber(), 255));
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
@@ -187,6 +188,7 @@ public class FleetController {
         vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
+        vessel.setEngineSerialNumber(inputSanitizer.optionalText(request.engineSerialNumber(), 255));
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 

@@ -12,6 +12,7 @@ public record CreateVesselRequest(
         @Size(max = 255) String model,
         Integer engineCount,
         List<String> engineLabels,
+        @Size(max = 255) String engineSerialNumber,
         Double lengthMeters,
         @NotNull Long ownerId
 ) {

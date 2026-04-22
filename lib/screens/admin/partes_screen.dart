@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
@@ -611,7 +610,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   late final SignatureController _sigController;
   late final TabController _detailsTabController;
   final GlobalKey _signaturePadKey = GlobalKey();
-  final List<_PickedProof> _proofFiles = <_PickedProof>[];
   final WorkOrderMaterialDraftStore _materialDraftStore =
       WorkOrderMaterialDraftStore();
   late final TextEditingController _observationsCtrl;
@@ -1020,7 +1018,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     return _buildSectionCard(
       title: 'Avance del trabajo',
       subtitle:
-          'Actualiza observaciones, horas imputables y horas de motor antes de cerrar o firmar el parte.',
+          'Actualiza observaciones, horas imputables, horas de motor y fotos de avance antes de cerrar o firmar el parte.',
       action: _canUpdateWorkLog
           ? FilledButton.icon(
               onPressed: _busy ? null : _saveWorkLogChanges,
@@ -1031,8 +1029,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          NavalgoFormFieldBlock(
-            label: 'Observaciones',
+          _WorkLogFieldCard(
+            icon: Icons.notes_outlined,
+            title: 'Descripción del trabajo',
             caption: 'Resume el avance real, incidencias y material pendiente.',
             child: TextField(
               controller: _observationsCtrl,
@@ -1047,8 +1046,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             ),
           ),
           const SizedBox(height: 14),
-          NavalgoFormFieldBlock(
-            label: 'Horas de trabajo',
+          _WorkLogFieldCard(
+            icon: Icons.schedule_outlined,
+            title: 'Horas de trabajo',
             caption:
                 'Tiempo total dedicado por los técnicos a esta intervención. Admite valores decimales.',
             child: TextField(
@@ -1111,6 +1111,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
               ),
             ),
           ],
+          const SizedBox(height: 14),
+          _buildWorkProgressAttachmentsPanel(),
         ],
       ),
     );
@@ -1170,11 +1172,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                   ),
               ],
             ),
-            const SizedBox(height: 16),
-            _buildProofAttachmentsPanel(
-              title: 'Pruebas adjuntas a esta firma',
-              emptyText: 'No hay pruebas adjuntas registradas en este cierre.',
-            ),
           ],
         ),
       );
@@ -1191,11 +1188,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
               'Solo un trabajador o un administrador pueden firmar el parte cuando esté pendiente de cierre.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
-            _buildProofAttachmentsPanel(
-              title: 'Pruebas vinculadas al cierre',
-              emptyText: 'Todavía no hay pruebas adjuntas a este parte.',
-            ),
           ],
         ),
       );
@@ -1204,7 +1196,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     return _buildSectionCard(
       title: 'Firma y cierre',
       subtitle:
-          'Dibuja la firma y añade pruebas opcionales que viajarán junto al cierre del parte.',
+          'Dibuja la firma para cerrar el parte cuando el avance del trabajo ya esté actualizado.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1233,86 +1225,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
               label: const Text('Borrar trazo'),
             ),
           ),
-          if (_attachments.isNotEmpty) ...[
-            const SizedBox(height: 14),
-            _buildProofAttachmentsPanel(
-              title: 'Pruebas ya guardadas',
-              emptyText: 'No hay pruebas guardadas todavía.',
-            ),
-          ],
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: NavalgoColors.foam,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: NavalgoColors.border),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Pruebas adjuntas a esta firma',
-                            style: Theme.of(context).textTheme.titleMedium
-                                ?.copyWith(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Fotos o vídeos opcionales que se enviarán junto con la firma, no como multimedia general del parte.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    OutlinedButton.icon(
-                      onPressed: _busy || _signing ? null : _pickProof,
-                      icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                      label: const Text('Añadir prueba'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (_proofFiles.isEmpty)
-                  Text(
-                    'No has añadido pruebas para esta firma.',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  )
-                else
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: _proofFiles
-                        .map(
-                          (proof) => Chip(
-                            avatar: Icon(
-                              proof.mimeType.startsWith('video/')
-                                  ? Icons.videocam
-                                  : Icons.image,
-                              size: 16,
-                            ),
-                            label: Text(
-                              proof.fileName,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onDeleted: _busy || _signing
-                                ? null
-                                : () =>
-                                      setState(() => _proofFiles.remove(proof)),
-                          ),
-                        )
-                        .toList(),
-                  ),
-              ],
-            ),
-          ),
           const SizedBox(height: 16),
           NavalgoGradientButton(
             label: _signing ? 'Cerrando parte...' : 'Firmar y cerrar parte',
@@ -1325,10 +1237,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     );
   }
 
-  Widget _buildProofAttachmentsPanel({
-    required String title,
-    required String emptyText,
-  }) {
+  Widget _buildWorkProgressAttachmentsPanel() {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(14),
@@ -1340,20 +1249,55 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Aquí solo se muestran las evidencias vinculadas al cierre del parte.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Avances del trabajo',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Las fotos de avance se capturan desde la cámara del móvil y se guardan con ubicación y marca de agua.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              if (_canDeleteMedia && !kIsWeb) ...[
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _busy || _signing
+                      ? null
+                      : _captureWorkProgressPhoto,
+                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                  label: const Text('Hacer foto'),
+                ),
+              ],
+            ],
           ),
           const SizedBox(height: 12),
+          if (kIsWeb)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'Las fotos de avance solo pueden capturarse desde la app móvil para evitar adjuntos externos.',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.storm),
+              ),
+            ),
           if (_attachments.isEmpty)
-            Text(emptyText, style: Theme.of(context).textTheme.bodyMedium)
+            Text(
+              'Todavía no hay avances adjuntos en este parte.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            )
           else
             Column(
               children: _attachments
@@ -1375,12 +1319,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                             color: NavalgoColors.harbor,
                           ),
                         ),
-                        title: Text(item.originalFileName ?? 'Prueba adjunta'),
-                        subtitle: Text(
-                          item.capturedAt == null
-                              ? item.fileUrl
-                              : 'Hora: ${item.capturedAt!.toLocal()}',
-                        ),
+                        title: Text(item.originalFileName ?? 'Avance adjunto'),
+                        subtitle: Text(_formatAttachmentDetails(item)),
                         trailing: Wrap(
                           spacing: 4,
                           children: [
@@ -1416,6 +1356,25 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     if (!opened && mounted) {
       AppToast.error(context, 'No se pudo abrir el archivo.');
     }
+  }
+
+  String _formatAttachmentDetails(WorkOrderAttachmentItem item) {
+    final parts = <String>[];
+    if (item.capturedAt != null) {
+      parts.add('Captura: ${item.capturedAt!.toLocal()}');
+    }
+    if (item.latitude != null && item.longitude != null) {
+      parts.add(
+        'GPS: ${item.latitude!.toStringAsFixed(5)}, ${item.longitude!.toStringAsFixed(5)}',
+      );
+    }
+    if (item.watermarked) {
+      parts.add('Con marca de agua');
+    }
+    if (parts.isEmpty) {
+      return item.fileUrl;
+    }
+    return parts.join(' • ');
   }
 
   Future<void> _saveWorkLogChanges() async {
@@ -1840,39 +1799,112 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     ];
   }
 
-  Future<void> _pickProof() async {
+  Future<void> _captureWorkProgressPhoto() async {
     if (kIsWeb) {
-      final result = await FilePicker.platform.pickFiles(
-        allowMultiple: true,
-        withData: true,
-        type: FileType.custom,
-        allowedExtensions: const ['jpg', 'jpeg', 'png', 'mp4', 'mov'],
+      AppToast.warning(
+        context,
+        'Las fotos de avance solo se pueden capturar desde la app móvil.',
       );
-      if (result == null) return;
-      for (final file in result.files) {
-        if (file.bytes != null && file.bytes!.isNotEmpty) {
-          setState(
-            () => _proofFiles.add(
-              _PickedProof(
-                fileName: file.name,
-                bytes: file.bytes!,
-                mimeType: _guessMimeType(file.name),
-              ),
-            ),
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    final mediaService = context.read<WorkOrderMediaService>();
+    if (token == null) {
+      return;
+    }
+
+    final position = await _getRequiredAttachmentPosition();
+    if (position == null) {
+      return;
+    }
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.camera,
+      preferredCameraDevice: CameraDevice.rear,
+      imageQuality: 92,
+    );
+    if (picked == null) {
+      return;
+    }
+
+    final bytes = await picked.readAsBytes();
+    final mime = picked.mimeType ?? _guessMimeType(picked.name);
+    final capturedAt = DateTime.now().toUtc();
+
+    setState(() => _busy = true);
+    try {
+      final updated = await mediaService.attachToWorkOrder(
+        token,
+        workOrderId: _workOrder.id,
+        fileName: picked.name.isEmpty
+            ? 'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.jpg'
+            : picked.name,
+        bytes: bytes,
+        mimeType: mime,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        capturedAt: capturedAt,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _updateWorkOrder(updated, syncInputs: false);
+      });
+      AppToast.success(context, 'Foto de avance guardada.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo subir la foto de avance: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<Position?> _getRequiredAttachmentPosition() async {
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          AppToast.warning(
+            context,
+            'Activa la ubicación del dispositivo para adjuntar fotos de avance.',
           );
         }
+        return null;
       }
-    } else {
-      final picker = ImagePicker();
-      final picked = await picker.pickMedia();
-      if (picked == null) return;
-      final bytes = await picked.readAsBytes();
-      final mime = picked.mimeType ?? _guessMimeType(picked.name);
-      setState(
-        () => _proofFiles.add(
-          _PickedProof(fileName: picked.name, bytes: bytes, mimeType: mime),
-        ),
-      );
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.unableToDetermine) {
+        if (mounted) {
+          AppToast.warning(
+            context,
+            'La ubicación es obligatoria para guardar fotos de avance con metadatos y marca de agua.',
+          );
+        }
+        return null;
+      }
+
+      return await Geolocator.getCurrentPosition();
+    } catch (_) {
+      if (mounted) {
+        AppToast.warning(
+          context,
+          'No se pudo obtener la ubicación actual para adjuntar la foto.',
+        );
+      }
+      return null;
     }
   }
 
@@ -1925,15 +1957,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         signatureFileName: 'firma_parte_${_workOrder.id}.png',
         signatureBytes: signatureBytes,
         signatureMimeType: 'image/png',
-        proofFiles: _proofFiles
-            .map(
-              (p) => ProofFile(
-                fileName: p.fileName,
-                bytes: p.bytes,
-                mimeType: p.mimeType,
-              ),
-            )
-            .toList(),
         latitude: position?.latitude,
         longitude: position?.longitude,
       );
@@ -2414,6 +2437,69 @@ class _EngineHourInputCard extends StatelessWidget {
               prefixIcon: const Icon(Icons.av_timer_outlined),
             ).copyWith(suffixText: 'h'),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkLogFieldCard extends StatelessWidget {
+  const _WorkLogFieldCard({
+    required this.icon,
+    required this.title,
+    required this.caption,
+    required this.child,
+  });
+
+  final IconData icon;
+  final String title;
+  final String caption;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavalgoPanel(
+      padding: const EdgeInsets.all(14),
+      tint: Colors.white.withValues(alpha: 0.96),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: NavalgoColors.deepSea.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: NavalgoColors.deepSea),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      caption,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: NavalgoColors.storm,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
         ],
       ),
     );
@@ -4148,16 +4234,4 @@ double? _parseLaborHours(String raw) {
     return null;
   }
   return double.tryParse(normalized);
-}
-
-class _PickedProof {
-  const _PickedProof({
-    required this.fileName,
-    required this.bytes,
-    required this.mimeType,
-  });
-
-  final String fileName;
-  final List<int> bytes;
-  final String mimeType;
 }

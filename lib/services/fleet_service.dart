@@ -101,6 +101,7 @@ class FleetService {
     String? model,
     int? engineCount,
     List<String>? engineLabels,
+    String? engineSerialNumber,
     double? lengthMeters,
     required int ownerId,
   }) async {
@@ -113,6 +114,7 @@ class FleetService {
         'model': model,
         'engineCount': engineCount,
         'engineLabels': engineLabels,
+        'engineSerialNumber': engineSerialNumber,
         'lengthMeters': lengthMeters,
         'ownerId': ownerId,
       },
@@ -129,6 +131,7 @@ class FleetService {
     String? model,
     int? engineCount,
     List<String>? engineLabels,
+    String? engineSerialNumber,
     double? lengthMeters,
     required int ownerId,
   }) async {
@@ -141,6 +144,7 @@ class FleetService {
         'model': model,
         'engineCount': engineCount,
         'engineLabels': engineLabels,
+        'engineSerialNumber': engineSerialNumber,
         'lengthMeters': lengthMeters,
         'ownerId': ownerId,
       },

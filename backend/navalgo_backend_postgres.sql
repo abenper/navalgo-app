@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS vessels (
     model VARCHAR(255),
     engine_count INTEGER,
     engine_labels VARCHAR(1000),
+    engine_serial_number VARCHAR(255),
     length_meters DOUBLE PRECISION,
     owner_id BIGINT NOT NULL,
     CONSTRAINT fk_vessels_owner FOREIGN KEY (owner_id) REFERENCES owners(id)
@@ -325,6 +326,9 @@ ALTER TABLE time_entries
 
 ALTER TABLE vessels
     ADD COLUMN IF NOT EXISTS engine_labels VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS engine_serial_number VARCHAR(255);
 
 DO $$
 BEGIN

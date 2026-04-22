@@ -252,6 +252,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
         model: input.model,
         engineCount: input.engineCount,
         engineLabels: input.engineLabels,
+        engineSerialNumber: input.engineSerialNumber,
         lengthMeters: input.lengthMeters,
         ownerId: input.ownerId,
       );
@@ -294,6 +295,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
         model: input.model,
         engineCount: input.engineCount,
         engineLabels: input.engineLabels,
+        engineSerialNumber: input.engineSerialNumber,
         lengthMeters: input.lengthMeters,
         ownerId: input.ownerId,
       );
@@ -1025,6 +1027,7 @@ class _VesselInput {
     this.model,
     this.engineCount,
     required this.engineLabels,
+    this.engineSerialNumber,
     this.lengthMeters,
     required this.ownerId,
   });
@@ -1034,6 +1037,7 @@ class _VesselInput {
   final String? model;
   final int? engineCount;
   final List<String> engineLabels;
+  final String? engineSerialNumber;
   final double? lengthMeters;
   final int ownerId;
 }
@@ -1054,6 +1058,7 @@ class _VesselDialogState extends State<_VesselDialog> {
   late final TextEditingController _regCtrl;
   late final TextEditingController _modelCtrl;
   late final TextEditingController _engineCtrl;
+  late final TextEditingController _engineSerialCtrl;
   late final TextEditingController _lengthCtrl;
   late int _ownerId;
   List<String> _enginePositions = <String>[];
@@ -1067,6 +1072,9 @@ class _VesselDialogState extends State<_VesselDialog> {
     _modelCtrl = TextEditingController(text: initial?.model ?? '');
     _engineCtrl = TextEditingController(
       text: (initial?.engineCount ?? 1).toString(),
+    );
+    _engineSerialCtrl = TextEditingController(
+      text: initial?.engineSerialNumber ?? '',
     );
     _lengthCtrl = TextEditingController(
       text: initial?.lengthMeters?.toString() ?? '',
@@ -1086,6 +1094,7 @@ class _VesselDialogState extends State<_VesselDialog> {
     _regCtrl.dispose();
     _modelCtrl.dispose();
     _engineCtrl.dispose();
+    _engineSerialCtrl.dispose();
     _lengthCtrl.dispose();
     super.dispose();
   }
@@ -1124,6 +1133,9 @@ class _VesselDialogState extends State<_VesselDialog> {
                     : _modelCtrl.text.trim(),
                 engineCount: int.tryParse(_engineCtrl.text.trim()),
                 engineLabels: _buildEngineLabels(_enginePositions),
+                engineSerialNumber: _engineSerialCtrl.text.trim().isEmpty
+                    ? null
+                    : _engineSerialCtrl.text.trim(),
                 lengthMeters: double.tryParse(_lengthCtrl.text.trim()),
                 ownerId: _ownerId,
               ),
@@ -1206,6 +1218,22 @@ class _VesselDialogState extends State<_VesselDialog> {
                 },
                 onChanged: (value) =>
                     _syncEnginePositions(int.tryParse(value) ?? 0),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Número de serie del motor',
+              caption:
+                  'Opcional. Si la embarcación tiene varios motores, puedes separarlos por comas en el mismo campo.',
+              child: TextFormField(
+                controller: _engineSerialCtrl,
+                textInputAction: TextInputAction.next,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Número de serie del motor',
+                  hint: 'Ej. YAM150-00123 o YAM150-00123, YAM150-00124',
+                  prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                ),
               ),
             ),
             if (_enginePositions.isNotEmpty) ...[
@@ -1399,9 +1427,9 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
     setState(() => _loadingHours = true);
     try {
       final hours = await context.read<FleetService>().getVesselLastEngineHours(
-            token,
-            vesselId: widget.vessel.id,
-          );
+        token,
+        vesselId: widget.vessel.id,
+      );
       if (mounted) setState(() => _engineHours = hours);
     } catch (_) {
       if (mounted) setState(() => _engineHours = const []);
@@ -1475,6 +1503,14 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
           ),
           const SizedBox(height: 14),
           NavalgoFormFieldBlock(
+            label: 'Número de serie del motor',
+            child: _VesselDetailValue(
+              icon: Icons.confirmation_number_outlined,
+              value: vessel.engineSerialNumber ?? 'No indicado',
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
             label: 'Posiciones / tipología',
             child: _VesselDetailValue(
               icon: Icons.tune_outlined,
@@ -1490,24 +1526,23 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
                     child: Center(child: CircularProgressIndicator()),
                   )
                 : (_engineHours == null || _engineHours!.isEmpty)
-                    ? _VesselDetailValue(
-                        icon: Icons.hourglass_empty_outlined,
-                        value: 'Sin horas registradas',
-                      )
-                    : Column(
-                        children: _engineHours!
-                            .map(
-                              (e) => Padding(
-                                padding: const EdgeInsets.only(bottom: 8),
-                                child: _VesselDetailValue(
-                                  icon: Icons.speed_outlined,
-                                  value:
-                                      '${e.engineLabel}: ${e.hours} h',
-                                ),
-                              ),
-                            )
-                            .toList(),
-                      ),
+                ? _VesselDetailValue(
+                    icon: Icons.hourglass_empty_outlined,
+                    value: 'Sin horas registradas',
+                  )
+                : Column(
+                    children: _engineHours!
+                        .map(
+                          (e) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _VesselDetailValue(
+                              icon: Icons.speed_outlined,
+                              value: '${e.engineLabel}: ${e.hours} h',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
           ),
         ],
       ),
