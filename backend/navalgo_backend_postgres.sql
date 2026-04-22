@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS vessels (
     model VARCHAR(255),
     engine_count INTEGER,
     engine_labels VARCHAR(1000),
-    engine_serial_number VARCHAR(255),
+    engine_serial_numbers VARCHAR(1000),
     length_meters DOUBLE PRECISION,
     owner_id BIGINT NOT NULL,
     CONSTRAINT fk_vessels_owner FOREIGN KEY (owner_id) REFERENCES owners(id)
@@ -327,8 +327,31 @@ ALTER TABLE time_entries
 ALTER TABLE vessels
     ADD COLUMN IF NOT EXISTS engine_labels VARCHAR(1000);
 
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'vessels'
+          AND column_name = 'engine_serial_number'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM information_schema.columns
+        WHERE table_name = 'vessels'
+          AND column_name = 'engine_serial_numbers'
+    ) THEN
+        ALTER TABLE vessels RENAME COLUMN engine_serial_number TO engine_serial_numbers;
+    END IF;
+END $$;
+
 ALTER TABLE vessels
-    ADD COLUMN IF NOT EXISTS engine_serial_number VARCHAR(255);
+    ADD COLUMN IF NOT EXISTS engine_serial_numbers VARCHAR(1000);
+
+ALTER TABLE vessels
+    ALTER COLUMN engine_serial_numbers TYPE VARCHAR(1000);
+
+ALTER TABLE vessels
+    DROP COLUMN IF EXISTS engine_serial_number;
 
 DO $$
 BEGIN

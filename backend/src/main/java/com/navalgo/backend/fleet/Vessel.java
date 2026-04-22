@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "vessels")
@@ -25,8 +26,8 @@ public class Vessel {
     @Column(name = "engine_labels", length = 1000)
     private String engineLabels;
 
-    @Column(name = "engine_serial_number")
-    private String engineSerialNumber;
+    @Column(name = "engine_serial_numbers", length = 1000)
+    private String engineSerialNumbers;
 
     private Double lengthMeters;
 
@@ -69,8 +70,52 @@ public class Vessel {
                 .collect(java.util.stream.Collectors.joining("|"));
     }
 
-    public String getEngineSerialNumber() { return engineSerialNumber; }
-    public void setEngineSerialNumber(String engineSerialNumber) { this.engineSerialNumber = engineSerialNumber; }
+    public List<String> getEngineSerialNumbers() {
+        if (engineSerialNumbers == null || engineSerialNumbers.isBlank()) {
+            return List.of();
+        }
+
+        String[] rawValues = engineSerialNumbers.contains("|")
+                ? engineSerialNumbers.split("\\|", -1)
+                : engineSerialNumbers.split("\\s*,\\s*", -1);
+
+        int lastNonBlankIndex = rawValues.length - 1;
+        while (lastNonBlankIndex >= 0 && rawValues[lastNonBlankIndex].trim().isEmpty()) {
+            lastNonBlankIndex--;
+        }
+
+        if (lastNonBlankIndex < 0) {
+            return List.of();
+        }
+
+        return Arrays.stream(rawValues, 0, lastNonBlankIndex + 1)
+                .map(value -> value == null ? "" : value.trim())
+                .toList();
+    }
+
+    public void setEngineSerialNumbers(List<String> engineSerialNumbers) {
+        if (engineSerialNumbers == null || engineSerialNumbers.isEmpty()) {
+            this.engineSerialNumbers = null;
+            return;
+        }
+
+        List<String> normalized = engineSerialNumbers.stream()
+                .map(value -> value == null ? "" : value.trim())
+                .toList();
+
+        int lastNonBlankIndex = normalized.size() - 1;
+        while (lastNonBlankIndex >= 0 && normalized.get(lastNonBlankIndex).isEmpty()) {
+            lastNonBlankIndex--;
+        }
+
+        if (lastNonBlankIndex < 0) {
+            this.engineSerialNumbers = null;
+            return;
+        }
+
+        this.engineSerialNumbers = normalized.subList(0, lastNonBlankIndex + 1).stream()
+                .collect(Collectors.joining("|"));
+    }
 
     public Double getLengthMeters() { return lengthMeters; }
     public void setLengthMeters(Double lengthMeters) { this.lengthMeters = lengthMeters; }

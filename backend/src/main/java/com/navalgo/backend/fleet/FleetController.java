@@ -137,12 +137,15 @@ public class FleetController {
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
+        List<String> engineSerialNumbers = normalizeEngineSerialNumbers(
+            request.engineSerialNumbers(),
+            request.engineCount());
         vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
         vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
         vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
-        vessel.setEngineSerialNumber(inputSanitizer.optionalText(request.engineSerialNumber(), 255));
+        vessel.setEngineSerialNumbers(engineSerialNumbers);
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
@@ -185,13 +188,16 @@ public class FleetController {
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
+        List<String> engineSerialNumbers = normalizeEngineSerialNumbers(
+            request.engineSerialNumbers(),
+            request.engineCount());
 
         vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
         vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
         vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
-        vessel.setEngineSerialNumber(inputSanitizer.optionalText(request.engineSerialNumber(), 255));
+        vessel.setEngineSerialNumbers(engineSerialNumbers);
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
@@ -211,6 +217,33 @@ public class FleetController {
 
         if (engineCount != null && engineCount > 0 && normalized.size() != engineCount) {
             throw new IllegalArgumentException("La cantidad de motores no coincide con las posiciones indicadas");
+        }
+
+        return normalized;
+    }
+
+    private List<String> normalizeEngineSerialNumbers(List<String> engineSerialNumbers,
+                                                      Integer engineCount) {
+        if (engineSerialNumbers == null || engineSerialNumbers.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> normalized = engineSerialNumbers.stream()
+                .map(value -> inputSanitizer.optionalText(value, 255))
+                .map(value -> value == null ? "" : value.trim())
+                .toList();
+
+        if (engineCount != null && engineCount > 0) {
+            if (normalized.size() > engineCount) {
+                throw new IllegalArgumentException("La cantidad de motores no coincide con los numeros de serie indicados");
+            }
+            if (normalized.size() < engineCount) {
+                List<String> padded = new ArrayList<>(normalized);
+                while (padded.size() < engineCount) {
+                    padded.add("");
+                }
+                return padded;
+            }
         }
 
         return normalized;

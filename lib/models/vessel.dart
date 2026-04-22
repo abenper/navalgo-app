@@ -26,7 +26,7 @@ class Vessel {
     this.model,
     this.engineCount,
     required this.engineLabels,
-    this.engineSerialNumber,
+    required this.engineSerialNumbers,
     this.lengthMeters,
     required this.ownerId,
     required this.ownerName,
@@ -38,7 +38,7 @@ class Vessel {
   final String? model;
   final int? engineCount;
   final List<String> engineLabels;
-  final String? engineSerialNumber;
+  final List<String> engineSerialNumbers;
   final double? lengthMeters;
   final int ownerId;
   final String ownerName;
@@ -54,7 +54,10 @@ class Vessel {
           (json['engineLabels'] as List<dynamic>? ?? const <dynamic>[])
               .map((item) => item as String)
               .toList(),
-      engineSerialNumber: json['engineSerialNumber'] as String?,
+      engineSerialNumbers:
+          (json['engineSerialNumbers'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => '$item'.trim())
+              .toList(),
       lengthMeters: (json['lengthMeters'] as num?)?.toDouble(),
       ownerId: json['ownerId'] as int,
       ownerName: json['ownerName'] as String,

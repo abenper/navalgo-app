@@ -12,16 +12,16 @@ import '../../widgets/navalgo_ui.dart';
 IconData _engineOptionIcon(String position) {
   switch (position) {
     case 'Motor central':
-      return Icons.adjust_outlined;
+      return Icons.settings_outlined;
     case 'Babor':
       return Icons.keyboard_double_arrow_left_rounded;
     case 'Estribor':
       return Icons.keyboard_double_arrow_right_rounded;
     case 'Auxiliar':
-      return Icons.extension_outlined;
+      return Icons.handyman_outlined;
     case 'Fuera borda':
     default:
-      return Icons.power_outlined;
+      return Icons.precision_manufacturing_outlined;
   }
 }
 
@@ -252,7 +252,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
         model: input.model,
         engineCount: input.engineCount,
         engineLabels: input.engineLabels,
-        engineSerialNumber: input.engineSerialNumber,
+        engineSerialNumbers: input.engineSerialNumbers,
         lengthMeters: input.lengthMeters,
         ownerId: input.ownerId,
       );
@@ -295,7 +295,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
         model: input.model,
         engineCount: input.engineCount,
         engineLabels: input.engineLabels,
-        engineSerialNumber: input.engineSerialNumber,
+        engineSerialNumbers: input.engineSerialNumbers,
         lengthMeters: input.lengthMeters,
         ownerId: input.ownerId,
       );
@@ -1027,7 +1027,7 @@ class _VesselInput {
     this.model,
     this.engineCount,
     required this.engineLabels,
-    this.engineSerialNumber,
+    required this.engineSerialNumbers,
     this.lengthMeters,
     required this.ownerId,
   });
@@ -1037,7 +1037,7 @@ class _VesselInput {
   final String? model;
   final int? engineCount;
   final List<String> engineLabels;
-  final String? engineSerialNumber;
+  final List<String> engineSerialNumbers;
   final double? lengthMeters;
   final int ownerId;
 }
@@ -1058,10 +1058,11 @@ class _VesselDialogState extends State<_VesselDialog> {
   late final TextEditingController _regCtrl;
   late final TextEditingController _modelCtrl;
   late final TextEditingController _engineCtrl;
-  late final TextEditingController _engineSerialCtrl;
   late final TextEditingController _lengthCtrl;
   late int _ownerId;
   List<String> _enginePositions = <String>[];
+  final List<TextEditingController> _engineSerialCtrls =
+      <TextEditingController>[];
 
   @override
   void initState() {
@@ -1073,22 +1074,26 @@ class _VesselDialogState extends State<_VesselDialog> {
     _engineCtrl = TextEditingController(
       text: (initial?.engineCount ?? 1).toString(),
     );
-    _engineSerialCtrl = TextEditingController(
-      text: initial?.engineSerialNumber ?? '',
-    );
     _lengthCtrl = TextEditingController(
       text: initial?.lengthMeters?.toString() ?? '',
     );
     _ownerId = _resolveInitialOwnerId(initial?.ownerId);
 
     final count = int.tryParse(_engineCtrl.text) ?? 1;
-    _syncEnginePositions(count);
-    if (initial != null && initial.engineLabels.isNotEmpty) {
-      _enginePositions = _extractBasePositions(
-        initial.engineLabels,
+    final initialPositions = initial != null && initial.engineLabels.isNotEmpty
+        ? _extractBasePositions(
+            initial.engineLabels,
+            count,
+          ).map(_sanitizeEnginePosition).toList()
+        : null;
+    _syncEngineInputs(
+      count,
+      positions: initialPositions,
+      serialNumbers: _resizeEngineSerialNumbers(
         count,
-      ).map(_sanitizeEnginePosition).toList();
-    }
+        initial?.engineSerialNumbers ?? const <String>[],
+      ),
+    );
   }
 
   @override
@@ -1097,8 +1102,10 @@ class _VesselDialogState extends State<_VesselDialog> {
     _regCtrl.dispose();
     _modelCtrl.dispose();
     _engineCtrl.dispose();
-    _engineSerialCtrl.dispose();
     _lengthCtrl.dispose();
+    for (final controller in _engineSerialCtrls) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -1136,9 +1143,9 @@ class _VesselDialogState extends State<_VesselDialog> {
                     : _modelCtrl.text.trim(),
                 engineCount: int.tryParse(_engineCtrl.text.trim()),
                 engineLabels: _buildEngineLabels(_enginePositions),
-                engineSerialNumber: _engineSerialCtrl.text.trim().isEmpty
-                    ? null
-                    : _engineSerialCtrl.text.trim(),
+                engineSerialNumbers: _engineSerialCtrls
+                    .map((controller) => controller.text.trim())
+                    .toList(),
                 lengthMeters: double.tryParse(_lengthCtrl.text.trim()),
                 ownerId: _ownerId,
               ),
@@ -1220,25 +1227,42 @@ class _VesselDialogState extends State<_VesselDialog> {
                   return null;
                 },
                 onChanged: (value) =>
-                    _syncEnginePositions(int.tryParse(value) ?? 0),
+                    _syncEngineInputs(int.tryParse(value) ?? 0),
               ),
             ),
             const SizedBox(height: 14),
-            NavalgoFormFieldBlock(
-              label: 'Número de serie del motor',
-              caption:
-                  'Opcional. Si la embarcación tiene varios motores, puedes separarlos por comas en el mismo campo.',
-              child: TextFormField(
-                controller: _engineSerialCtrl,
-                textInputAction: TextInputAction.next,
-                decoration: NavalgoFormStyles.inputDecoration(
-                  context,
-                  label: 'Número de serie del motor',
-                  hint: 'Ej. YAM150-00123 o YAM150-00123, YAM150-00124',
-                  prefixIcon: const Icon(Icons.confirmation_number_outlined),
+            if (_engineSerialCtrls.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              NavalgoFormFieldBlock(
+                label: 'Número de serie por motor',
+                caption:
+                    'Cada motor tiene su propio campo para no mezclar números de serie.',
+                child: Column(
+                  children: List<Widget>.generate(_engineSerialCtrls.length, (
+                    index,
+                  ) {
+                    final selectedPosition = index < _enginePositions.length
+                        ? _sanitizeEnginePosition(_enginePositions[index])
+                        : 'Fuera borda';
+                    return Padding(
+                      padding: EdgeInsets.only(
+                        bottom: index == _engineSerialCtrls.length - 1 ? 0 : 12,
+                      ),
+                      child: TextFormField(
+                        controller: _engineSerialCtrls[index],
+                        textInputAction: TextInputAction.next,
+                        decoration: NavalgoFormStyles.inputDecoration(
+                          context,
+                          label: 'Motor ${index + 1} - $selectedPosition',
+                          hint: 'Ej. YAM150-00123',
+                          prefixIcon: Icon(_engineOptionIcon(selectedPosition)),
+                        ),
+                      ),
+                    );
+                  }),
                 ),
               ),
-            ),
+            ],
             if (_enginePositions.isNotEmpty) ...[
               const SizedBox(height: 14),
               NavalgoFormFieldBlock(
@@ -1325,9 +1349,8 @@ class _VesselDialogState extends State<_VesselDialog> {
                       style: Theme.of(context).textTheme.bodyMedium,
                     )
                   : DropdownButtonFormField<int>(
-                      initialValue: widget.owners.any(
-                        (owner) => owner.id == _ownerId,
-                      )
+                      initialValue:
+                          widget.owners.any((owner) => owner.id == _ownerId)
                           ? _ownerId
                           : widget.owners.first.id,
                       dropdownColor: NavalgoColors.shell,
@@ -1361,7 +1384,8 @@ class _VesselDialogState extends State<_VesselDialog> {
                             ),
                           )
                           .toList(),
-                      onChanged: (v) => setState(() => _ownerId = v ?? _ownerId),
+                      onChanged: (v) =>
+                          setState(() => _ownerId = v ?? _ownerId),
                     ),
             ),
           ],
@@ -1389,26 +1413,64 @@ class _VesselDialogState extends State<_VesselDialog> {
     return 'Fuera borda';
   }
 
-  void _syncEnginePositions(int count) {
+  void _syncEngineInputs(
+    int count, {
+    List<String>? positions,
+    List<String>? serialNumbers,
+  }) {
     final safeCount = count < 0 ? 0 : count;
     setState(() {
-      if (safeCount == 0) {
-        _enginePositions = <String>[];
-        return;
+      _enginePositions = _resizeEnginePositions(
+        safeCount,
+        positions ?? _enginePositions,
+      );
+
+      final normalizedSerials = _resizeEngineSerialNumbers(
+        safeCount,
+        serialNumbers ?? _engineSerialCtrls.map((ctrl) => ctrl.text).toList(),
+      );
+
+      while (_engineSerialCtrls.length > safeCount) {
+        _engineSerialCtrls.removeLast().dispose();
       }
 
-      if (_enginePositions.length < safeCount) {
-        _enginePositions = <String>[
-          ..._enginePositions,
-          ...List<String>.filled(
-            safeCount - _enginePositions.length,
-            'Fuera borda',
-          ),
-        ];
-      } else {
-        _enginePositions = _enginePositions.take(safeCount).toList();
+      while (_engineSerialCtrls.length < safeCount) {
+        _engineSerialCtrls.add(TextEditingController());
+      }
+
+      for (var index = 0; index < safeCount; index++) {
+        if (_engineSerialCtrls[index].text != normalizedSerials[index]) {
+          _engineSerialCtrls[index].text = normalizedSerials[index];
+        }
       }
     });
+  }
+
+  List<String> _resizeEnginePositions(int count, List<String> positions) {
+    final normalized = positions.map(_sanitizeEnginePosition).toList();
+    if (normalized.length >= count) {
+      return normalized.take(count).toList();
+    }
+
+    return <String>[
+      ...normalized,
+      ...List<String>.filled(count - normalized.length, 'Fuera borda'),
+    ];
+  }
+
+  List<String> _resizeEngineSerialNumbers(
+    int count,
+    List<String> serialNumbers,
+  ) {
+    final normalized = serialNumbers.map((item) => item.trim()).toList();
+    if (normalized.length >= count) {
+      return normalized.take(count).toList();
+    }
+
+    return <String>[
+      ...normalized,
+      ...List<String>.filled(count - normalized.length, ''),
+    ];
   }
 
   List<String> _buildEngineLabels(List<String> positions) {
@@ -1545,10 +1607,10 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
           ),
           const SizedBox(height: 14),
           NavalgoFormFieldBlock(
-            label: 'Número de serie del motor',
+            label: 'Números de serie de motor',
             child: _VesselDetailValue(
               icon: Icons.confirmation_number_outlined,
-              value: vessel.engineSerialNumber ?? 'No indicado',
+              value: _buildEngineSerialSummary(vessel),
             ),
           ),
           const SizedBox(height: 14),
@@ -1626,4 +1688,28 @@ class _VesselDetailValue extends StatelessWidget {
       ),
     );
   }
+}
+
+String _buildEngineSerialSummary(Vessel vessel) {
+  final totalEngines = <int>[
+    vessel.engineCount ?? 0,
+    vessel.engineLabels.length,
+    vessel.engineSerialNumbers.length,
+  ].reduce((current, next) => current > next ? current : next);
+
+  if (totalEngines == 0) {
+    return 'No indicado';
+  }
+
+  final lines = List<String>.generate(totalEngines, (index) {
+    final label = index < vessel.engineLabels.length
+        ? vessel.engineLabels[index]
+        : 'Motor ${index + 1}';
+    final serial = index < vessel.engineSerialNumbers.length
+        ? vessel.engineSerialNumbers[index].trim()
+        : '';
+    return '$label: ${serial.isEmpty ? 'No indicado' : serial}';
+  });
+
+  return lines.join('\n');
 }

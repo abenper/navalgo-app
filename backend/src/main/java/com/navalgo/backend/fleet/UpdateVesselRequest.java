@@ -12,7 +12,7 @@ public record UpdateVesselRequest(
         @Size(max = 255) String model,
         Integer engineCount,
         List<String> engineLabels,
-        @Size(max = 255) String engineSerialNumber,
+        List<@Size(max = 255) String> engineSerialNumbers,
         Double lengthMeters,
         @NotNull Long ownerId
 ) {
