@@ -693,8 +693,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         _workOrderRefreshInFlight ||
         _busy ||
         _materialBusy ||
-        _signing ||
-        _hasMaterialDraft) {
+        _signing) {
+      return;
+    }
+
+    if (_hasMaterialDraft) {
+      await _syncPendingMaterialChecklistItems(showErrorToast: false);
       return;
     }
 
@@ -875,16 +879,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         _buildSectionCard(
           title: 'Revisión de material',
           subtitle:
-              'Marca el material mientras preparas la caja. Si te quedas sin cobertura, el progreso se conserva localmente.',
-          action: _canReviewMaterial
-              ? FilledButton.icon(
-                  onPressed: _materialBusy
-                      ? null
-                      : _saveMaterialChecklistProgress,
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text('Sincronizar ahora'),
-                )
-              : null,
+              'Marca el material mientras preparas la caja. Cada cambio se intenta guardar al momento y, si no hay cobertura, se reintenta automáticamente.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -925,7 +920,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     ),
                   ),
                   child: Text(
-                    'Hay cambios guardados localmente para este checklist. Pulsa “Sincronizar ahora” para enviarlos a la base de datos.',
+                    'Hay cambios pendientes guardados localmente para este checklist. Se volverán a intentar automáticamente cuando haya conexión.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: NavalgoColors.deepSea,
                     ),
@@ -1482,44 +1477,43 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     }
   }
 
-  Future<void> _saveMaterialChecklistProgress() async {
-    final checklist = _workOrder.materialChecklist;
-    final token = context.read<SessionViewModel>().token;
-    if (checklist == null || token == null) {
-      return;
-    }
-
-    await _syncMaterialChecklistItems(
-      checklist.items
-          .map(
-            (item) => <String, dynamic>{
-              'itemId': item.id,
-              'checked': _materialChecks[item.id] ?? item.checked,
-            },
-          )
-          .toList(),
-      showSuccessToast: true,
-    );
-  }
-
   Future<void> _toggleMaterialChecklistItem(
     WorkOrderMaterialChecklistItem item,
     bool value,
   ) async {
     setState(() {
       _materialChecks[item.id] = value;
-      _hasMaterialDraft = true;
+      _hasMaterialDraft = _buildPendingMaterialChecklistPayload().isNotEmpty;
     });
     await _persistMaterialChecklistDraft();
 
-    await _syncMaterialChecklistItems(<Map<String, dynamic>>[
-      <String, dynamic>{'itemId': item.id, 'checked': value},
-    ]);
+    await _syncPendingMaterialChecklistItems();
+  }
+
+  Future<void> _syncPendingMaterialChecklistItems({
+    bool showSuccessToast = false,
+    bool showErrorToast = true,
+  }) async {
+    final items = _buildPendingMaterialChecklistPayload();
+    if (items.isEmpty) {
+      await _materialDraftStore.clear(_workOrder.id);
+      if (mounted && _hasMaterialDraft) {
+        setState(() => _hasMaterialDraft = false);
+      }
+      return;
+    }
+
+    await _syncMaterialChecklistItems(
+      items,
+      showSuccessToast: showSuccessToast,
+      showErrorToast: showErrorToast,
+    );
   }
 
   Future<void> _syncMaterialChecklistItems(
     List<Map<String, dynamic>> items, {
     bool showSuccessToast = false,
+    bool showErrorToast = true,
   }) async {
     final token = context.read<SessionViewModel>().token;
     if (token == null || items.isEmpty) {
@@ -1547,10 +1541,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       if (!mounted) {
         return;
       }
-      AppToast.warning(
-        context,
-        'No se pudo sincronizar ahora. El cambio queda guardado localmente y se puede reintentar.',
-      );
+      if (showErrorToast) {
+        AppToast.warning(
+          context,
+          'No se pudo guardar ahora. El cambio queda localmente y se reintentará automáticamente.',
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _materialBusy = false);
@@ -1809,13 +1805,39 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }
 
   Future<void> _persistMaterialChecklistDraft() async {
+    final pendingItems = {
+      for (final item
+          in _workOrder.materialChecklist?.items ??
+              const <WorkOrderMaterialChecklistItem>[])
+        if ((_materialChecks[item.id] ?? item.checked) != item.checked)
+          item.id: _materialChecks[item.id] ?? item.checked,
+    };
+
+    if (pendingItems.isEmpty) {
+      await _materialDraftStore.clear(_workOrder.id);
+      return;
+    }
+
     await _materialDraftStore.save(
       WorkOrderMaterialDraft(
         workOrderId: _workOrder.id,
-        items: _materialChecks,
+        items: pendingItems,
         updatedAt: DateTime.now().toUtc(),
       ),
     );
+  }
+
+  List<Map<String, dynamic>> _buildPendingMaterialChecklistPayload() {
+    return [
+      for (final item
+          in _workOrder.materialChecklist?.items ??
+              const <WorkOrderMaterialChecklistItem>[])
+        if ((_materialChecks[item.id] ?? item.checked) != item.checked)
+          <String, dynamic>{
+            'itemId': item.id,
+            'checked': _materialChecks[item.id] ?? item.checked,
+          },
+    ];
   }
 
   Future<void> _pickProof() async {
