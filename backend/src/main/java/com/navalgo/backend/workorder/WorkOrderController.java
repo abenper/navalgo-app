@@ -47,6 +47,13 @@ public class WorkOrderController {
         return ResponseEntity.ok(service.findByWorker(currentWorkerId));
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkOrderDto> getById(@PathVariable Long id,
+                                                Authentication authentication) {
+        return ResponseEntity.ok(service.findById(id, authentication.getName()));
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WorkOrderDto> create(@RequestBody @Valid CreateWorkOrderRequest request) {

@@ -63,6 +63,18 @@ public class WorkOrderService {
                 .toList();
     }
 
+    public WorkOrderDto findById(Long id, String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
+            throw new AccessDeniedException("Solo puedes ver tus propios partes");
+        }
+
+        return toDto(workOrder);
+    }
+
     public WorkOrderMediaContext getWorkOrderMediaContext(Long workOrderId, String currentUserEmail) {
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));

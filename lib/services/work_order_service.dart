@@ -8,6 +8,18 @@ class WorkOrderService {
 
   final ApiClient _apiClient;
 
+  Future<WorkOrder> getWorkOrder(
+    String token, {
+    required int workOrderId,
+  }) async {
+    final data = await _apiClient.get(
+      '/work-orders/$workOrderId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    return WorkOrder.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<List<WorkOrder>> getWorkOrders(String token, {int? workerId}) async {
     final data = await _apiClient.get(
       '/work-orders',

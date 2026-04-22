@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -617,6 +619,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   final Map<String, TextEditingController> _engineHoursControllers =
       <String, TextEditingController>{};
   Map<int, bool> _materialChecks = <int, bool>{};
+  Timer? _workOrderRefreshTimer;
+  bool _workOrderRefreshInFlight = false;
 
   @override
   void initState() {
@@ -629,15 +633,18 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       exportBackgroundColor: Colors.white,
     );
     _detailsTabController = TabController(length: 2, vsync: this);
+    _detailsTabController.addListener(_handleDetailsTabChanged);
     _observationsCtrl = TextEditingController();
     _laborHoursCtrl = TextEditingController();
     _syncWorkInputsFromWorkOrder();
     _syncMaterialChecklistInputsFromWorkOrder();
+    _startWorkOrderRealtimeSync();
     Future<void>.microtask(_restoreMaterialChecklistDraft);
   }
 
   @override
   void dispose() {
+    _workOrderRefreshTimer?.cancel();
     _sigController.dispose();
     _detailsTabController.dispose();
     _observationsCtrl.dispose();
@@ -664,6 +671,55 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       return true;
     }
     return !_isSigned;
+  }
+
+  void _handleDetailsTabChanged() {
+    if (_detailsTabController.indexIsChanging ||
+        _detailsTabController.index != 1) {
+      return;
+    }
+    _refreshWorkOrderRealtime();
+  }
+
+  void _startWorkOrderRealtimeSync() {
+    _workOrderRefreshTimer?.cancel();
+    _workOrderRefreshTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      _refreshWorkOrderRealtime();
+    });
+  }
+
+  Future<void> _refreshWorkOrderRealtime() async {
+    if (!mounted ||
+        _workOrderRefreshInFlight ||
+        _busy ||
+        _materialBusy ||
+        _signing ||
+        _hasMaterialDraft) {
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    _workOrderRefreshInFlight = true;
+    try {
+      final refreshed = await context.read<WorkOrderService>().getWorkOrder(
+        token,
+        workOrderId: _workOrder.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _updateWorkOrder(refreshed, syncInputs: false);
+      });
+    } catch (_) {
+      // Keep the sheet usable when the periodic refresh fails transiently.
+    } finally {
+      _workOrderRefreshInFlight = false;
+    }
   }
 
   @override
@@ -826,7 +882,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                       ? null
                       : _saveMaterialChecklistProgress,
                   icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text('Guardar progreso'),
+                  label: const Text('Sincronizar ahora'),
                 )
               : null,
           child: Column(
@@ -869,7 +925,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     ),
                   ),
                   child: Text(
-                    'Hay cambios guardados localmente para este checklist. Pulsa “Guardar progreso” para sincronizarlos.',
+                    'Hay cambios guardados localmente para este checklist. Pulsa “Sincronizar ahora” para enviarlos a la base de datos.',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: NavalgoColors.deepSea,
                     ),
@@ -893,13 +949,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     pendingRequests: pendingForItem,
                     busy: _materialBusy,
                     onChanged: _canReviewMaterial
-                        ? (value) async {
-                            setState(() {
-                              _materialChecks[item.id] = value;
-                              _hasMaterialDraft = true;
-                            });
-                            await _persistMaterialChecklistDraft();
-                          }
+                        ? (value) => _toggleMaterialChecklistItem(item, value)
                         : null,
                     onRequestRevision: _canReviewMaterial
                         ? () => _createMaterialRevisionRequest(item)
@@ -1439,31 +1489,59 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       return;
     }
 
+    await _syncMaterialChecklistItems(
+      checklist.items
+          .map(
+            (item) => <String, dynamic>{
+              'itemId': item.id,
+              'checked': _materialChecks[item.id] ?? item.checked,
+            },
+          )
+          .toList(),
+      showSuccessToast: true,
+    );
+  }
+
+  Future<void> _toggleMaterialChecklistItem(
+    WorkOrderMaterialChecklistItem item,
+    bool value,
+  ) async {
+    setState(() {
+      _materialChecks[item.id] = value;
+      _hasMaterialDraft = true;
+    });
+    await _persistMaterialChecklistDraft();
+
+    await _syncMaterialChecklistItems(<Map<String, dynamic>>[
+      <String, dynamic>{'itemId': item.id, 'checked': value},
+    ]);
+  }
+
+  Future<void> _syncMaterialChecklistItems(
+    List<Map<String, dynamic>> items, {
+    bool showSuccessToast = false,
+  }) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null || items.isEmpty) {
+      return;
+    }
+
     setState(() => _materialBusy = true);
     try {
       final updated = await context
           .read<WorkOrderMaterialService>()
-          .updateChecklist(
-            token,
-            workOrderId: _workOrder.id,
-            items: checklist.items
-                .map(
-                  (item) => <String, dynamic>{
-                    'itemId': item.id,
-                    'checked': _materialChecks[item.id] ?? item.checked,
-                  },
-                )
-                .toList(),
-          );
+          .updateChecklist(token, workOrderId: _workOrder.id, items: items);
       await _materialDraftStore.clear(_workOrder.id);
       if (!mounted) {
         return;
       }
       setState(() {
         _hasMaterialDraft = false;
-        _updateWorkOrder(updated, syncInputs: true);
+        _updateWorkOrder(updated, syncInputs: false);
       });
-      AppToast.success(context, 'Checklist de material sincronizado.');
+      if (showSuccessToast) {
+        AppToast.success(context, 'Checklist de material sincronizado.');
+      }
     } catch (_) {
       await _persistMaterialChecklistDraft();
       if (!mounted) {
@@ -1471,7 +1549,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       }
       AppToast.warning(
         context,
-        'No se pudo sincronizar ahora. El progreso queda guardado localmente.',
+        'No se pudo sincronizar ahora. El cambio queda guardado localmente y se puede reintentar.',
       );
     } finally {
       if (mounted) {
