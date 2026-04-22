@@ -148,8 +148,16 @@ Además, el backend devuelve una cookie `HttpOnly` con el refresh token.
 - `POST /api/work-orders`
 - `PUT /api/work-orders/{id}`
 - `PATCH /api/work-orders/{id}/status`
+- `PATCH /api/work-orders/{id}/material-checklist`
+- `POST /api/work-orders/{id}/material-revision-requests`
+- `PATCH /api/work-orders/{id}/material-revision-requests/{requestId}`
 - `POST /api/work-orders/{id}/sign`
 - `DELETE /api/work-orders/{workOrderId}/attachments/{attachmentId}`
+
+### Plantillas de revisión de material
+- `GET /api/material-checklist-templates`
+- `POST /api/material-checklist-templates`
+- `PUT /api/material-checklist-templates/{id}`
 
 ### Fichajes
 - `POST /api/time-entries/clock-in`

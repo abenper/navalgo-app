@@ -11,6 +11,9 @@ import '../../models/owner.dart';
 import '../../models/vessel.dart';
 import '../../models/worker_profile.dart';
 import '../../models/work_order.dart';
+import '../../services/material_checklist_template_service.dart';
+import '../../services/work_order_material_draft_store.dart';
+import '../../services/work_order_material_service.dart';
 import '../../services/work_order_media_service.dart';
 import '../../utils/app_toast.dart';
 import '../../utils/media_url.dart';
@@ -101,6 +104,8 @@ class _PartesScreenState extends State<PartesScreen> {
         ownerId: input.ownerId,
         vesselId: input.vesselId,
         workerIds: input.workerIds,
+        laborHours: input.laborHours,
+        materialTemplateId: input.materialTemplateId,
         engineHours: input.engineHours
             .map(
               (item) => <String, dynamic>{
@@ -593,17 +598,25 @@ class _WorkOrderDetailsSheet extends StatefulWidget {
   State<_WorkOrderDetailsSheet> createState() => _WorkOrderDetailsSheetState();
 }
 
-class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
+class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
+    with SingleTickerProviderStateMixin {
   late WorkOrder _workOrder;
   late List<WorkOrderAttachmentItem> _attachments;
   bool _busy = false;
+  bool _materialBusy = false;
   bool _signing = false;
+  bool _hasMaterialDraft = false;
   late final SignatureController _sigController;
+  late final TabController _detailsTabController;
   final GlobalKey _signaturePadKey = GlobalKey();
   final List<_PickedProof> _proofFiles = <_PickedProof>[];
+  final WorkOrderMaterialDraftStore _materialDraftStore =
+      WorkOrderMaterialDraftStore();
   late final TextEditingController _observationsCtrl;
+  late final TextEditingController _laborHoursCtrl;
   final Map<String, TextEditingController> _engineHoursControllers =
       <String, TextEditingController>{};
+  Map<int, bool> _materialChecks = <int, bool>{};
 
   @override
   void initState() {
@@ -615,16 +628,20 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       penColor: Colors.black,
       exportBackgroundColor: Colors.white,
     );
-    _observationsCtrl = TextEditingController(
-      text: _workOrder.description ?? '',
-    );
+    _detailsTabController = TabController(length: 2, vsync: this);
+    _observationsCtrl = TextEditingController();
+    _laborHoursCtrl = TextEditingController();
     _syncWorkInputsFromWorkOrder();
+    _syncMaterialChecklistInputsFromWorkOrder();
+    Future<void>.microtask(_restoreMaterialChecklistDraft);
   }
 
   @override
   void dispose() {
     _sigController.dispose();
+    _detailsTabController.dispose();
     _observationsCtrl.dispose();
+    _laborHoursCtrl.dispose();
     for (final controller in _engineHoursControllers.values) {
       controller.dispose();
     }
@@ -637,6 +654,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       context.read<SessionViewModel>().user?.canEditWorkOrders ?? false;
   bool get _canEditPart => _isAdmin || (_isWorker && _hasEditPermission);
   bool get _canUpdateWorkLog => _isAdmin || _isWorker;
+  bool get _canReviewMaterial => _isAdmin || _isWorker;
   bool get _isSigned =>
       _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
   bool get _canSign => (_isWorker || _isAdmin) && !_isSigned;
@@ -675,32 +693,25 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                 if (_isHighPriority(_workOrder.priority))
                   const Chip(label: Text('Prioridad alta')),
                 if (_isSigned) const Chip(label: Text('Firmado')),
+                if (_workOrder.materialChecklist != null)
+                  const Chip(label: Text('Revisión de material activa')),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 12),
+            TabBar(
+              controller: _detailsTabController,
+              labelColor: NavalgoColors.deepSea,
+              indicatorColor: NavalgoColors.harbor,
+              tabs: const [
+                Tab(text: 'Trabajo'),
+                Tab(text: 'Revisión de material'),
+              ],
+            ),
+            const SizedBox(height: 10),
             Expanded(
-              child: ListView(
-                children: [
-                  _DetailRow(label: 'Propietario', value: _workOrder.ownerName),
-                  _DetailRow(
-                    label: 'Embarcación',
-                    value: _workOrder.vesselName ?? 'Sin embarcación',
-                  ),
-                  _DetailRow(
-                    label: 'Asignados',
-                    value: _workOrder.workerNames.isEmpty
-                        ? 'Sin asignar'
-                        : _workOrder.workerNames.join(', '),
-                  ),
-                  _DetailRow(
-                    label: 'Creado',
-                    value: _workOrder.createdAt.toLocal().toString(),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildWorkLogSection(),
-                  const SizedBox(height: 14),
-                  _buildSignatureSection(),
-                ],
+              child: TabBarView(
+                controller: _detailsTabController,
+                children: [_buildWorkOverviewTab(), _buildMaterialReviewTab()],
               ),
             ),
             const SizedBox(height: 8),
@@ -739,6 +750,205 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     );
   }
 
+  Widget _buildWorkOverviewTab() {
+    return ListView(
+      children: [
+        _DetailRow(label: 'Propietario', value: _workOrder.ownerName),
+        _DetailRow(
+          label: 'Embarcación',
+          value: _workOrder.vesselName ?? 'Sin embarcación',
+        ),
+        _DetailRow(
+          label: 'Asignados',
+          value: _workOrder.workerNames.isEmpty
+              ? 'Sin asignar'
+              : _workOrder.workerNames.join(', '),
+        ),
+        _DetailRow(
+          label: 'Creado',
+          value: _workOrder.createdAt.toLocal().toString(),
+        ),
+        _DetailRow(
+          label: 'Horas de trabajo',
+          value: _formatLaborHoursLabel(_workOrder.laborHours),
+        ),
+        const SizedBox(height: 16),
+        _buildWorkLogSection(),
+        const SizedBox(height: 14),
+        _buildSignatureSection(),
+      ],
+    );
+  }
+
+  Widget _buildMaterialReviewTab() {
+    final checklist = _workOrder.materialChecklist;
+    if (checklist == null) {
+      return ListView(
+        children: [
+          _buildSectionCard(
+            title: 'Revisión de material',
+            subtitle:
+                'Asigna una plantilla de material al parte para que el trabajador pueda revisar la caja antes de salir al puerto.',
+            action: _isAdmin
+                ? FilledButton.icon(
+                    onPressed: _busy ? null : _openEditDialog,
+                    icon: const Icon(Icons.playlist_add_check_circle_outlined),
+                    label: const Text('Asignar plantilla'),
+                  )
+                : null,
+            child: Text(
+              _isAdmin
+                  ? 'Este parte todavía no tiene plantilla de material. Puedes adjuntarla desde la edición del parte.'
+                  : 'Todavía no hay una plantilla de material asignada a este parte.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      );
+    }
+
+    final checkedCount = checklist.items
+        .where((item) => _materialChecks[item.id] ?? item.checked)
+        .length;
+    final pendingRequests = _workOrder.materialRevisionRequests
+        .where((item) => item.isPending)
+        .length;
+
+    return ListView(
+      children: [
+        _buildSectionCard(
+          title: 'Revisión de material',
+          subtitle:
+              'Marca el material mientras preparas la caja. Si te quedas sin cobertura, el progreso se conserva localmente.',
+          action: _canReviewMaterial
+              ? FilledButton.icon(
+                  onPressed: _materialBusy
+                      ? null
+                      : _saveMaterialChecklistProgress,
+                  icon: const Icon(Icons.cloud_upload_outlined),
+                  label: const Text('Guardar progreso'),
+                )
+              : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              NavalgoPanel(
+                tint: NavalgoColors.foam,
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _CompactMetricPill(
+                      label: 'Plantilla',
+                      value: checklist.sourceTemplateName,
+                      color: NavalgoColors.harbor,
+                    ),
+                    _CompactMetricPill(
+                      label: 'Completados',
+                      value: '$checkedCount/${checklist.items.length}',
+                      color: NavalgoColors.kelp,
+                    ),
+                    _CompactMetricPill(
+                      label: 'Incidencias',
+                      value: '$pendingRequests pendientes',
+                      color: NavalgoColors.coral,
+                    ),
+                  ],
+                ),
+              ),
+              if (_hasMaterialDraft) ...[
+                const SizedBox(height: 14),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: NavalgoColors.sand.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: NavalgoColors.sand.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  child: Text(
+                    'Hay cambios guardados localmente para este checklist. Pulsa “Guardar progreso” para sincronizarlos.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: NavalgoColors.deepSea,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              ...checklist.items.map((item) {
+                final pendingForItem = _workOrder.materialRevisionRequests
+                    .where(
+                      (request) =>
+                          request.checklistItemSnapshotId == item.id &&
+                          request.isPending,
+                    )
+                    .length;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _MaterialChecklistItemCard(
+                    item: item,
+                    checked: _materialChecks[item.id] ?? item.checked,
+                    pendingRequests: pendingForItem,
+                    busy: _materialBusy,
+                    onChanged: _canReviewMaterial
+                        ? (value) async {
+                            setState(() {
+                              _materialChecks[item.id] = value;
+                              _hasMaterialDraft = true;
+                            });
+                            await _persistMaterialChecklistDraft();
+                          }
+                        : null,
+                    onRequestRevision: _canReviewMaterial
+                        ? () => _createMaterialRevisionRequest(item)
+                        : null,
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildSectionCard(
+          title: 'Solicitudes de revisión',
+          subtitle:
+              'Trazabilidad de cambios y errores detectados por los técnicos en esta plantilla.',
+          child: _workOrder.materialRevisionRequests.isEmpty
+              ? Text(
+                  'Todavía no hay solicitudes de revisión para este parte.',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                )
+              : Column(
+                  children: _workOrder.materialRevisionRequests.map((request) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _MaterialRevisionRequestCard(
+                        request: request,
+                        busy: _materialBusy,
+                        canModerate: _isAdmin && request.isPending,
+                        onApprove: _isAdmin && request.isPending
+                            ? () => _updateMaterialRevisionStatus(
+                                request,
+                                'APPROVED',
+                              )
+                            : null,
+                        onReject: _isAdmin && request.isPending
+                            ? () => _updateMaterialRevisionStatus(
+                                request,
+                                'REJECTED',
+                              )
+                            : null,
+                      ),
+                    );
+                  }).toList(),
+                ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSectionCard({
     required String title,
     required String subtitle,
@@ -765,7 +975,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     return _buildSectionCard(
       title: 'Avance del trabajo',
       subtitle:
-          'Actualiza observaciones y horas de motor antes de cerrar o firmar el parte.',
+          'Actualiza observaciones, horas imputables y horas de motor antes de cerrar o firmar el parte.',
       action: _canUpdateWorkLog
           ? FilledButton.icon(
               onPressed: _busy ? null : _saveWorkLogChanges,
@@ -793,6 +1003,25 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
           ),
           const SizedBox(height: 14),
           NavalgoFormFieldBlock(
+            label: 'Horas de trabajo',
+            caption:
+                'Tiempo total dedicado por los técnicos a esta intervención. Admite valores decimales.',
+            child: TextField(
+              controller: _laborHoursCtrl,
+              readOnly: !_canUpdateWorkLog || _busy,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: NavalgoFormStyles.inputDecoration(
+                context,
+                label: 'Horas de trabajo',
+                hint: 'Ej. 3.5',
+                prefixIcon: const Icon(Icons.schedule_outlined),
+              ).copyWith(suffixText: 'h'),
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
             label: 'Horas de motor',
             caption:
                 'Cada bloque identifica el motor al que se le imputan las horas: babor, estribor, auxiliar, central u otro.',
@@ -814,6 +1043,13 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
                     }).toList(),
                   ),
           ),
+          if (_workOrder.laborHours != null) ...[
+            const SizedBox(height: 8),
+            _DetailRow(
+              label: 'Últimas horas guardadas',
+              value: _formatLaborHoursLabel(_workOrder.laborHours),
+            ),
+          ],
           if (_workOrder.engineHours.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -1143,6 +1379,15 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
       return;
     }
 
+    final laborHours = _parseLaborHours(_laborHoursCtrl.text);
+    if (_laborHoursCtrl.text.trim().isNotEmpty && laborHours == null) {
+      AppToast.warning(
+        context,
+        'Las horas de trabajo deben ser un numero valido, por ejemplo 4 o 4.5.',
+      );
+      return;
+    }
+
     final engineHours = <Map<String, dynamic>>[];
     for (final entry in _engineHoursControllers.entries) {
       final parsed = int.tryParse(entry.value.text.trim());
@@ -1165,6 +1410,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         token,
         workOrderId: _workOrder.id,
         description: _observationsCtrl.text.trim(),
+        laborHours: laborHours,
         engineHours: engineHoursPayload,
       );
       if (!mounted) {
@@ -1184,6 +1430,314 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         setState(() => _busy = false);
       }
     }
+  }
+
+  Future<void> _saveMaterialChecklistProgress() async {
+    final checklist = _workOrder.materialChecklist;
+    final token = context.read<SessionViewModel>().token;
+    if (checklist == null || token == null) {
+      return;
+    }
+
+    setState(() => _materialBusy = true);
+    try {
+      final updated = await context
+          .read<WorkOrderMaterialService>()
+          .updateChecklist(
+            token,
+            workOrderId: _workOrder.id,
+            items: checklist.items
+                .map(
+                  (item) => <String, dynamic>{
+                    'itemId': item.id,
+                    'checked': _materialChecks[item.id] ?? item.checked,
+                  },
+                )
+                .toList(),
+          );
+      await _materialDraftStore.clear(_workOrder.id);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _hasMaterialDraft = false;
+        _updateWorkOrder(updated, syncInputs: true);
+      });
+      AppToast.success(context, 'Checklist de material sincronizado.');
+    } catch (_) {
+      await _persistMaterialChecklistDraft();
+      if (!mounted) {
+        return;
+      }
+      AppToast.warning(
+        context,
+        'No se pudo sincronizar ahora. El progreso queda guardado localmente.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _materialBusy = false);
+      }
+    }
+  }
+
+  Future<void> _createMaterialRevisionRequest(
+    WorkOrderMaterialChecklistItem item,
+  ) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final observationsController = TextEditingController();
+    String? errorText;
+    final observations = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return NavalgoFormDialog(
+              eyebrow: 'MATERIAL',
+              title: 'Solicitud de revisión',
+              subtitle:
+                  'Explica al admin qué artículo o referencia no encaja con la embarcación o la reparación.',
+              maxWidth: 640,
+              actions: [
+                NavalgoGhostButton(
+                  label: 'Cancelar',
+                  onPressed: () => Navigator.pop(dialogContext),
+                ),
+                NavalgoGradientButton(
+                  label: 'Enviar solicitud',
+                  icon: Icons.send_outlined,
+                  onPressed: () {
+                    final trimmed = observationsController.text.trim();
+                    if (trimmed.isEmpty) {
+                      setDialogState(() {
+                        errorText = 'Las observaciones son obligatorias.';
+                      });
+                      return;
+                    }
+                    Navigator.pop(dialogContext, trimmed);
+                  },
+                ),
+              ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  NavalgoPanel(
+                    tint: Colors.white.withValues(alpha: 0.96),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _DetailRow(label: 'Artículo', value: item.articleName),
+                        _DetailRow(label: 'Referencia', value: item.reference),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  NavalgoFormFieldBlock(
+                    label: 'Observaciones',
+                    caption:
+                        'Describe el error, el cambio de pieza o cualquier corrección necesaria.',
+                    child: TextField(
+                      controller: observationsController,
+                      minLines: 4,
+                      maxLines: 6,
+                      decoration: NavalgoFormStyles.inputDecoration(
+                        dialogContext,
+                        label: 'Observaciones',
+                        hint:
+                            'Ej. El filtro indicado no corresponde a este Yamaha 150.',
+                        prefixIcon: const Icon(Icons.rate_review_outlined),
+                      ),
+                    ),
+                  ),
+                  if (errorText != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      errorText!,
+                      style: Theme.of(dialogContext).textTheme.bodyMedium
+                          ?.copyWith(
+                            color: Theme.of(dialogContext).colorScheme.error,
+                          ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+    observationsController.dispose();
+
+    if (!mounted || observations == null) {
+      return;
+    }
+
+    setState(() => _materialBusy = true);
+    try {
+      final updated = await context
+          .read<WorkOrderMaterialService>()
+          .createRevisionRequest(
+            token,
+            workOrderId: _workOrder.id,
+            checklistItemId: item.id,
+            observations: observations,
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _updateWorkOrder(updated, syncInputs: true);
+      });
+      AppToast.success(context, 'Solicitud enviada al administrador.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo crear la solicitud: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _materialBusy = false);
+      }
+    }
+  }
+
+  Future<void> _updateMaterialRevisionStatus(
+    MaterialRevisionRequest request,
+    String status,
+  ) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final noteController = TextEditingController(
+      text: request.resolutionNote ?? '',
+    );
+    final resolutionNote = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return NavalgoFormDialog(
+          eyebrow: 'MATERIAL',
+          title: status == 'APPROVED'
+              ? 'Aprobar incidencia'
+              : 'Rechazar incidencia',
+          subtitle:
+              'Puedes añadir una nota opcional para dejar trazabilidad del motivo de la decisión.',
+          maxWidth: 620,
+          actions: [
+            NavalgoGhostButton(
+              label: 'Cancelar',
+              onPressed: () => Navigator.pop(dialogContext),
+            ),
+            NavalgoGradientButton(
+              label: status == 'APPROVED' ? 'Aprobar' : 'Rechazar',
+              icon: status == 'APPROVED'
+                  ? Icons.check_circle_outline
+                  : Icons.block_outlined,
+              onPressed: () =>
+                  Navigator.pop(dialogContext, noteController.text.trim()),
+            ),
+          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              NavalgoPanel(
+                tint: Colors.white.withValues(alpha: 0.96),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _DetailRow(label: 'Artículo', value: request.articleName),
+                    _DetailRow(label: 'Referencia', value: request.reference),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              NavalgoFormFieldBlock(
+                label: 'Nota de resolución',
+                caption: 'Opcional. Quedará asociada a la solicitud.',
+                child: TextField(
+                  controller: noteController,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: NavalgoFormStyles.inputDecoration(
+                    dialogContext,
+                    label: 'Nota de resolución',
+                    hint: 'Añadir contexto para la decisión tomada.',
+                    prefixIcon: const Icon(Icons.fact_check_outlined),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    noteController.dispose();
+
+    if (!mounted || resolutionNote == null) {
+      return;
+    }
+
+    setState(() => _materialBusy = true);
+    try {
+      final updated = await context
+          .read<WorkOrderMaterialService>()
+          .updateRevisionRequestStatus(
+            token,
+            workOrderId: _workOrder.id,
+            requestId: request.id,
+            status: status,
+            resolutionNote: resolutionNote,
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _updateWorkOrder(updated, syncInputs: true);
+      });
+      AppToast.success(context, 'Estado de la incidencia actualizado.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo actualizar la incidencia: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _materialBusy = false);
+      }
+    }
+  }
+
+  Future<void> _restoreMaterialChecklistDraft() async {
+    final draft = await _materialDraftStore.load(_workOrder.id);
+    if (!mounted || draft == null) {
+      return;
+    }
+
+    setState(() {
+      _materialChecks = {
+        for (final item
+            in _workOrder.materialChecklist?.items ??
+                const <WorkOrderMaterialChecklistItem>[])
+          item.id: draft.items[item.id] ?? item.checked,
+      };
+      _hasMaterialDraft = draft.items.isNotEmpty;
+    });
+  }
+
+  Future<void> _persistMaterialChecklistDraft() async {
+    await _materialDraftStore.save(
+      WorkOrderMaterialDraft(
+        workOrderId: _workOrder.id,
+        items: _materialChecks,
+        updatedAt: DateTime.now().toUtc(),
+      ),
+    );
   }
 
   Future<void> _pickProof() async {
@@ -1338,12 +1892,16 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         vesselId: result.vesselId,
         workerIds: result.workerIds,
         priority: result.highPriority ? 'HIGH' : 'NORMAL',
+        materialTemplateId: result.materialTemplateId,
+        clearMaterialChecklist: result.clearMaterialChecklist,
       );
+      await _materialDraftStore.clear(_workOrder.id);
       if (!mounted) {
         return;
       }
       setState(() {
-        _updateWorkOrder(updated);
+        _hasMaterialDraft = false;
+        _updateWorkOrder(updated, syncInputs: true);
       });
       AppToast.success(context, 'Parte actualizado.');
     } catch (e) {
@@ -1429,7 +1987,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         return;
       }
       setState(() {
-        _updateWorkOrder(updated);
+        _updateWorkOrder(updated, syncInputs: true);
       });
       AppToast.success(context, 'Firma eliminada.');
     } catch (e) {
@@ -1488,7 +2046,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
         return;
       }
       setState(() {
-        _updateWorkOrder(updated);
+        _updateWorkOrder(updated, syncInputs: true);
       });
       AppToast.success(context, 'Adjunto eliminado.');
     } catch (e) {
@@ -1505,6 +2063,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
 
   void _syncWorkInputsFromWorkOrder() {
     _observationsCtrl.text = _workOrder.description ?? '';
+    _laborHoursCtrl.text = _formatLaborHoursInput(_workOrder.laborHours);
 
     final existingValues = <String, String>{
       for (final entry in _engineHoursControllers.entries)
@@ -1536,9 +2095,19 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet> {
     }
   }
 
+  void _syncMaterialChecklistInputsFromWorkOrder() {
+    _materialChecks = {
+      for (final item
+          in _workOrder.materialChecklist?.items ??
+              const <WorkOrderMaterialChecklistItem>[])
+        item.id: item.checked,
+    };
+  }
+
   void _updateWorkOrder(WorkOrder updated, {bool syncInputs = false}) {
     _workOrder = updated;
     _attachments = _resolveAttachments(updated);
+    _syncMaterialChecklistInputsFromWorkOrder();
     if (syncInputs) {
       _syncWorkInputsFromWorkOrder();
     }
@@ -1848,12 +2417,16 @@ class _EditPartInput {
     required this.vesselId,
     required this.workerIds,
     required this.highPriority,
+    required this.materialTemplateId,
+    required this.clearMaterialChecklist,
   });
 
   final int ownerId;
   final int? vesselId;
   final List<int> workerIds;
   final bool highPriority;
+  final int? materialTemplateId;
+  final bool clearMaterialChecklist;
 }
 
 class _EditPartDialog extends StatefulWidget {
@@ -1879,6 +2452,8 @@ class _EditPartDialogState extends State<_EditPartDialog> {
   int? _vesselId;
   late bool _highPriority;
   late final Set<int> _selectedWorkers;
+  int? _selectedMaterialTemplateId;
+  bool _clearMaterialChecklist = false;
 
   @override
   void initState() {
@@ -1889,6 +2464,8 @@ class _EditPartDialogState extends State<_EditPartDialog> {
         widget.workOrder.priority == 'HIGH' ||
         widget.workOrder.priority == 'URGENT';
     _selectedWorkers = widget.workOrder.workerIds.toSet();
+    _selectedMaterialTemplateId =
+        widget.workOrder.materialChecklist?.sourceTemplateId;
   }
 
   @override
@@ -1927,6 +2504,8 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                 vesselId: _vesselId,
                 workerIds: _selectedWorkers.toList(),
                 highPriority: _highPriority,
+                materialTemplateId: _selectedMaterialTemplateId,
+                clearMaterialChecklist: _clearMaterialChecklist,
               ),
             );
           },
@@ -2064,6 +2643,18 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+            _MaterialTemplateAssignmentField(
+              selectedTemplateId: _selectedMaterialTemplateId,
+              onChanged: (value) {
+                setState(() {
+                  _selectedMaterialTemplateId = value;
+                  _clearMaterialChecklist =
+                      value == null &&
+                      widget.workOrder.materialChecklist != null;
+                });
+              },
+            ),
           ],
         ),
       ),
@@ -2078,6 +2669,8 @@ class _CreatePartInput {
     required this.ownerId,
     required this.vesselId,
     required this.workerIds,
+    required this.laborHours,
+    required this.materialTemplateId,
     required this.engineHours,
     required this.attachments,
     required this.priority,
@@ -2088,6 +2681,8 @@ class _CreatePartInput {
   final int ownerId;
   final int? vesselId;
   final List<int> workerIds;
+  final double? laborHours;
+  final int? materialTemplateId;
   final List<EngineHourLog> engineHours;
   final List<WorkOrderAttachmentItem> attachments;
   final String priority;
@@ -2112,6 +2707,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final _titleCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
+  final _laborHoursCtrl = TextEditingController();
   late int _ownerId;
   int? _vesselId;
   bool _highPriority = false;
@@ -2119,6 +2715,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   final Map<String, TextEditingController> _engineHoursControllers =
       <String, TextEditingController>{};
   String? _validationError;
+  int? _selectedMaterialTemplateId;
 
   @override
   void initState() {
@@ -2131,6 +2728,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   void dispose() {
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
+    _laborHoursCtrl.dispose();
     for (final controller in _engineHoursControllers.values) {
       controller.dispose();
     }
@@ -2197,6 +2795,24 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                   hint: 'Describe la intervención a realizar.',
                   prefixIcon: const Icon(Icons.notes_outlined),
                 ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Horas de trabajo',
+              caption:
+                  'Campo opcional para registrar el tiempo total imputable de la intervención.',
+              child: TextFormField(
+                controller: _laborHoursCtrl,
+                keyboardType: const TextInputType.numberWithOptions(
+                  decimal: true,
+                ),
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Horas de trabajo',
+                  hint: 'Ej. 3.5',
+                  prefixIcon: const Icon(Icons.schedule_outlined),
+                ).copyWith(suffixText: 'h'),
               ),
             ),
             const SizedBox(height: 14),
@@ -2295,6 +2911,15 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
               ),
             ],
             const SizedBox(height: 14),
+            _MaterialTemplateAssignmentField(
+              selectedTemplateId: _selectedMaterialTemplateId,
+              onChanged: (value) {
+                setState(() {
+                  _selectedMaterialTemplateId = value;
+                });
+              },
+            ),
+            const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Asignar trabajadores',
               caption:
@@ -2339,6 +2964,14 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
     }
 
     final title = _titleCtrl.text.trim();
+    final laborHours = _parseLaborHours(_laborHoursCtrl.text);
+    if (_laborHoursCtrl.text.trim().isNotEmpty && laborHours == null) {
+      setState(() {
+        _validationError =
+            'Las horas de trabajo deben ser un numero valido, por ejemplo 4 o 4.5.';
+      });
+      return;
+    }
 
     final engineHours = <EngineHourLog>[];
     for (final entry in _engineHoursControllers.entries) {
@@ -2364,6 +2997,8 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
         ownerId: _ownerId,
         vesselId: _vesselId,
         workerIds: _selectedWorkers.toList(),
+        laborHours: laborHours,
+        materialTemplateId: _selectedMaterialTemplateId,
         engineHours: engineHours,
         attachments: const <WorkOrderAttachmentItem>[],
         priority: _highPriority ? 'HIGH' : 'NORMAL',
@@ -2452,6 +3087,967 @@ class _PartBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CompactMetricPill extends StatelessWidget {
+  const _CompactMetricPill({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaterialChecklistItemCard extends StatelessWidget {
+  const _MaterialChecklistItemCard({
+    required this.item,
+    required this.checked,
+    required this.pendingRequests,
+    required this.busy,
+    required this.onChanged,
+    required this.onRequestRevision,
+  });
+
+  final WorkOrderMaterialChecklistItem item;
+  final bool checked;
+  final int pendingRequests;
+  final bool busy;
+  final ValueChanged<bool>? onChanged;
+  final VoidCallback? onRequestRevision;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavalgoPanel(
+      tint: checked ? NavalgoColors.foam : Colors.white,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Checkbox(
+                value: checked,
+                onChanged: busy || onChanged == null
+                    ? null
+                    : (value) => onChanged!(value ?? false),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.articleName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Referencia: ${item.reference}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    if (item.checkedAt != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        'Último check: ${item.checkedAt!.toLocal()}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: NavalgoColors.storm,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (pendingRequests > 0)
+                NavalgoStatusChip(
+                  label:
+                      '$pendingRequests pendiente${pendingRequests == 1 ? '' : 's'}',
+                  color: NavalgoColors.coral,
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: busy ? null : onRequestRevision,
+              icon: const Icon(Icons.rate_review_outlined, size: 18),
+              label: const Text('Solicitar cambio'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaterialRevisionRequestCard extends StatelessWidget {
+  const _MaterialRevisionRequestCard({
+    required this.request,
+    required this.busy,
+    required this.canModerate,
+    this.onApprove,
+    this.onReject,
+  });
+
+  final MaterialRevisionRequest request;
+  final bool busy;
+  final bool canModerate;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _materialRevisionStatusColor(request.status);
+    return NavalgoPanel(
+      tint: statusColor.withValues(alpha: 0.06),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      request.articleName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Referencia: ${request.reference}',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              NavalgoStatusChip(
+                label: _materialRevisionStatusLabel(request.status),
+                color: statusColor,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            request.observations,
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Reportado por ${request.requestedByWorkerName ?? 'Técnico'}${request.createdAt != null ? ' · ${request.createdAt!.toLocal()}' : ''}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
+          ),
+          if ((request.resolutionNote ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              'Resolución: ${request.resolutionNote!.trim()}',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.deepSea),
+            ),
+          ],
+          if (canModerate) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: busy ? null : onReject,
+                  icon: const Icon(Icons.close_outlined),
+                  label: const Text('Rechazar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: NavalgoColors.coral,
+                  ),
+                ),
+                FilledButton.icon(
+                  onPressed: busy ? null : onApprove,
+                  icon: const Icon(Icons.check_circle_outline),
+                  label: const Text('Aprobar'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MaterialTemplateAssignmentField extends StatefulWidget {
+  const _MaterialTemplateAssignmentField({
+    required this.selectedTemplateId,
+    required this.onChanged,
+  });
+
+  final int? selectedTemplateId;
+  final ValueChanged<int?> onChanged;
+
+  @override
+  State<_MaterialTemplateAssignmentField> createState() =>
+      _MaterialTemplateAssignmentFieldState();
+}
+
+class _MaterialTemplateAssignmentFieldState
+    extends State<_MaterialTemplateAssignmentField> {
+  bool _loading = false;
+  String? _error;
+  List<MaterialChecklistTemplate> _templates =
+      const <MaterialChecklistTemplate>[];
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_loadTemplates);
+  }
+
+  Future<void> _loadTemplates({int? selectTemplateId}) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final templates = await context
+          .read<MaterialChecklistTemplateService>()
+          .getTemplates(token);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _templates = templates;
+      });
+      if (selectTemplateId != null) {
+        widget.onChanged(selectTemplateId);
+      }
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = '$e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedTemplate = _templates
+        .where((item) => item.id == widget.selectedTemplateId)
+        .cast<MaterialChecklistTemplate?>()
+        .firstOrNull;
+
+    return NavalgoFormFieldBlock(
+      label: 'Plantilla de material',
+      caption:
+          'Opcional. Se clona al parte como checklist independiente para no alterar históricos cuando cambie la plantilla original.',
+      child: NavalgoPanel(
+        tint: Colors.white.withValues(alpha: 0.96),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _loading
+                      ? const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 18),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      : DropdownButtonFormField<int?>(
+                          initialValue: selectedTemplate?.id,
+                          dropdownColor: NavalgoColors.shell,
+                          decoration: NavalgoFormStyles.inputDecoration(
+                            context,
+                            label: 'Plantilla de material',
+                            prefixIcon: const Icon(Icons.fact_check_outlined),
+                          ),
+                          items: [
+                            const DropdownMenuItem<int?>(
+                              value: null,
+                              child: Text('Sin plantilla'),
+                            ),
+                            ..._templates.map(
+                              (template) => DropdownMenuItem<int?>(
+                                value: template.id,
+                                child: Text(template.name),
+                              ),
+                            ),
+                          ],
+                          onChanged: widget.onChanged,
+                        ),
+                ),
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _loading
+                      ? null
+                      : () async {
+                          final selectedId = await showDialog<int?>(
+                            context: context,
+                            builder: (_) =>
+                                const _ManageMaterialTemplatesDialog(),
+                          );
+                          if (!mounted) {
+                            return;
+                          }
+                          await _loadTemplates(selectTemplateId: selectedId);
+                        },
+                  icon: const Icon(Icons.settings_outlined, size: 18),
+                  label: const Text('Gestionar'),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+            if (selectedTemplate?.latestIncident != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: NavalgoColors.coral.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: NavalgoColors.coral.withValues(alpha: 0.22),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Última incidencia reportada',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: NavalgoColors.coral,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${selectedTemplate!.latestIncident!.articleName} · Ref ${selectedTemplate.latestIncident!.reference}',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      selectedTemplate.latestIncident!.observations,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ManageMaterialTemplatesDialog extends StatefulWidget {
+  const _ManageMaterialTemplatesDialog();
+
+  @override
+  State<_ManageMaterialTemplatesDialog> createState() =>
+      _ManageMaterialTemplatesDialogState();
+}
+
+class _ManageMaterialTemplatesDialogState
+    extends State<_ManageMaterialTemplatesDialog> {
+  bool _loading = false;
+  String? _error;
+  List<MaterialChecklistTemplate> _templates =
+      const <MaterialChecklistTemplate>[];
+
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.microtask(_loadTemplates);
+  }
+
+  Future<void> _loadTemplates() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final templates = await context
+          .read<MaterialChecklistTemplateService>()
+          .getTemplates(token);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _templates = templates;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = '$e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _openEditor({MaterialChecklistTemplate? template}) async {
+    final saved = await showDialog<MaterialChecklistTemplate>(
+      context: context,
+      builder: (_) => _MaterialTemplateEditorDialog(template: template),
+    );
+    if (!mounted || saved == null) {
+      return;
+    }
+    await _loadTemplates();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NavalgoFormDialog(
+      eyebrow: 'MATERIAL',
+      title: 'Plantillas de material',
+      subtitle:
+          'Crea y ajusta checklists reutilizables con artículo y referencia. Puedes usar una plantilla directamente al cerrar este diálogo.',
+      maxWidth: 860,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        NavalgoGradientButton(
+          label: 'Nueva plantilla',
+          icon: Icons.playlist_add_outlined,
+          onPressed: () => _openEditor(),
+        ),
+      ],
+      child: _loading
+          ? const SizedBox(
+              height: 180,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_error != null)
+                  Text(
+                    _error!,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                  ),
+                if (_templates.isEmpty)
+                  Text(
+                    'Todavía no hay plantillas de material creadas.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  )
+                else
+                  SizedBox(
+                    width: double.infinity,
+                    child: Column(
+                      children: _templates.map((template) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: NavalgoPanel(
+                            tint: Colors.white.withValues(alpha: 0.96),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            template.name,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                          ),
+                                          if ((template.description ?? '')
+                                              .trim()
+                                              .isNotEmpty) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              template.description!.trim(),
+                                              style: Theme.of(
+                                                context,
+                                              ).textTheme.bodyMedium,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                    ),
+                                    NavalgoStatusChip(
+                                      label: '${template.items.length} items',
+                                      color: NavalgoColors.harbor,
+                                    ),
+                                  ],
+                                ),
+                                if (template.latestIncident != null) ...[
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: NavalgoColors.coral.withValues(
+                                        alpha: 0.08,
+                                      ),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: Text(
+                                      'Última incidencia: ${template.latestIncident!.observations}',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodyMedium,
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: 10),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
+                                  children: [
+                                    OutlinedButton.icon(
+                                      onPressed: () =>
+                                          _openEditor(template: template),
+                                      icon: const Icon(Icons.edit_outlined),
+                                      label: const Text('Editar'),
+                                    ),
+                                    FilledButton.icon(
+                                      onPressed: () =>
+                                          Navigator.pop(context, template.id),
+                                      icon: const Icon(
+                                        Icons.checklist_outlined,
+                                      ),
+                                      label: const Text('Usar en el parte'),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+              ],
+            ),
+    );
+  }
+}
+
+class _MaterialTemplateEditorDialog extends StatefulWidget {
+  const _MaterialTemplateEditorDialog({this.template});
+
+  final MaterialChecklistTemplate? template;
+
+  @override
+  State<_MaterialTemplateEditorDialog> createState() =>
+      _MaterialTemplateEditorDialogState();
+}
+
+class _MaterialTemplateEditorDialogState
+    extends State<_MaterialTemplateEditorDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _descriptionCtrl;
+  late final List<_MaterialTemplateItemDraft> _items;
+  String? _error;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.template?.name ?? '');
+    _descriptionCtrl = TextEditingController(
+      text: widget.template?.description ?? '',
+    );
+    _items = (widget.template?.items ?? const <MaterialChecklistTemplateItem>[])
+        .map(
+          (item) => _MaterialTemplateItemDraft(
+            articleName: item.articleName,
+            reference: item.reference,
+          ),
+        )
+        .toList();
+    if (_items.isEmpty) {
+      _items.add(_MaterialTemplateItemDraft());
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _descriptionCtrl.dispose();
+    for (final item in _items) {
+      item.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    final normalizedItems = <MaterialChecklistTemplateItem>[];
+    for (var index = 0; index < _items.length; index += 1) {
+      final draft = _items[index];
+      final article = draft.articleController.text.trim();
+      final reference = draft.referenceController.text.trim();
+      if (article.isEmpty || reference.isEmpty) {
+        setState(() {
+          _error = 'Cada item debe tener artículo y referencia.';
+        });
+        return;
+      }
+      normalizedItems.add(
+        MaterialChecklistTemplateItem(
+          articleName: article,
+          reference: reference,
+          sortOrder: index,
+        ),
+      );
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final service = context.read<MaterialChecklistTemplateService>();
+      final saved = widget.template == null
+          ? await service.createTemplate(
+              token,
+              name: _nameCtrl.text.trim(),
+              description: _descriptionCtrl.text.trim(),
+              items: normalizedItems,
+            )
+          : await service.updateTemplate(
+              token,
+              templateId: widget.template!.id!,
+              name: _nameCtrl.text.trim(),
+              description: _descriptionCtrl.text.trim(),
+              items: normalizedItems,
+            );
+      if (!mounted) {
+        return;
+      }
+      Navigator.pop(context, saved);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = '$e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _saving = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NavalgoFormDialog(
+      eyebrow: 'MATERIAL',
+      title: widget.template == null ? 'Nueva plantilla' : 'Editar plantilla',
+      subtitle:
+          'Cada elemento debe indicar el artículo y su referencia para que el técnico no salga con una lista ambigua.',
+      maxWidth: 780,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cancelar',
+          onPressed: _saving ? null : () => Navigator.pop(context),
+        ),
+        NavalgoGradientButton(
+          label: _saving ? 'Guardando...' : 'Guardar plantilla',
+          icon: _saving ? null : Icons.save_outlined,
+          onPressed: _saving ? null : _save,
+        ),
+      ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            NavalgoFormFieldBlock(
+              label: 'Nombre',
+              child: TextFormField(
+                controller: _nameCtrl,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Nombre de la plantilla',
+                  prefixIcon: const Icon(Icons.inventory_2_outlined),
+                ),
+                validator: (value) => (value?.trim() ?? '').isEmpty
+                    ? 'El nombre es obligatorio.'
+                    : null,
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Descripción',
+              child: TextFormField(
+                controller: _descriptionCtrl,
+                minLines: 2,
+                maxLines: 4,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Descripción',
+                  hint: 'Ej. Mantenimiento Guardia Civil - Motor Yamaha',
+                  prefixIcon: const Icon(Icons.notes_outlined),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Elementos de la plantilla',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _saving
+                      ? null
+                      : () => setState(() {
+                          _items.add(_MaterialTemplateItemDraft());
+                        }),
+                  icon: const Icon(Icons.add_outlined),
+                  label: const Text('Añadir item'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ..._items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final item = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: NavalgoPanel(
+                  tint: Colors.white.withValues(alpha: 0.96),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Artículo ${index + 1}',
+                              style: Theme.of(context).textTheme.labelLarge,
+                            ),
+                          ),
+                          if (_items.length > 1)
+                            IconButton(
+                              onPressed: _saving
+                                  ? null
+                                  : () => setState(() {
+                                      final removed = _items.removeAt(index);
+                                      removed.dispose();
+                                    }),
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      TextFormField(
+                        controller: item.articleController,
+                        decoration: NavalgoFormStyles.inputDecoration(
+                          context,
+                          label: 'Artículo',
+                          hint: 'Nombre del repuesto o consumible',
+                          prefixIcon: const Icon(Icons.build_circle_outlined),
+                        ),
+                        validator: (value) => (value?.trim() ?? '').isEmpty
+                            ? 'El artículo es obligatorio.'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: item.referenceController,
+                        decoration: NavalgoFormStyles.inputDecoration(
+                          context,
+                          label: 'Referencia',
+                          hint: 'SKU o código de pieza',
+                          prefixIcon: const Icon(Icons.qr_code_outlined),
+                        ),
+                        validator: (value) => (value?.trim() ?? '').isEmpty
+                            ? 'La referencia es obligatoria.'
+                            : null,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MaterialTemplateItemDraft {
+  _MaterialTemplateItemDraft({String articleName = '', String reference = ''})
+    : articleController = TextEditingController(text: articleName),
+      referenceController = TextEditingController(text: reference);
+
+  final TextEditingController articleController;
+  final TextEditingController referenceController;
+
+  void dispose() {
+    articleController.dispose();
+    referenceController.dispose();
+  }
+}
+
+Color _materialRevisionStatusColor(String status) {
+  switch (status) {
+    case 'APPROVED':
+      return NavalgoColors.kelp;
+    case 'REJECTED':
+      return NavalgoColors.coral;
+    case 'PENDING':
+    default:
+      return NavalgoColors.sand;
+  }
+}
+
+String _materialRevisionStatusLabel(String status) {
+  switch (status) {
+    case 'APPROVED':
+      return 'Aprobada';
+    case 'REJECTED':
+      return 'Rechazada';
+    case 'PENDING':
+    default:
+      return 'Pendiente';
+  }
+}
+
+String _formatLaborHoursInput(double? value) {
+  if (value == null) {
+    return '';
+  }
+  final text = value.toStringAsFixed(value.truncateToDouble() == value ? 0 : 2);
+  return text
+      .replaceFirst(RegExp(r'\.0+$'), '')
+      .replaceFirst(RegExp(r'(\.[0-9]*?)0+$'), r'$1');
+}
+
+String _formatLaborHoursLabel(double? value) {
+  if (value == null) {
+    return 'Sin registrar';
+  }
+  return '${_formatLaborHoursInput(value)} h';
+}
+
+double? _parseLaborHours(String raw) {
+  final normalized = raw.trim().replaceAll(',', '.');
+  if (normalized.isEmpty) {
+    return null;
+  }
+  return double.tryParse(normalized);
 }
 
 class _PickedProof {

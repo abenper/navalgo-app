@@ -69,6 +69,36 @@ public class WorkOrderController {
         return ResponseEntity.ok(service.updateWorkOrder(id, request, authentication.getName()));
     }
 
+    @PatchMapping("/{id}/material-checklist")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkOrderDto> updateMaterialChecklist(@PathVariable Long id,
+                                                                @RequestBody @Valid UpdateWorkOrderChecklistRequest request,
+                                                                Authentication authentication) {
+        return ResponseEntity.ok(service.updateMaterialChecklist(id, request, authentication.getName()));
+    }
+
+    @PostMapping("/{id}/material-revision-requests")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkOrderDto> createMaterialRevisionRequest(@PathVariable Long id,
+                                                                      @RequestBody @Valid CreateMaterialRevisionRequest request,
+                                                                      Authentication authentication) {
+        return ResponseEntity.ok(service.createMaterialRevisionRequest(id, request, authentication.getName()));
+    }
+
+    @PatchMapping("/{id}/material-revision-requests/{requestId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkOrderDto> updateMaterialRevisionRequestStatus(@PathVariable Long id,
+                                                                            @PathVariable Long requestId,
+                                                                            @RequestBody @Valid UpdateMaterialRevisionRequestStatusRequest request,
+                                                                            Authentication authentication) {
+        return ResponseEntity.ok(service.updateMaterialRevisionRequestStatus(
+                id,
+                requestId,
+                request,
+                authentication.getName()
+        ));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteWorkOrder(@PathVariable Long id,

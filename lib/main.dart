@@ -5,9 +5,11 @@ import 'package:navalgo/services/network/api_client.dart';
 import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
 import 'package:navalgo/services/leave_service.dart';
+import 'package:navalgo/services/material_checklist_template_service.dart';
 import 'package:navalgo/services/notification_service.dart';
 import 'package:navalgo/services/time_tracking_service.dart';
 import 'package:navalgo/services/worker_service.dart';
+import 'package:navalgo/services/work_order_material_service.dart';
 import 'package:navalgo/services/work_order_media_service.dart';
 import 'package:navalgo/services/work_order_service.dart';
 import 'package:navalgo/services/worker_photo_service.dart';
@@ -49,7 +51,13 @@ Future<void> main() async {
         Provider<LeaveService>(create: (_) => LeaveService()),
         Provider<NotificationService>(create: (_) => NotificationService()),
         Provider<TimeTrackingService>(create: (_) => TimeTrackingService()),
+        Provider<MaterialChecklistTemplateService>(
+          create: (_) => MaterialChecklistTemplateService(),
+        ),
         Provider<WorkOrderService>(create: (_) => WorkOrderService()),
+        Provider<WorkOrderMaterialService>(
+          create: (_) => WorkOrderMaterialService(),
+        ),
         Provider<WorkOrderMediaService>(create: (_) => WorkOrderMediaService()),
         Provider<WorkerPhotoService>(create: (_) => WorkerPhotoService()),
         ChangeNotifierProvider(

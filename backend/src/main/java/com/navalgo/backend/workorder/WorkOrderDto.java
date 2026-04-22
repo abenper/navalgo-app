@@ -1,5 +1,6 @@
 package com.navalgo.backend.workorder;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -15,6 +16,9 @@ public record WorkOrderDto(
         String vesselName,
         List<Long> workerIds,
         List<String> workerNames,
+        BigDecimal laborHours,
+        WorkOrderChecklistDto materialChecklist,
+        List<MaterialRevisionRequestDto> materialRevisionRequests,
         List<EngineHourRequest> engineHours,
         List<String> attachmentUrls,
         List<AttachmentInfoDto> attachments,

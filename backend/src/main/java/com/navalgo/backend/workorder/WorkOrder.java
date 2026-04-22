@@ -5,6 +5,7 @@ import com.navalgo.backend.fleet.Vessel;
 import com.navalgo.backend.worker.Worker;
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -52,6 +53,15 @@ public class WorkOrder {
     @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<WorkOrderAttachment> attachments = new LinkedHashSet<>();
 
+    @Column(precision = 8, scale = 2)
+    private BigDecimal laborHours;
+
+    @OneToOne(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    private WorkOrderChecklist materialChecklist;
+
+    @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
+    private Set<MaterialRevisionRequest> materialRevisionRequests = new LinkedHashSet<>();
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -93,6 +103,22 @@ public class WorkOrder {
 
     public Set<WorkOrderAttachment> getAttachments() { return attachments; }
     public void setAttachments(Set<WorkOrderAttachment> attachments) { this.attachments = attachments; }
+
+    public BigDecimal getLaborHours() { return laborHours; }
+    public void setLaborHours(BigDecimal laborHours) { this.laborHours = laborHours; }
+
+    public WorkOrderChecklist getMaterialChecklist() { return materialChecklist; }
+    public void setMaterialChecklist(WorkOrderChecklist materialChecklist) {
+        this.materialChecklist = materialChecklist;
+        if (materialChecklist != null) {
+            materialChecklist.setWorkOrder(this);
+        }
+    }
+
+    public Set<MaterialRevisionRequest> getMaterialRevisionRequests() { return materialRevisionRequests; }
+    public void setMaterialRevisionRequests(Set<MaterialRevisionRequest> materialRevisionRequests) {
+        this.materialRevisionRequests = materialRevisionRequests;
+    }
 
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }

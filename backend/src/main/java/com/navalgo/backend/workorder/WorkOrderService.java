@@ -14,6 +14,7 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 
@@ -27,6 +28,7 @@ public class WorkOrderService {
     private final WorkerRepository workerRepository;
     private final NotificationService notificationService;
     private final WorkOrderMediaService workOrderMediaService;
+    private final MaterialChecklistTemplateRepository materialChecklistTemplateRepository;
     private final InputSanitizer inputSanitizer;
 
     public WorkOrderService(WorkOrderRepository workOrderRepository,
@@ -35,6 +37,7 @@ public class WorkOrderService {
                             WorkerRepository workerRepository,
                             NotificationService notificationService,
                             WorkOrderMediaService workOrderMediaService,
+                            MaterialChecklistTemplateRepository materialChecklistTemplateRepository,
                             InputSanitizer inputSanitizer) {
         this.workOrderRepository = workOrderRepository;
         this.ownerRepository = ownerRepository;
@@ -42,6 +45,7 @@ public class WorkOrderService {
         this.workerRepository = workerRepository;
         this.notificationService = notificationService;
         this.workOrderMediaService = workOrderMediaService;
+        this.materialChecklistTemplateRepository = materialChecklistTemplateRepository;
         this.inputSanitizer = inputSanitizer;
     }
 
@@ -112,6 +116,13 @@ public class WorkOrderService {
         workOrder.setOwner(owner);
         workOrder.setVessel(vessel);
         workOrder.setPriority(request.priority() == null ? WorkOrderPriority.NORMAL : request.priority());
+        workOrder.setLaborHours(request.laborHours());
+
+        if (request.materialTemplateId() != null) {
+            MaterialChecklistTemplate template = materialChecklistTemplateRepository.findById(request.materialTemplateId())
+                .orElseThrow(() -> new EntityNotFoundException("Plantilla de material no encontrada"));
+            applyMaterialChecklistTemplate(workOrder, template);
+        }
 
         if (request.workerIds() != null && !request.workerIds().isEmpty()) {
             Set<Worker> workers = new HashSet<>(workerRepository.findAllById(request.workerIds()));
@@ -202,6 +213,9 @@ public class WorkOrderService {
         if (request.priority() != null) {
             workOrder.setPriority(request.priority());
         }
+        if (request.laborHours() != null) {
+            workOrder.setLaborHours(request.laborHours());
+        }
         if (request.status() != null) {
             workOrder.setStatus(request.status());
         }
@@ -216,6 +230,22 @@ public class WorkOrderService {
             workOrder.setSignatureUrl(null);
             workOrder.setSignedAt(null);
             workOrder.setSignedByWorker(null);
+        }
+
+        if (request.materialTemplateId() != null) {
+            if (!admin) {
+                throw new AccessDeniedException("Solo un administrador puede asignar plantillas de material");
+            }
+            MaterialChecklistTemplate template = materialChecklistTemplateRepository.findById(request.materialTemplateId())
+                    .orElseThrow(() -> new EntityNotFoundException("Plantilla de material no encontrada"));
+            applyMaterialChecklistTemplate(workOrder, template);
+        }
+
+        if (Boolean.TRUE.equals(request.clearMaterialChecklist())) {
+            if (!admin) {
+                throw new AccessDeniedException("Solo un administrador puede desasignar plantillas de material");
+            }
+            workOrder.setMaterialChecklist(null);
         }
 
         if (request.ownerId() != null) {
@@ -287,6 +317,106 @@ public class WorkOrderService {
         }
 
         return toDto(saved);
+    }
+
+    @Transactional
+    public WorkOrderDto updateMaterialChecklist(Long id,
+                                                UpdateWorkOrderChecklistRequest request,
+                                                String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
+            throw new AccessDeniedException("No puedes revisar material en este parte");
+        }
+
+        WorkOrderChecklist checklist = requireMaterialChecklist(workOrder);
+        Map<Long, WorkOrderChecklistItem> itemsById = new HashMap<>();
+        for (WorkOrderChecklistItem item : checklist.getItems()) {
+            itemsById.put(item.getId(), item);
+        }
+
+        for (WorkOrderChecklistItemUpdateRequest itemRequest : request.items()) {
+            WorkOrderChecklistItem item = itemsById.get(itemRequest.itemId());
+            if (item == null) {
+                throw new EntityNotFoundException("Elemento de checklist no encontrado en este parte");
+            }
+
+            boolean checked = Boolean.TRUE.equals(itemRequest.checked());
+            item.setChecked(checked);
+            item.setCheckedAt(checked ? Instant.now() : null);
+            item.setCheckedByWorker(checked ? current : null);
+        }
+
+        return toDto(workOrderRepository.save(workOrder));
+    }
+
+    @Transactional
+    public WorkOrderDto createMaterialRevisionRequest(Long id,
+                                                      CreateMaterialRevisionRequest request,
+                                                      String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
+            throw new AccessDeniedException("No puedes crear incidencias de material en este parte");
+        }
+
+        WorkOrderChecklist checklist = requireMaterialChecklist(workOrder);
+        WorkOrderChecklistItem checklistItem = checklist.getItems().stream()
+                .filter(item -> item.getId().equals(request.checklistItemId()))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Articulo no encontrado en este checklist"));
+
+        MaterialRevisionRequest revisionRequest = new MaterialRevisionRequest();
+        revisionRequest.setWorkOrder(workOrder);
+        revisionRequest.setChecklistItemSnapshotId(checklistItem.getId());
+        revisionRequest.setSourceTemplateId(checklist.getSourceTemplateId());
+        revisionRequest.setSourceTemplateItemId(checklistItem.getSourceTemplateItemId());
+        revisionRequest.setArticleName(checklistItem.getArticleName());
+        revisionRequest.setReference(checklistItem.getReference());
+        revisionRequest.setObservations(
+                inputSanitizer.requiredText(request.observations(), "Las observaciones", 3000)
+        );
+        revisionRequest.setStatus(MaterialRevisionRequestStatus.PENDING);
+        revisionRequest.setRequestedByWorker(current);
+        revisionRequest.setCreatedAt(Instant.now());
+
+        workOrder.getMaterialRevisionRequests().add(revisionRequest);
+        return toDto(workOrderRepository.save(workOrder));
+    }
+
+    @Transactional
+    public WorkOrderDto updateMaterialRevisionRequestStatus(Long workOrderId,
+                                                            Long requestId,
+                                                            UpdateMaterialRevisionRequestStatusRequest request,
+                                                            String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current)) {
+            throw new AccessDeniedException("Solo un administrador puede revisar incidencias de material");
+        }
+
+        MaterialRevisionRequest revisionRequest = workOrder.getMaterialRevisionRequests().stream()
+                .filter(item -> item.getId().equals(requestId))
+                .findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud de revision no encontrada"));
+
+        revisionRequest.setStatus(request.status());
+        revisionRequest.setResolutionNote(inputSanitizer.optionalText(request.resolutionNote(), 1000));
+        if (request.status() == MaterialRevisionRequestStatus.PENDING) {
+            revisionRequest.setReviewedAt(null);
+            revisionRequest.setReviewedByWorker(null);
+        } else {
+            revisionRequest.setReviewedAt(Instant.now());
+            revisionRequest.setReviewedByWorker(current);
+        }
+
+        return toDto(workOrderRepository.save(workOrder));
     }
 
     @Transactional
@@ -387,7 +517,9 @@ public class WorkOrderService {
                 || request.ownerId() != null
                 || request.vesselId() != null
                 || request.workerIds() != null
-                || Boolean.TRUE.equals(request.clearSignature());
+                || Boolean.TRUE.equals(request.clearSignature())
+                || request.materialTemplateId() != null
+                || Boolean.TRUE.equals(request.clearMaterialChecklist());
     }
 
     private boolean canModifyMultimedia(Worker worker, WorkOrder workOrder) {
@@ -447,6 +579,17 @@ public class WorkOrderService {
                 .map(e -> new EngineHourRequest(e.getEngineLabel(), e.getHours()))
                 .toList();
 
+        WorkOrderChecklistDto materialChecklist = w.getMaterialChecklist() == null
+            ? null
+            : toChecklistDto(w.getMaterialChecklist());
+
+        List<MaterialRevisionRequestDto> materialRevisionRequests = w.getMaterialRevisionRequests() == null
+            ? List.of()
+            : w.getMaterialRevisionRequests().stream()
+            .sorted(Comparator.comparing(MaterialRevisionRequest::getCreatedAt).reversed())
+            .map(this::toMaterialRevisionRequestDto)
+            .toList();
+
         Set<WorkOrderAttachment> attachments = w.getAttachments() == null
             ? Set.of()
             : w.getAttachments();
@@ -463,6 +606,9 @@ public class WorkOrderService {
             vessel != null ? vessel.getName() : null,
             workerIds,
             workerNames,
+            w.getLaborHours(),
+            materialChecklist,
+            materialRevisionRequests,
             engineHours,
             attachments.stream().map(WorkOrderAttachment::getFileUrl).filter(Objects::nonNull).toList(),
             attachments.stream().map(AttachmentInfoDto::from).toList(),
@@ -506,6 +652,84 @@ public class WorkOrderService {
         }
 
         return toDto(workOrderRepository.save(workOrder));
+    }
+
+    private WorkOrderChecklist requireMaterialChecklist(WorkOrder workOrder) {
+        if (workOrder.getMaterialChecklist() == null) {
+            throw new EntityNotFoundException("Este parte no tiene plantilla de material asignada");
+        }
+        return workOrder.getMaterialChecklist();
+    }
+
+    private void applyMaterialChecklistTemplate(WorkOrder workOrder, MaterialChecklistTemplate template) {
+        WorkOrderChecklist checklist = new WorkOrderChecklist();
+        checklist.setWorkOrder(workOrder);
+        checklist.setSourceTemplateId(template.getId());
+        checklist.setSourceTemplateName(template.getName());
+        checklist.setAssignedAt(Instant.now());
+
+        template.getItems().stream()
+                .sorted(Comparator.comparingInt(MaterialChecklistTemplateItem::getSortOrder).thenComparing(MaterialChecklistTemplateItem::getId))
+                .forEach(templateItem -> {
+                    WorkOrderChecklistItem checklistItem = new WorkOrderChecklistItem();
+                    checklistItem.setChecklist(checklist);
+                    checklistItem.setSourceTemplateItemId(templateItem.getId());
+                    checklistItem.setArticleName(templateItem.getArticleName());
+                    checklistItem.setReference(templateItem.getReference());
+                    checklistItem.setSortOrder(templateItem.getSortOrder());
+                    checklist.getItems().add(checklistItem);
+                });
+
+        workOrder.setMaterialChecklist(checklist);
+    }
+
+    private WorkOrderChecklistDto toChecklistDto(WorkOrderChecklist checklist) {
+        List<WorkOrderChecklistItemDto> items = checklist.getItems().stream()
+                .sorted(Comparator.comparingInt(WorkOrderChecklistItem::getSortOrder).thenComparing(WorkOrderChecklistItem::getId))
+                .map(this::toChecklistItemDto)
+                .toList();
+
+        return new WorkOrderChecklistDto(
+                checklist.getId(),
+                checklist.getSourceTemplateId(),
+                checklist.getSourceTemplateName(),
+                checklist.getAssignedAt(),
+                items
+        );
+    }
+
+    private WorkOrderChecklistItemDto toChecklistItemDto(WorkOrderChecklistItem item) {
+        return new WorkOrderChecklistItemDto(
+                item.getId(),
+                item.getSourceTemplateItemId(),
+                item.getArticleName(),
+                item.getReference(),
+                item.isChecked(),
+                item.getCheckedAt(),
+                item.getCheckedByWorker() != null ? item.getCheckedByWorker().getId() : null,
+                item.getCheckedByWorker() != null ? item.getCheckedByWorker().getFullName() : null,
+                item.getSortOrder()
+        );
+    }
+
+    private MaterialRevisionRequestDto toMaterialRevisionRequestDto(MaterialRevisionRequest request) {
+        return new MaterialRevisionRequestDto(
+                request.getId(),
+                request.getChecklistItemSnapshotId(),
+                request.getSourceTemplateId(),
+                request.getSourceTemplateItemId(),
+                request.getArticleName(),
+                request.getReference(),
+                request.getObservations(),
+                request.getStatus(),
+                request.getRequestedByWorker() != null ? request.getRequestedByWorker().getId() : null,
+                request.getRequestedByWorker() != null ? request.getRequestedByWorker().getFullName() : null,
+                request.getCreatedAt(),
+                request.getReviewedByWorker() != null ? request.getReviewedByWorker().getId() : null,
+                request.getReviewedByWorker() != null ? request.getReviewedByWorker().getFullName() : null,
+                request.getReviewedAt(),
+                request.getResolutionNote()
+        );
     }
 
     private WorkOrderAttachment mapAttachmentRequest(WorkOrder workOrder, AttachmentRequest item) {
