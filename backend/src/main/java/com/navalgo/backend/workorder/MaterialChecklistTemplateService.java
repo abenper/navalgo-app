@@ -61,10 +61,6 @@ public class MaterialChecklistTemplateService {
             template.getItems().add(item);
             index += 1;
         }
-
-        if (!(template.getItems() instanceof LinkedHashSet<?>)) {
-            template.setItems(new LinkedHashSet<>(template.getItems()));
-        }
     }
 
     private MaterialChecklistTemplateDto toDto(MaterialChecklistTemplate template) {

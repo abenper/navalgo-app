@@ -662,25 +662,32 @@ public class WorkOrderService {
     }
 
     private void applyMaterialChecklistTemplate(WorkOrder workOrder, MaterialChecklistTemplate template) {
-        WorkOrderChecklist checklist = new WorkOrderChecklist();
-        checklist.setWorkOrder(workOrder);
-        checklist.setSourceTemplateId(template.getId());
-        checklist.setSourceTemplateName(template.getName());
-        checklist.setAssignedAt(Instant.now());
+        WorkOrderChecklist checklist = workOrder.getMaterialChecklist();
+        if (checklist == null) {
+            checklist = new WorkOrderChecklist();
+            checklist.setWorkOrder(workOrder);
+            workOrder.setMaterialChecklist(checklist);
+        } else {
+            checklist.getItems().clear();
+        }
+
+        final WorkOrderChecklist targetChecklist = checklist;
+
+        targetChecklist.setSourceTemplateId(template.getId());
+        targetChecklist.setSourceTemplateName(template.getName());
+        targetChecklist.setAssignedAt(Instant.now());
 
         template.getItems().stream()
                 .sorted(Comparator.comparingInt(MaterialChecklistTemplateItem::getSortOrder).thenComparing(MaterialChecklistTemplateItem::getId))
                 .forEach(templateItem -> {
                     WorkOrderChecklistItem checklistItem = new WorkOrderChecklistItem();
-                    checklistItem.setChecklist(checklist);
+                    checklistItem.setChecklist(targetChecklist);
                     checklistItem.setSourceTemplateItemId(templateItem.getId());
                     checklistItem.setArticleName(templateItem.getArticleName());
                     checklistItem.setReference(templateItem.getReference());
                     checklistItem.setSortOrder(templateItem.getSortOrder());
-                    checklist.getItems().add(checklistItem);
+                    targetChecklist.getItems().add(checklistItem);
                 });
-
-        workOrder.setMaterialChecklist(checklist);
     }
 
     private WorkOrderChecklistDto toChecklistDto(WorkOrderChecklist checklist) {
