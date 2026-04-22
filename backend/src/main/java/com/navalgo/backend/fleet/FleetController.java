@@ -156,6 +156,9 @@ public class FleetController {
         if (!vesselRepository.existsById(id)) {
             throw new EntityNotFoundException("Embarcacion no encontrada");
         }
+        if (workOrderRepository.existsByVesselId(id)) {
+            throw new IllegalArgumentException("No se puede borrar una embarcacion con partes asociados");
+        }
         vesselRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

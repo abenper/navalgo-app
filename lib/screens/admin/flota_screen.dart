@@ -1079,12 +1079,15 @@ class _VesselDialogState extends State<_VesselDialog> {
     _lengthCtrl = TextEditingController(
       text: initial?.lengthMeters?.toString() ?? '',
     );
-    _ownerId = initial?.ownerId ?? widget.owners.first.id;
+    _ownerId = _resolveInitialOwnerId(initial?.ownerId);
 
     final count = int.tryParse(_engineCtrl.text) ?? 1;
     _syncEnginePositions(count);
     if (initial != null && initial.engineLabels.isNotEmpty) {
-      _enginePositions = _extractBasePositions(initial.engineLabels, count);
+      _enginePositions = _extractBasePositions(
+        initial.engineLabels,
+        count,
+      ).map(_sanitizeEnginePosition).toList();
     }
   }
 
@@ -1250,38 +1253,46 @@ class _VesselDialogState extends State<_VesselDialog> {
                       padding: EdgeInsets.only(
                         bottom: index == _enginePositions.length - 1 ? 0 : 12,
                       ),
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _enginePositions[index],
-                        dropdownColor: NavalgoColors.shell,
-                        decoration: NavalgoFormStyles.inputDecoration(
-                          context,
-                          label: 'Motor ${index + 1}',
-                          prefixIcon: Icon(
-                            _engineOptionIcon(_enginePositions[index]),
-                          ),
-                        ),
-                        items: _FlotaScreenState._enginePositionOptions
-                            .map(
-                              (position) => DropdownMenuItem(
-                                value: position,
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      _engineOptionIcon(position),
-                                      size: 18,
-                                      color: NavalgoColors.tide,
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Text(position),
-                                  ],
-                                ),
+                      child: Builder(
+                        builder: (context) {
+                          final selectedPosition = _sanitizeEnginePosition(
+                            _enginePositions[index],
+                          );
+                          return DropdownButtonFormField<String>(
+                            initialValue: selectedPosition,
+                            dropdownColor: NavalgoColors.shell,
+                            decoration: NavalgoFormStyles.inputDecoration(
+                              context,
+                              label: 'Motor ${index + 1}',
+                              prefixIcon: Icon(
+                                _engineOptionIcon(selectedPosition),
                               ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _enginePositions[index] = value ?? 'Fuera borda';
-                          });
+                            ),
+                            items: _FlotaScreenState._enginePositionOptions
+                                .map(
+                                  (position) => DropdownMenuItem(
+                                    value: position,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          _engineOptionIcon(position),
+                                          size: 18,
+                                          color: NavalgoColors.tide,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(position),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _enginePositions[index] =
+                                    _sanitizeEnginePosition(value);
+                              });
+                            },
+                          );
                         },
                       ),
                     );
@@ -1308,43 +1319,74 @@ class _VesselDialogState extends State<_VesselDialog> {
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Propietario',
-              child: DropdownButtonFormField<int>(
-                initialValue: _ownerId,
-                dropdownColor: NavalgoColors.shell,
-                decoration: NavalgoFormStyles.inputDecoration(
-                  context,
-                  label: 'Propietario',
-                  prefixIcon: const Icon(Icons.business_outlined),
-                ),
-                items: widget.owners
-                    .map(
-                      (o) => DropdownMenuItem(
-                        value: o.id,
-                        child: Row(
-                          children: [
-                            Icon(
-                              o.type == 'COMPANY'
-                                  ? Icons.business
-                                  : Icons.person,
-                              size: 18,
-                              color: o.type == 'COMPANY'
-                                  ? NavalgoColors.tide
-                                  : NavalgoColors.kelp,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(child: Text(o.displayName)),
-                          ],
-                        ),
-                      ),
+              child: widget.owners.isEmpty
+                  ? Text(
+                      'No hay propietarios disponibles.',
+                      style: Theme.of(context).textTheme.bodyMedium,
                     )
-                    .toList(),
-                onChanged: (v) => setState(() => _ownerId = v ?? _ownerId),
-              ),
+                  : DropdownButtonFormField<int>(
+                      initialValue: widget.owners.any(
+                        (owner) => owner.id == _ownerId,
+                      )
+                          ? _ownerId
+                          : widget.owners.first.id,
+                      dropdownColor: NavalgoColors.shell,
+                      decoration: NavalgoFormStyles.inputDecoration(
+                        context,
+                        label: 'Propietario',
+                        prefixIcon: const Icon(Icons.business_outlined),
+                      ),
+                      items: widget.owners
+                          .map(
+                            (o) => DropdownMenuItem(
+                              value: o.id,
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    o.type == 'COMPANY'
+                                        ? Icons.business
+                                        : Icons.person,
+                                    size: 18,
+                                    color: o.type == 'COMPANY'
+                                        ? NavalgoColors.tide
+                                        : NavalgoColors.kelp,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    o.displayName,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (v) => setState(() => _ownerId = v ?? _ownerId),
+                    ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  int _resolveInitialOwnerId(int? initialOwnerId) {
+    if (widget.owners.isEmpty) {
+      return initialOwnerId ?? 0;
+    }
+    if (initialOwnerId != null &&
+        widget.owners.any((owner) => owner.id == initialOwnerId)) {
+      return initialOwnerId;
+    }
+    return widget.owners.first.id;
+  }
+
+  String _sanitizeEnginePosition(String? rawValue) {
+    final normalized = (rawValue ?? '').trim();
+    if (_FlotaScreenState._enginePositionOptions.contains(normalized)) {
+      return normalized;
+    }
+    return 'Fuera borda';
   }
 
   void _syncEnginePositions(int count) {
