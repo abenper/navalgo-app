@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 
 @Service
@@ -15,11 +16,14 @@ import java.util.List;
 public class NotificationService {
 
     private final NotificationRepository notificationRepository;
+    private final PushNotificationService pushNotificationService;
     private final WorkerRepository workerRepository;
 
     public NotificationService(NotificationRepository notificationRepository,
+                               PushNotificationService pushNotificationService,
                                WorkerRepository workerRepository) {
         this.notificationRepository = notificationRepository;
+        this.pushNotificationService = pushNotificationService;
         this.workerRepository = workerRepository;
     }
 
@@ -66,16 +70,50 @@ public class NotificationService {
     @Transactional
     public void notifyAdmins(String title, String message, String actionRoute, NotificationType type) {
         List<Worker> admins = workerRepository.findByRoleAndActiveTrue(Role.ADMIN);
-        for (Worker admin : admins) {
-            notificationRepository.save(buildNotification(admin, title, message, actionRoute, type));
-        }
+        deliver(admins, title, message, actionRoute, type);
     }
 
     @Transactional
     public void notifyWorker(Long workerId, String title, String message, String actionRoute, NotificationType type) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
-        notificationRepository.save(buildNotification(worker, title, message, actionRoute, type));
+        deliver(List.of(worker), title, message, actionRoute, type);
+    }
+
+    @Transactional
+    public void notifyWorkers(Collection<Long> workerIds,
+                              String title,
+                              String message,
+                              String actionRoute,
+                              NotificationType type) {
+        if (workerIds == null || workerIds.isEmpty()) {
+            return;
+        }
+
+        List<Worker> workers = workerRepository.findAllById(workerIds).stream()
+                .filter(Worker::isActive)
+                .toList();
+        deliver(workers, title, message, actionRoute, type);
+    }
+
+    private void deliver(List<Worker> workers,
+                         String title,
+                         String message,
+                         String actionRoute,
+                         NotificationType type) {
+        for (Worker worker : workers) {
+            NotificationEntity saved = notificationRepository.save(
+                    buildNotification(worker, title, message, actionRoute, type)
+            );
+            pushNotificationService.sendToWorker(
+                    worker.getId(),
+                    title,
+                    message,
+                    actionRoute,
+                    type,
+                    saved.getId()
+            );
+        }
     }
 
     private NotificationEntity buildNotification(Worker worker,

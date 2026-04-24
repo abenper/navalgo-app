@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 public record CreateWorkOrderRequest(
@@ -16,6 +17,7 @@ public record CreateWorkOrderRequest(
         Long vesselId,
         List<Long> workerIds,
         WorkOrderPriority priority,
+        @NotNull LocalDate closeDueDate,
         @DecimalMin(value = "0.0", inclusive = true) BigDecimal laborHours,
         Long materialTemplateId,
         @Valid List<EngineHourRequest> engineHours,

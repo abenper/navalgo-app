@@ -8,6 +8,13 @@ class WorkOrderService {
 
   final ApiClient _apiClient;
 
+  String _formatDate(DateTime value) {
+    final normalized = DateTime(value.year, value.month, value.day);
+    final month = normalized.month.toString().padLeft(2, '0');
+    final day = normalized.day.toString().padLeft(2, '0');
+    return '${normalized.year}-$month-$day';
+  }
+
   Future<WorkOrder> getWorkOrder(
     String token, {
     required int workOrderId,
@@ -72,6 +79,7 @@ class WorkOrderService {
     required int ownerId,
     int? vesselId,
     List<int>? workerIds,
+    required DateTime closeDueDate,
     double? laborHours,
     int? materialTemplateId,
     List<Map<String, dynamic>>? engineHours,
@@ -88,6 +96,7 @@ class WorkOrderService {
         'ownerId': ownerId,
         'vesselId': vesselId,
         'workerIds': workerIds,
+        'closeDueDate': _formatDate(closeDueDate),
         'laborHours': laborHours,
         'materialTemplateId': materialTemplateId,
         'engineHours': engineHours,
@@ -109,6 +118,7 @@ class WorkOrderService {
     List<int>? workerIds,
     String? priority,
     String? status,
+    DateTime? closeDueDate,
     bool? clearSignature,
     double? laborHours,
     int? materialTemplateId,
@@ -127,6 +137,7 @@ class WorkOrderService {
         'workerIds': workerIds,
         'priority': priority,
         'status': status,
+        'closeDueDate': closeDueDate == null ? null : _formatDate(closeDueDate),
         'clearSignature': clearSignature,
         'laborHours': laborHours,
         'materialTemplateId': materialTemplateId,

@@ -12,7 +12,7 @@ import '../../widgets/navalgo_ui.dart';
 IconData _engineOptionIcon(String position) {
   switch (position) {
     case 'Motor central':
-      return Icons.settings_outlined;
+      return Icons.adjust;
     case 'Babor':
       return Icons.keyboard_double_arrow_left_rounded;
     case 'Estribor':
@@ -21,7 +21,7 @@ IconData _engineOptionIcon(String position) {
       return Icons.handyman_outlined;
     case 'Fuera borda':
     default:
-      return Icons.precision_manufacturing_outlined;
+      return Icons.shortcut;
   }
 }
 
@@ -1199,7 +1199,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Modelo',
-                  prefixIcon: const Icon(Icons.sailing_outlined),
+                  prefixIcon: const Icon(Icons.description),
                 ),
               ),
             ),
@@ -1230,95 +1230,89 @@ class _VesselDialogState extends State<_VesselDialog> {
                     _syncEngineInputs(int.tryParse(value) ?? 0),
               ),
             ),
-            const SizedBox(height: 14),
-            if (_engineSerialCtrls.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              NavalgoFormFieldBlock(
-                label: 'Número de serie por motor',
-                caption:
-                    'Cada motor tiene su propio campo para no mezclar números de serie.',
-                child: Column(
-                  children: List<Widget>.generate(_engineSerialCtrls.length, (
-                    index,
-                  ) {
-                    final selectedPosition = index < _enginePositions.length
-                        ? _sanitizeEnginePosition(_enginePositions[index])
-                        : 'Fuera borda';
-                    return Padding(
-                      padding: EdgeInsets.only(
-                        bottom: index == _engineSerialCtrls.length - 1 ? 0 : 12,
-                      ),
-                      child: TextFormField(
-                        controller: _engineSerialCtrls[index],
-                        textInputAction: TextInputAction.next,
-                        decoration: NavalgoFormStyles.inputDecoration(
-                          context,
-                          label: 'Motor ${index + 1} - $selectedPosition',
-                          hint: 'Ej. YAM150-00123',
-                          prefixIcon: Icon(_engineOptionIcon(selectedPosition)),
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-              ),
-            ],
             if (_enginePositions.isNotEmpty) ...[
               const SizedBox(height: 14),
               NavalgoFormFieldBlock(
                 label: 'Tipo de motor',
                 caption:
-                    'Selecciona la posición o tipología de cada motor. Incluye ahora la opción Motor central.',
+                    'Selecciona la posición o tipología de cada motor y añade justo debajo su número de serie.',
                 child: Column(
                   children: List<Widget>.generate(_enginePositions.length, (
                     index,
                   ) {
-                    return Padding(
-                      padding: EdgeInsets.only(
-                        bottom: index == _enginePositions.length - 1 ? 0 : 12,
-                      ),
-                      child: Builder(
-                        builder: (context) {
-                          final selectedPosition = _sanitizeEnginePosition(
-                            _enginePositions[index],
-                          );
-                          return DropdownButtonFormField<String>(
-                            initialValue: selectedPosition,
-                            dropdownColor: NavalgoColors.shell,
-                            decoration: NavalgoFormStyles.inputDecoration(
-                              context,
-                              label: 'Motor ${index + 1}',
-                              prefixIcon: Icon(
-                                _engineOptionIcon(selectedPosition),
-                              ),
-                            ),
-                            items: _FlotaScreenState._enginePositionOptions
-                                .map(
-                                  (position) => DropdownMenuItem(
-                                    value: position,
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          _engineOptionIcon(position),
-                                          size: 18,
-                                          color: NavalgoColors.tide,
-                                        ),
-                                        const SizedBox(width: 8),
-                                        Text(position),
-                                      ],
-                                    ),
+                    return Builder(
+                      builder: (context) {
+                        final selectedPosition = _sanitizeEnginePosition(
+                          _enginePositions[index],
+                        );
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            bottom: index == _enginePositions.length - 1
+                                ? 0
+                                : 16,
+                          ),
+                          child: Column(
+                            children: [
+                              DropdownButtonFormField<String>(
+                                initialValue: selectedPosition,
+                                dropdownColor: NavalgoColors.shell,
+                                decoration: NavalgoFormStyles.inputDecoration(
+                                  context,
+                                  label: 'Motor ${index + 1}',
+                                  prefixIcon: Icon(
+                                    _engineOptionIcon(selectedPosition),
                                   ),
-                                )
-                                .toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                _enginePositions[index] =
-                                    _sanitizeEnginePosition(value);
-                              });
-                            },
-                          );
-                        },
-                      ),
+                                ),
+                                selectedItemBuilder: (context) {
+                                  return _FlotaScreenState._enginePositionOptions
+                                      .map(
+                                        (position) => Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Text(position),
+                                        ),
+                                      )
+                                      .toList();
+                                },
+                                items: _FlotaScreenState._enginePositionOptions
+                                    .map(
+                                      (position) => DropdownMenuItem(
+                                        value: position,
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              _engineOptionIcon(position),
+                                              size: 18,
+                                              color: NavalgoColors.tide,
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Text(position),
+                                          ],
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) {
+                                  setState(() {
+                                    _enginePositions[index] =
+                                        _sanitizeEnginePosition(value);
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              TextFormField(
+                                controller: _engineSerialCtrls[index],
+                                textInputAction: TextInputAction.next,
+                                decoration: NavalgoFormStyles.inputDecoration(
+                                  context,
+                                  label: 'Número de serie',
+                                  hint: 'Introduce el número de serie del motor',
+                                  prefixIcon: const Icon(Icons.dialpad),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
                     );
                   }),
                 ),
@@ -1583,7 +1577,7 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
           NavalgoFormFieldBlock(
             label: 'Modelo',
             child: _VesselDetailValue(
-              icon: Icons.sailing_outlined,
+              icon: Icons.description,
               value: vessel.model ?? 'No indicado',
             ),
           ),
@@ -1609,7 +1603,7 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
           NavalgoFormFieldBlock(
             label: 'Números de serie de motor',
             child: _VesselDetailValue(
-              icon: Icons.confirmation_number_outlined,
+              icon: Icons.dialpad,
               value: _buildEngineSerialSummary(vessel),
             ),
           ),

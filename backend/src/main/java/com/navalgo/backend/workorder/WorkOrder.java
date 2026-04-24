@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -62,8 +63,14 @@ public class WorkOrder {
     @OneToMany(mappedBy = "workOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<MaterialRevisionRequest> materialRevisionRequests = new LinkedHashSet<>();
 
+    @Column(name = "close_due_date")
+    private LocalDate closeDueDate;
+
     @Column(nullable = false)
     private Instant createdAt = Instant.now();
+
+    @Column(name = "last_close_reminder_sent_at")
+    private Instant lastCloseReminderSentAt;
 
     @Column(length = 2000)
     private String signatureUrl;
@@ -120,8 +127,14 @@ public class WorkOrder {
         this.materialRevisionRequests = materialRevisionRequests;
     }
 
+    public LocalDate getCloseDueDate() { return closeDueDate; }
+    public void setCloseDueDate(LocalDate closeDueDate) { this.closeDueDate = closeDueDate; }
+
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
+    public Instant getLastCloseReminderSentAt() { return lastCloseReminderSentAt; }
+    public void setLastCloseReminderSentAt(Instant lastCloseReminderSentAt) { this.lastCloseReminderSentAt = lastCloseReminderSentAt; }
 
     public String getSignatureUrl() { return signatureUrl; }
     public void setSignatureUrl(String signatureUrl) { this.signatureUrl = signatureUrl; }

@@ -127,6 +127,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     switch (actionRoute) {
       case 'PARTES':
         return 1;
+      case 'FICHAJES':
+        return 4;
       case 'AUSENCIAS':
         return 5;
       default:

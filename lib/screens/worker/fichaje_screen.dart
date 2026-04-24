@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/time_adjustment_request.dart';
 import '../../models/time_entry.dart';
 import '../../services/time_tracking_service.dart';
 import '../../theme/navalgo_theme.dart';
+import '../../utils/app_toast.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 
@@ -36,6 +38,10 @@ class _FichajeScreenState extends State<FichajeScreen> {
   String? _error;
   bool _isPunchedIn = false;
   List<TimeEntry> _entries = <TimeEntry>[];
+  List<TimeAdjustmentRequest> _adjustmentRequests =
+      <TimeAdjustmentRequest>[];
+  TodayClockedWorkersSummary? _todaySummary;
+  bool _adjustmentBusy = false;
 
   @override
   void initState() {
@@ -47,6 +53,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
     final session = context.read<SessionViewModel>();
     final token = session.token;
     final workerId = session.user?.id;
+    final isAdmin = session.user?.role == 'ADMIN';
 
     if (token == null || workerId == null) {
       setState(() {
@@ -67,12 +74,32 @@ class _FichajeScreenState extends State<FichajeScreen> {
         token,
         workerId: workerId,
       );
+
+      TodayClockedWorkersSummary? todaySummary;
+      List<TimeAdjustmentRequest> adjustmentRequests =
+          <TimeAdjustmentRequest>[];
+      try {
+        if (isAdmin) {
+          todaySummary = await timeTrackingService.getTodaySummary(token);
+          adjustmentRequests = await timeTrackingService.getAdjustmentRequests(
+            token,
+            status: 'PENDING',
+          );
+        } else {
+          adjustmentRequests = await timeTrackingService.getAdjustmentRequests(
+            token,
+          );
+        }
+      } catch (_) {}
+
       if (!mounted) {
         return;
       }
       setState(() {
         _entries = entries;
         _isPunchedIn = entries.any((e) => e.clockOut == null);
+        _todaySummary = todaySummary;
+        _adjustmentRequests = adjustmentRequests;
       });
     } catch (e) {
       if (!mounted) {
@@ -126,6 +153,9 @@ class _FichajeScreenState extends State<FichajeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isAdmin = context.select<SessionViewModel, bool>(
+      (session) => session.user?.role == 'ADMIN',
+    );
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -206,9 +236,98 @@ class _FichajeScreenState extends State<FichajeScreen> {
                     ),
                   ),
                 ),
+                if (!isAdmin) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: _adjustmentBusy
+                          ? null
+                          : _openAdjustmentRequestDialog,
+                      icon: const Icon(Icons.fact_check_outlined),
+                      label: const Text('Solicitar ajuste de fichaje'),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
+          if (isAdmin && _todaySummary != null) ...[
+            const SizedBox(height: 18),
+            const NavalgoSectionHeader(
+              title: 'Resumen del día',
+              subtitle:
+                  'Vista rápida del personal que ya ha registrado actividad hoy.',
+            ),
+            const SizedBox(height: 12),
+            NavalgoPanel(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_todaySummary!.clockedWorkersCount} trabajador(es) con actividad hoy',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    _todaySummary!.workerNames.isEmpty
+                        ? 'Todavía no hay registros hoy.'
+                        : _todaySummary!.workerNames.join(', '),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 18),
+          NavalgoSectionHeader(
+            title: isAdmin
+                ? 'Solicitudes pendientes de ajuste'
+                : 'Mis solicitudes de ajuste',
+            subtitle: isAdmin
+                ? 'Aprueba o rechaza los cambios solicitados por el equipo.'
+                : 'Consulta el estado de tus solicitudes recientes.',
+          ),
+          const SizedBox(height: 12),
+          if (_adjustmentRequests.isEmpty)
+            NavalgoPanel(
+              child: Text(
+                isAdmin
+                    ? 'No hay solicitudes pendientes de revisión.'
+                    : 'Todavía no has enviado solicitudes de ajuste.',
+              ),
+            )
+          else
+            ..._adjustmentRequests.map((request) {
+              final requestedClockIn = request.requestedClockIn;
+              final requestedClockOut = request.requestedClockOut;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _TimeAdjustmentRequestCard(
+                  request: request,
+                  workDateLabel: _fmtDate(request.workDate),
+                  requestedHoursLabel:
+                      '${requestedClockIn == null ? '--:--' : _fmtHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _fmtHour(requestedClockOut)}',
+                  workSiteLabel: _workSiteLabel(request.workSite),
+                  busy: _adjustmentBusy,
+                  canReview: isAdmin && request.isPending,
+                  onApprove: isAdmin && request.isPending
+                      ? () => _reviewAdjustmentRequest(
+                          request,
+                          approve: true,
+                        )
+                      : null,
+                  onReject: isAdmin && request.isPending
+                      ? () => _reviewAdjustmentRequest(
+                          request,
+                          approve: false,
+                        )
+                      : null,
+                ),
+              );
+            }),
           const SizedBox(height: 18),
           const NavalgoSectionHeader(
             title: 'Últimos registros',
@@ -410,6 +529,490 @@ class _FichajeScreenState extends State<FichajeScreen> {
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     return '${hours}h ${minutes}m';
   }
+
+  Future<void> _openAdjustmentRequestDialog() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final result = await showDialog<_TimeAdjustmentRequestInput>(
+      context: context,
+      builder: (_) => _TimeAdjustmentRequestDialog(entries: _entries),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() => _adjustmentBusy = true);
+    try {
+      await context.read<TimeTrackingService>().createAdjustmentRequest(
+        token,
+        timeEntryId: result.timeEntryId,
+        workDate: result.workDate,
+        requestedClockIn: result.requestedClockIn,
+        requestedClockOut: result.requestedClockOut,
+        workSite: result.workSite,
+        reason: result.reason,
+      );
+      await _loadEntries();
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(context, 'Solicitud de ajuste enviada.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo enviar la solicitud: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _adjustmentBusy = false);
+      }
+    }
+  }
+
+  Future<void> _reviewAdjustmentRequest(
+    TimeAdjustmentRequest request, {
+    required bool approve,
+  }) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final commentController = TextEditingController();
+    final comment = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            approve
+                ? 'Aprobar ajuste de fichaje'
+                : 'Rechazar ajuste de fichaje',
+          ),
+          content: TextField(
+            controller: commentController,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Comentario para el trabajador',
+              hintText: 'Opcional',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(
+                dialogContext,
+                commentController.text.trim(),
+              ),
+              child: Text(approve ? 'Aprobar' : 'Rechazar'),
+            ),
+          ],
+        );
+      },
+    );
+    commentController.dispose();
+
+    if (!mounted || comment == null) {
+      return;
+    }
+
+    setState(() => _adjustmentBusy = true);
+    try {
+      await context.read<TimeTrackingService>().reviewAdjustmentRequest(
+        token,
+        requestId: request.id,
+        status: approve ? 'APPROVED' : 'REJECTED',
+        adminComment: comment.isEmpty ? null : comment,
+      );
+      await _loadEntries();
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(
+        context,
+        approve
+            ? 'Ajuste aprobado y aplicado.'
+            : 'Solicitud rechazada correctamente.',
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo revisar la solicitud: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _adjustmentBusy = false);
+      }
+    }
+  }
+}
+
+class _TimeAdjustmentRequestInput {
+  const _TimeAdjustmentRequestInput({
+    required this.timeEntryId,
+    required this.workDate,
+    required this.requestedClockIn,
+    required this.requestedClockOut,
+    required this.workSite,
+    required this.reason,
+  });
+
+  final int? timeEntryId;
+  final DateTime workDate;
+  final DateTime? requestedClockIn;
+  final DateTime? requestedClockOut;
+  final String workSite;
+  final String reason;
+}
+
+class _TimeAdjustmentRequestDialog extends StatefulWidget {
+  const _TimeAdjustmentRequestDialog({required this.entries});
+
+  final List<TimeEntry> entries;
+
+  @override
+  State<_TimeAdjustmentRequestDialog> createState() =>
+      _TimeAdjustmentRequestDialogState();
+}
+
+class _TimeAdjustmentRequestDialogState
+    extends State<_TimeAdjustmentRequestDialog> {
+  final TextEditingController _reasonController = TextEditingController();
+  int? _selectedEntryId;
+  late DateTime _workDate;
+  TimeOfDay? _clockInTime;
+  TimeOfDay? _clockOutTime;
+  String _workSite = 'WORKSHOP';
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _workDate = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Solicitar ajuste de fichaje'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            DropdownButtonFormField<int?>(
+              initialValue: _selectedEntryId,
+              decoration: const InputDecoration(
+                labelText: 'Fichaje a ajustar',
+              ),
+              items: [
+                const DropdownMenuItem<int?>(
+                  value: null,
+                  child: Text('Sin registro existente'),
+                ),
+                ...widget.entries.map(
+                  (entry) => DropdownMenuItem<int?>(
+                    value: entry.id,
+                    child: Text(
+                      '${_formatDialogDate(entry.clockIn)} · ${_workSiteLabelForDialog(entry.workSite)} · ${_formatDialogHour(entry.clockIn)} - ${entry.clockOut == null ? '--:--' : _formatDialogHour(entry.clockOut!)}',
+                    ),
+                  ),
+                ),
+              ],
+              onChanged: (value) {
+                final selectedEntry = widget.entries
+                    .where((entry) => entry.id == value)
+                    .cast<TimeEntry?>()
+                    .firstOrNull;
+                setState(() {
+                  _selectedEntryId = value;
+                  if (selectedEntry != null) {
+                    final localClockIn = selectedEntry.clockIn.toLocal();
+                    _workDate = DateTime(
+                      localClockIn.year,
+                      localClockIn.month,
+                      localClockIn.day,
+                    );
+                    _clockInTime = TimeOfDay.fromDateTime(localClockIn);
+                    _clockOutTime = selectedEntry.clockOut == null
+                        ? null
+                        : TimeOfDay.fromDateTime(selectedEntry.clockOut!.toLocal());
+                    _workSite = selectedEntry.workSite;
+                  }
+                  _error = null;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _workDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2100),
+                );
+                if (!mounted || picked == null) {
+                  return;
+                }
+                setState(() {
+                  _workDate = picked;
+                });
+              },
+              icon: const Icon(Icons.event_outlined),
+              label: Text('Fecha: ${_formatDialogDate(_workDate)}'),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime:
+                            _clockInTime ??
+                            const TimeOfDay(hour: 8, minute: 0),
+                      );
+                      if (!mounted || picked == null) {
+                        return;
+                      }
+                      setState(() {
+                        _clockInTime = picked;
+                      });
+                    },
+                    icon: const Icon(Icons.login),
+                    label: Text(
+                      _clockInTime == null
+                          ? 'Entrada'
+                          : 'Entrada ${_clockInTime!.format(context)}',
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final picked = await showTimePicker(
+                        context: context,
+                        initialTime:
+                            _clockOutTime ??
+                            const TimeOfDay(hour: 17, minute: 0),
+                      );
+                      if (!mounted || picked == null) {
+                        return;
+                      }
+                      setState(() {
+                        _clockOutTime = picked;
+                      });
+                    },
+                    icon: const Icon(Icons.logout),
+                    label: Text(
+                      _clockOutTime == null
+                          ? 'Salida'
+                          : 'Salida ${_clockOutTime!.format(context)}',
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              initialValue: _workSite,
+              decoration: const InputDecoration(labelText: 'Tipo de jornada'),
+              items: const [
+                DropdownMenuItem(value: 'WORKSHOP', child: Text('Taller')),
+                DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
+              ],
+              onChanged: (value) {
+                if (value == null) {
+                  return;
+                }
+                setState(() {
+                  _workSite = value;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _reasonController,
+              minLines: 3,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: 'Motivo',
+                hintText:
+                    'Explica qué hora debe corregirse y por qué no quedó registrada correctamente.',
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Enviar solicitud'),
+        ),
+      ],
+    );
+  }
+
+  void _submit() {
+    if (_reasonController.text.trim().isEmpty) {
+      setState(() {
+        _error = 'Debes indicar el motivo del ajuste.';
+      });
+      return;
+    }
+    if (_clockInTime == null && _clockOutTime == null) {
+      setState(() {
+        _error = 'Indica al menos una hora a ajustar.';
+      });
+      return;
+    }
+
+    DateTime? combine(TimeOfDay? time) {
+      if (time == null) {
+        return null;
+      }
+      return DateTime(
+        _workDate.year,
+        _workDate.month,
+        _workDate.day,
+        time.hour,
+        time.minute,
+      );
+    }
+
+    Navigator.pop(
+      context,
+      _TimeAdjustmentRequestInput(
+        timeEntryId: _selectedEntryId,
+        workDate: DateTime(_workDate.year, _workDate.month, _workDate.day),
+        requestedClockIn: combine(_clockInTime),
+        requestedClockOut: combine(_clockOutTime),
+        workSite: _workSite,
+        reason: _reasonController.text.trim(),
+      ),
+    );
+  }
+}
+
+class _TimeAdjustmentRequestCard extends StatelessWidget {
+  const _TimeAdjustmentRequestCard({
+    required this.request,
+    required this.workDateLabel,
+    required this.requestedHoursLabel,
+    required this.workSiteLabel,
+    required this.busy,
+    required this.canReview,
+    this.onApprove,
+    this.onReject,
+  });
+
+  final TimeAdjustmentRequest request;
+  final String workDateLabel;
+  final String requestedHoursLabel;
+  final String workSiteLabel;
+  final bool busy;
+  final bool canReview;
+  final VoidCallback? onApprove;
+  final VoidCallback? onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _timeAdjustmentStatusColor(request.status);
+    return NavalgoPanel(
+      tint: statusColor.withValues(alpha: 0.06),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      request.workerName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$workDateLabel · $workSiteLabel · $requestedHoursLabel',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              NavalgoStatusChip(
+                label: _timeAdjustmentStatusLabel(request.status),
+                color: statusColor,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(request.reason, style: Theme.of(context).textTheme.bodyLarge),
+          if (request.adminComment != null && request.adminComment!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Comentario: ${request.adminComment}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          if (canReview) ...[
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: busy ? null : onReject,
+                    icon: const Icon(Icons.close_outlined),
+                    label: const Text('Rechazar'),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: busy ? null : onApprove,
+                    icon: const Icon(Icons.check_outlined),
+                    label: const Text('Aprobar'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _ClockWorkSiteOption {
@@ -426,4 +1029,52 @@ class _ClockWorkSiteOption {
   final String subtitle;
   final IconData icon;
   final Color accent;
+}
+
+Color _timeAdjustmentStatusColor(String status) {
+  switch (status) {
+    case 'APPROVED':
+      return NavalgoColors.kelp;
+    case 'REJECTED':
+      return NavalgoColors.coral;
+    case 'PENDING':
+    default:
+      return NavalgoColors.sand;
+  }
+}
+
+String _timeAdjustmentStatusLabel(String status) {
+  switch (status) {
+    case 'APPROVED':
+      return 'Aprobada';
+    case 'REJECTED':
+      return 'Rechazada';
+    case 'PENDING':
+    default:
+      return 'Pendiente';
+  }
+}
+
+String _formatDialogDate(DateTime d) {
+  final local = d.toLocal();
+  final dd = local.day.toString().padLeft(2, '0');
+  final mm = local.month.toString().padLeft(2, '0');
+  final yyyy = local.year.toString();
+  return '$dd/$mm/$yyyy';
+}
+
+String _formatDialogHour(DateTime d) {
+  final local = d.toLocal();
+  final hh = local.hour.toString().padLeft(2, '0');
+  final mm = local.minute.toString().padLeft(2, '0');
+  return '$hh:$mm';
+}
+
+String _workSiteLabelForDialog(String workSite) {
+  switch (workSite) {
+    case 'TRAVEL':
+      return 'Viaje';
+    default:
+      return 'Taller';
+  }
 }

@@ -117,6 +117,8 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     switch (actionRoute) {
       case 'PARTES':
         return 1;
+      case 'FICHAJES':
+        return 4;
       case 'AUSENCIAS':
         return 3;
       default:

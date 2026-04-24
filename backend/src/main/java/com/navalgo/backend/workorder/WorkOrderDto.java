@@ -2,6 +2,7 @@ package com.navalgo.backend.workorder;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 public record WorkOrderDto(
@@ -22,6 +23,7 @@ public record WorkOrderDto(
         List<EngineHourRequest> engineHours,
         List<String> attachmentUrls,
         List<AttachmentInfoDto> attachments,
+        LocalDate closeDueDate,
         Instant createdAt,
         String signatureUrl,
         Instant signedAt,

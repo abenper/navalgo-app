@@ -58,3 +58,9 @@ app:
     max-video-size-bytes: ${APP_MEDIA_MAX_VIDEO_SIZE_BYTES:26214400}
     max-signature-size-bytes: ${APP_MEDIA_MAX_SIGNATURE_SIZE_BYTES:5242880}
     max-profile-photo-size-bytes: ${APP_MEDIA_MAX_PROFILE_PHOTO_SIZE_BYTES:5242880}
+  firebase:
+    enabled: ${APP_FIREBASE_ENABLED:true}
+    service-account-path: ${APP_FIREBASE_SERVICE_ACCOUNT_PATH:}
+    service-account-json: ${APP_FIREBASE_SERVICE_ACCOUNT_JSON:}
+  scheduling:
+    work-order-close-reminders-cron: ${APP_SCHEDULING_WORK_ORDER_CLOSE_REMINDERS_CRON:0 0 9 * * *}

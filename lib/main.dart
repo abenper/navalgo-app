@@ -1,12 +1,15 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:navalgo/app/app_globals.dart';
+import 'package:navalgo/firebase_options.dart';
 import 'package:navalgo/services/network/api_client.dart';
 import 'package:navalgo/services/auth_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
 import 'package:navalgo/services/leave_service.dart';
 import 'package:navalgo/services/material_checklist_template_service.dart';
 import 'package:navalgo/services/notification_service.dart';
+import 'package:navalgo/services/push_notification_service.dart';
 import 'package:navalgo/services/time_tracking_service.dart';
 import 'package:navalgo/services/worker_service.dart';
 import 'package:navalgo/services/work_order_material_service.dart';
@@ -25,6 +28,15 @@ import 'screens/common/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    if (Firebase.apps.isEmpty) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+    }
+  } on UnsupportedError {
+    // Firebase is not configured for every desktop target.
+  }
   final sessionViewModel = SessionViewModel();
   await sessionViewModel.restoreSession();
   ApiClient.configureSessionExpiredHandler((message) async {
@@ -50,6 +62,9 @@ Future<void> main() async {
         Provider<FleetService>(create: (_) => FleetService()),
         Provider<LeaveService>(create: (_) => LeaveService()),
         Provider<NotificationService>(create: (_) => NotificationService()),
+        Provider<PushNotificationService>(
+          create: (_) => PushNotificationService(),
+        ),
         Provider<TimeTrackingService>(create: (_) => TimeTrackingService()),
         Provider<MaterialChecklistTemplateService>(
           create: (_) => MaterialChecklistTemplateService(),
@@ -91,9 +106,54 @@ Future<void> main() async {
           ),
         ),
       ],
-      child: const MyApp(),
+      child: const _PushNotificationBootstrap(child: MyApp()),
     ),
   );
+}
+
+class _PushNotificationBootstrap extends StatefulWidget {
+  const _PushNotificationBootstrap({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PushNotificationBootstrap> createState() =>
+      _PushNotificationBootstrapState();
+}
+
+class _PushNotificationBootstrapState extends State<_PushNotificationBootstrap> {
+  String? _lastAuthToken;
+
+  @override
+  void dispose() {
+    context.read<PushNotificationService>().dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currentAuthToken = context.select<SessionViewModel, String?>(
+      (session) => session.token,
+    );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || currentAuthToken == _lastAuthToken) {
+        return;
+      }
+
+      final previousAuthToken = _lastAuthToken;
+      _lastAuthToken = currentAuthToken;
+
+      context.read<PushNotificationService>().syncSession(
+        previousAuthToken: previousAuthToken,
+        currentAuthToken: currentAuthToken,
+        notificationApi: context.read<NotificationService>(),
+        refreshNotifications: context.read<NotificationsViewModel>().refresh,
+      );
+    });
+
+    return widget.child;
+  }
 }
 
 class MyApp extends StatelessWidget {

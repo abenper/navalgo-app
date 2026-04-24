@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "201883315763",
+    "project_id": "naval-go",
+    "storage_bucket": "naval-go.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:201883315763:android:cc1fb6527634ce724dbd46",
+        "android_client_info": {
+          "package_name": "com.example.navalgo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAccLlDvNplZOtO6K7Umx6fXtpkz0Vg0TA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

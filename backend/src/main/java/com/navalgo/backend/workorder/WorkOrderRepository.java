@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
@@ -15,6 +17,10 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     List<WorkOrder> findByAssignedWorkersIdOrderByCreatedAtDesc(Long workerId);
     boolean existsByVesselId(Long vesselId);
     List<WorkOrder> findByVesselIdOrderByCreatedAtDesc(Long vesselId);
+        List<WorkOrder> findByCloseDueDateBeforeAndStatusNotInOrderByCloseDueDateAsc(
+            LocalDate closeDueDate,
+            Collection<WorkOrderStatus> statuses
+        );
 
     @Modifying
     @Query(value = "DELETE FROM work_order_workers WHERE worker_id = :workerId", nativeQuery = true)

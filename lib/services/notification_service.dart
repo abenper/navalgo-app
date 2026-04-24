@@ -46,4 +46,27 @@ class NotificationService {
       headers: {'Authorization': 'Bearer $token'},
     );
   }
+
+  Future<void> registerPushToken(
+    String token, {
+    required String pushToken,
+    required String platform,
+  }) async {
+    await _apiClient.post(
+      '/push-tokens/register',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {'token': pushToken, 'platform': platform},
+    );
+  }
+
+  Future<void> unregisterPushToken(
+    String token, {
+    required String pushToken,
+  }) async {
+    await _apiClient.post(
+      '/push-tokens/unregister',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {'token': pushToken},
+    );
+  }
 }

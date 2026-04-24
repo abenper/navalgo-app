@@ -400,6 +400,7 @@ class WorkOrder {
     required this.engineHours,
     required this.attachmentUrls,
     required this.attachments,
+    this.closeDueDate,
     required this.createdAt,
     this.signatureUrl,
     this.signedAt,
@@ -424,6 +425,7 @@ class WorkOrder {
   final List<EngineHourLog> engineHours;
   final List<String> attachmentUrls;
   final List<WorkOrderAttachmentItem> attachments;
+  final DateTime? closeDueDate;
   final DateTime createdAt;
   final String? signatureUrl;
   final DateTime? signedAt;
@@ -452,6 +454,16 @@ class WorkOrder {
         : rawSignedAt is num
         ? DateTime.fromMillisecondsSinceEpoch(rawSignedAt.toInt(), isUtc: true)
         : null;
+
+    final rawCloseDueDate = json['closeDueDate'];
+    final DateTime? closeDueDate = rawCloseDueDate is String
+      ? DateTime.tryParse(rawCloseDueDate)
+      : rawCloseDueDate is num
+      ? DateTime.fromMillisecondsSinceEpoch(
+        rawCloseDueDate.toInt(),
+        isUtc: true,
+        )
+      : null;
 
     final rawWorkerIds = json['workerIds'];
     final List<int> workerIds = rawWorkerIds is List
@@ -535,6 +547,7 @@ class WorkOrder {
       engineHours: engineHours,
       attachmentUrls: attachmentUrls,
       attachments: attachments,
+        closeDueDate: closeDueDate,
       createdAt: createdAt,
       signatureUrl: asNullableString(json['signatureUrl']),
       signedAt: signedAt,

@@ -128,6 +128,7 @@ public class WorkOrderService {
         workOrder.setOwner(owner);
         workOrder.setVessel(vessel);
         workOrder.setPriority(request.priority() == null ? WorkOrderPriority.NORMAL : request.priority());
+        workOrder.setCloseDueDate(request.closeDueDate());
         workOrder.setLaborHours(request.laborHours());
 
         if (request.materialTemplateId() != null) {
@@ -172,7 +173,7 @@ public class WorkOrderService {
             notificationService.notifyWorker(
                     worker.getId(),
                     "Nuevo parte asignado",
-                    "Se te ha asignado el parte: " + saved.getTitle(),
+                    buildAssignmentMessage(saved),
                     "PARTES",
                     saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO
             );
@@ -224,6 +225,9 @@ public class WorkOrderService {
         }
         if (request.priority() != null) {
             workOrder.setPriority(request.priority());
+        }
+        if (request.closeDueDate() != null) {
+            workOrder.setCloseDueDate(request.closeDueDate());
         }
         if (request.laborHours() != null) {
             workOrder.setLaborHours(request.laborHours());
@@ -321,7 +325,7 @@ public class WorkOrderService {
                 notificationService.notifyWorker(
                         workerId,
                         "Nuevo parte asignado",
-                        "Se te ha asignado el parte: " + saved.getTitle(),
+                    buildAssignmentMessage(saved),
                         "PARTES",
                         saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO
                 );
@@ -526,6 +530,7 @@ public class WorkOrderService {
         return (request.title() != null && !request.title().isBlank())
                 || request.priority() != null
                 || request.status() != null
+            || request.closeDueDate() != null
                 || request.ownerId() != null
                 || request.vesselId() != null
                 || request.workerIds() != null
@@ -624,12 +629,29 @@ public class WorkOrderService {
             engineHours,
             attachments.stream().map(WorkOrderAttachment::getFileUrl).filter(Objects::nonNull).toList(),
             attachments.stream().map(AttachmentInfoDto::from).toList(),
+                w.getCloseDueDate(),
                 w.getCreatedAt(),
                 w.getSignatureUrl(),
                 w.getSignedAt(),
                 w.getSignedByWorker() != null ? w.getSignedByWorker().getId() : null,
                 w.getSignedByWorker() != null ? w.getSignedByWorker().getFullName() : null
         );
+    }
+
+    private String buildAssignmentMessage(WorkOrder workOrder) {
+        StringBuilder builder = new StringBuilder("Se te ha asignado el parte: ")
+                .append(workOrder.getTitle());
+        if (workOrder.getCloseDueDate() != null) {
+            builder.append(". Cierre previsto: ")
+                    .append(formatCloseDate(workOrder.getCloseDueDate()));
+        }
+        return builder.toString();
+    }
+
+    private String formatCloseDate(LocalDate closeDate) {
+        String day = String.format("%02d", closeDate.getDayOfMonth());
+        String month = String.format("%02d", closeDate.getMonthValue());
+        return day + "/" + month + "/" + closeDate.getYear();
     }
 
     @Transactional

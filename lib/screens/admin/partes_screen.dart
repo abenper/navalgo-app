@@ -105,6 +105,7 @@ class _PartesScreenState extends State<PartesScreen> {
         ownerId: input.ownerId,
         vesselId: input.vesselId,
         workerIds: input.workerIds,
+        closeDueDate: input.closeDueDate,
         laborHours: input.laborHours,
         materialTemplateId: input.materialTemplateId,
         engineHours: input.engineHours
@@ -518,6 +519,18 @@ class _PartesScreenState extends State<PartesScreen> {
                                                             0xFFDDF0F6,
                                                           ),
                                                     ),
+                                                  if (_isOverdueWorkOrder(
+                                                    parte,
+                                                  ))
+                                                    const _PartBadge(
+                                                      label: 'Cierre vencido',
+                                                      textColor: Color(
+                                                        0xFF9B1C1C,
+                                                      ),
+                                                      backgroundColor: Color(
+                                                        0xFFFDE8E8,
+                                                      ),
+                                                    ),
                                                 ],
                                               ),
                                               const SizedBox(height: 14),
@@ -535,6 +548,29 @@ class _PartesScreenState extends State<PartesScreen> {
                                                   color: Color(0xFF738892),
                                                 ),
                                               ),
+                                              if (parte.closeDueDate != null) ...[
+                                                const SizedBox(height: 4),
+                                                Text(
+                                                  'Cierre: ${_formatCalendarDate(parte.closeDueDate!)}',
+                                                  style: TextStyle(
+                                                    color: _isOverdueWorkOrder(
+                                                          parte,
+                                                        )
+                                                        ? const Color(
+                                                            0xFF9B1C1C,
+                                                          )
+                                                        : const Color(
+                                                            0xFF738892,
+                                                          ),
+                                                    fontWeight:
+                                                        _isOverdueWorkOrder(
+                                                          parte,
+                                                        )
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
                                             ],
                                           ),
                                         ),
@@ -588,6 +624,29 @@ class _PartesScreenState extends State<PartesScreen> {
     final minute = local.minute.toString().padLeft(2, '0');
     return '$day/$month/$year · $hour:$minute';
   }
+
+  bool _isOverdueWorkOrder(WorkOrder workOrder) {
+    if (workOrder.closeDueDate == null) {
+      return false;
+    }
+    if (workOrder.status == 'DONE' || workOrder.status == 'CANCELLED') {
+      return false;
+    }
+
+    final today = DateTime.now();
+    final normalizedToday = DateTime(today.year, today.month, today.day);
+    final dueDate = workOrder.closeDueDate!;
+    final normalizedDueDate = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    return normalizedDueDate.isBefore(normalizedToday);
+  }
+}
+
+String _formatCalendarDate(DateTime dateTime) {
+  final local = dateTime.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  final year = local.year.toString();
+  return '$day/$month/$year';
 }
 
 class _WorkOrderDetailsSheet extends StatefulWidget {
@@ -821,6 +880,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
           value: _workOrder.workerNames.isEmpty
               ? 'Sin asignar'
               : _workOrder.workerNames.join(', '),
+        ),
+        _DetailRow(
+          label: 'Fecha de cierre',
+          value: _workOrder.closeDueDate == null
+              ? 'Sin definir'
+              : _formatCalendarDate(_workOrder.closeDueDate!),
         ),
         _DetailRow(
           label: 'Creado',
@@ -2015,6 +2080,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         vesselId: result.vesselId,
         workerIds: result.workerIds,
         priority: result.highPriority ? 'HIGH' : 'NORMAL',
+        closeDueDate: result.closeDueDate,
         materialTemplateId: result.materialTemplateId,
         clearMaterialChecklist: result.clearMaterialChecklist,
       );
@@ -2333,6 +2399,9 @@ String _formatEngineLabel(String rawLabel) {
 
 IconData _engineIconForLabel(String rawLabel) {
   final label = rawLabel.toLowerCase();
+  if (label.contains('fuera borda') || label.contains('outboard')) {
+    return Icons.shortcut;
+  }
   if (label.contains('babor') || label.contains('port')) {
     return Icons.keyboard_double_arrow_left_rounded;
   }
@@ -2340,7 +2409,7 @@ IconData _engineIconForLabel(String rawLabel) {
     return Icons.keyboard_double_arrow_right_rounded;
   }
   if (label.contains('central') || label.contains('main')) {
-    return Icons.tune_rounded;
+    return Icons.adjust;
   }
   if (label.contains('aux')) {
     return Icons.power_outlined;
@@ -2603,6 +2672,7 @@ class _EditPartInput {
     required this.vesselId,
     required this.workerIds,
     required this.highPriority,
+    required this.closeDueDate,
     required this.materialTemplateId,
     required this.clearMaterialChecklist,
   });
@@ -2611,6 +2681,7 @@ class _EditPartInput {
   final int? vesselId;
   final List<int> workerIds;
   final bool highPriority;
+  final DateTime closeDueDate;
   final int? materialTemplateId;
   final bool clearMaterialChecklist;
 }
@@ -2637,9 +2708,11 @@ class _EditPartDialogState extends State<_EditPartDialog> {
   late int _ownerId;
   int? _vesselId;
   late bool _highPriority;
+  DateTime? _closeDueDate;
   late final Set<int> _selectedWorkers;
   int? _selectedMaterialTemplateId;
   bool _clearMaterialChecklist = false;
+  String? _validationError;
 
   @override
   void initState() {
@@ -2649,6 +2722,7 @@ class _EditPartDialogState extends State<_EditPartDialog> {
     _highPriority =
         widget.workOrder.priority == 'HIGH' ||
         widget.workOrder.priority == 'URGENT';
+    _closeDueDate = widget.workOrder.closeDueDate;
     _selectedWorkers = widget.workOrder.workerIds.toSet();
     _selectedMaterialTemplateId =
         widget.workOrder.materialChecklist?.sourceTemplateId;
@@ -2683,6 +2757,12 @@ class _EditPartDialogState extends State<_EditPartDialog> {
           label: 'Guardar',
           icon: Icons.save_outlined,
           onPressed: () {
+            if (_closeDueDate == null) {
+              setState(() {
+                _validationError = 'La fecha de cierre es obligatoria.';
+              });
+              return;
+            }
             Navigator.pop(
               context,
               _EditPartInput(
@@ -2690,6 +2770,7 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                 vesselId: _vesselId,
                 workerIds: _selectedWorkers.toList(),
                 highPriority: _highPriority,
+                closeDueDate: _closeDueDate!,
                 materialTemplateId: _selectedMaterialTemplateId,
                 clearMaterialChecklist: _clearMaterialChecklist,
               ),
@@ -2810,6 +2891,38 @@ class _EditPartDialogState extends State<_EditPartDialog> {
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
+              label: 'Fecha de cierre',
+              caption:
+                  'Obligatoria. Se usará para recordar el cierre si el parte sigue abierto.',
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final initialDate =
+                      _closeDueDate ??
+                      DateTime.now().add(const Duration(days: 1));
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initialDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2100),
+                  );
+                  if (!mounted || picked == null) {
+                    return;
+                  }
+                  setState(() {
+                    _closeDueDate = picked;
+                    _validationError = null;
+                  });
+                },
+                icon: const Icon(Icons.event_available_outlined),
+                label: Text(
+                  _closeDueDate == null
+                      ? 'Seleccionar fecha'
+                      : _formatCalendarDate(_closeDueDate!),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
               label: 'Mecánicos asignados',
               caption: 'Selecciona el equipo que trabajará sobre este parte.',
               child: NavalgoPanel(
@@ -2841,6 +2954,13 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                 });
               },
             ),
+            if (_validationError != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _validationError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
           ],
         ),
       ),
@@ -2855,6 +2975,7 @@ class _CreatePartInput {
     required this.ownerId,
     required this.vesselId,
     required this.workerIds,
+    required this.closeDueDate,
     required this.laborHours,
     required this.materialTemplateId,
     required this.engineHours,
@@ -2867,6 +2988,7 @@ class _CreatePartInput {
   final int ownerId;
   final int? vesselId;
   final List<int> workerIds;
+  final DateTime closeDueDate;
   final double? laborHours;
   final int? materialTemplateId;
   final List<EngineHourLog> engineHours;
@@ -2897,6 +3019,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
   late int _ownerId;
   int? _vesselId;
   bool _highPriority = false;
+  DateTime? _closeDueDate;
   final Set<int> _selectedWorkers = <int>{};
   final Map<String, TextEditingController> _engineHoursControllers =
       <String, TextEditingController>{};
@@ -3076,10 +3199,42 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Fecha de cierre',
+              caption:
+                  'Obligatoria. Si el parte sigue abierto después de esta fecha, se notificará a los asignados.',
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  final initialDate =
+                      _closeDueDate ??
+                      DateTime.now().add(const Duration(days: 1));
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: initialDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2100),
+                  );
+                  if (!mounted || picked == null) {
+                    return;
+                  }
+                  setState(() {
+                    _closeDueDate = picked;
+                    _validationError = null;
+                  });
+                },
+                icon: const Icon(Icons.event_available_outlined),
+                label: Text(
+                  _closeDueDate == null
+                      ? 'Seleccionar fecha'
+                      : _formatCalendarDate(_closeDueDate!),
+                ),
+              ),
+            ),
             if (_engineHoursControllers.isNotEmpty) ...[
               const SizedBox(height: 14),
               NavalgoFormFieldBlock(
-                label: 'Horas por motor',
+                label: 'Horas de motores',
                 caption:
                     'Opcional al crear. Puedes completarlas más tarde indicando qué motor corresponde a cada campo.',
                 child: Column(
@@ -3159,6 +3314,13 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
       return;
     }
 
+    if (_closeDueDate == null) {
+      setState(() {
+        _validationError = 'La fecha de cierre es obligatoria.';
+      });
+      return;
+    }
+
     final engineHours = <EngineHourLog>[];
     for (final entry in _engineHoursControllers.entries) {
       final rawHours = entry.value.text.trim();
@@ -3183,6 +3345,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
         ownerId: _ownerId,
         vesselId: _vesselId,
         workerIds: _selectedWorkers.toList(),
+        closeDueDate: _closeDueDate!,
         laborHours: laborHours,
         materialTemplateId: _selectedMaterialTemplateId,
         engineHours: engineHours,

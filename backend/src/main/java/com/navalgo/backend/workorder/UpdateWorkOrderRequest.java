@@ -5,6 +5,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 
 public record UpdateWorkOrderRequest(
@@ -15,6 +16,7 @@ public record UpdateWorkOrderRequest(
         List<Long> workerIds,
         WorkOrderPriority priority,
         WorkOrderStatus status,
+        LocalDate closeDueDate,
         Boolean clearSignature,
         @DecimalMin(value = "0.0", inclusive = true) BigDecimal laborHours,
         Long materialTemplateId,
