@@ -143,7 +143,7 @@ class NavalgoMetricCard extends StatelessWidget {
 
   final String label;
   final String value;
-  final IconData icon;
+  final Widget icon;
   final Color accent;
   final String? note;
 
@@ -182,7 +182,13 @@ class NavalgoMetricCard extends StatelessWidget {
                       color: accent.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: Icon(icon, color: accent, size: compact ? 20 : 22),
+                    child: IconTheme(
+                      data: IconThemeData(
+                        color: accent,
+                        size: compact ? 20 : 22,
+                      ),
+                      child: Center(child: icon),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

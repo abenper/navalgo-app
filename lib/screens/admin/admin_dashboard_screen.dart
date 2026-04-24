@@ -149,19 +149,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       _buildStatCard(
                         'Partes Pendientes',
                         '$_pendingWorkOrders',
-                        Icons.assignment_outlined,
+                        const Icon(Icons.assignment_outlined),
                         NavalgoColors.sand,
                       ),
                       _buildStatCard(
                         'Partes Urgentes',
                         '$_urgentWorkOrders',
-                        Icons.warning_amber_rounded,
+                        const Icon(Icons.warning_amber_rounded),
                         NavalgoColors.coral,
                       ),
                       _buildStatCard(
                         'Mecánicos activos hoy',
                         '$_workersClockedToday',
-                        Icons.engineering,
+                        const Icon(Icons.engineering),
                         NavalgoColors.tide,
                         note: _workersClockedTodayNames.isEmpty
                             ? 'Sin fichajes registrados hoy.'
@@ -170,7 +170,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       _buildStatCard(
                         'Ausencias Pendientes',
                         '$_pendingLeaves',
-                        Icons.event_busy,
+                        const Icon(Icons.event_busy),
                         NavalgoColors.harbor,
                       ),
                     ],
@@ -215,7 +215,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _buildStatCard(
     String title,
     String count,
-    IconData icon,
+    Widget icon,
     Color color, {
     String? note,
   }) {

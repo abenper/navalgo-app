@@ -162,19 +162,19 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                           _buildStatCard(
                             'Mis partes',
                             '$_myTasks',
-                            Icons.assignment_ind,
+                            const Icon(Icons.assignment_ind),
                             NavalgoColors.tide,
                           ),
                           _buildStatCard(
                             'Urgentes',
                             '$_urgentTasks',
-                            Icons.warning_amber_rounded,
+                            const Icon(Icons.warning_amber_rounded),
                             NavalgoColors.coral,
                           ),
                           _buildStatCard(
                             'Horas de hoy',
                             _hoursToday,
-                            Icons.timer_outlined,
+                            const Icon(Icons.timer_outlined),
                             NavalgoColors.kelp,
                           ),
                           _buildVacCard(_balance),
@@ -195,7 +195,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   Widget _buildStatCard(
     String title,
     String value,
-    IconData icon,
+    Widget icon,
     Color color, {
     String? note,
   }) {
@@ -215,7 +215,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     return _buildStatCard(
       'Vacaciones',
       '$available d',
-      Icons.beach_access_rounded,
+      const Icon(Icons.beach_access_rounded),
       NavalgoColors.harbor,
       note: bonus > 0
           ? 'Días naturales · +$bonus extra por viaje'

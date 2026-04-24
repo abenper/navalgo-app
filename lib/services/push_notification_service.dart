@@ -25,12 +25,15 @@ class PushNotificationService {
   PushNotificationService({
     FirebaseMessaging? messaging,
     FlutterLocalNotificationsPlugin? localNotifications,
-  }) : _messaging = messaging ?? FirebaseMessaging.instance,
+  }) : _messagingOverride = messaging,
        _localNotifications =
            localNotifications ?? FlutterLocalNotificationsPlugin();
 
-  final FirebaseMessaging _messaging;
+  final FirebaseMessaging? _messagingOverride;
   final FlutterLocalNotificationsPlugin _localNotifications;
+
+  FirebaseMessaging get _messaging =>
+      _messagingOverride ?? FirebaseMessaging.instance;
 
   StreamSubscription<RemoteMessage>? _foregroundSubscription;
   StreamSubscription<RemoteMessage>? _messageOpenedSubscription;
@@ -60,6 +63,10 @@ class PushNotificationService {
     _refreshNotifications = refreshNotifications;
     _authToken = currentAuthToken;
 
+    if (kIsWeb) {
+      return;
+    }
+
     await _ensureInitialized();
     if (!_firebaseAvailable) {
       return;
@@ -78,6 +85,11 @@ class PushNotificationService {
       return;
     }
     _setupAttempted = true;
+
+    if (kIsWeb) {
+      _firebaseAvailable = false;
+      return;
+    }
 
     try {
       if (Firebase.apps.isEmpty) {

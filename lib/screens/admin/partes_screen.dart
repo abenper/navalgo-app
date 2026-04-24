@@ -296,7 +296,9 @@ class _PartesScreenState extends State<PartesScreen> {
                                             child: NavalgoMetricCard(
                                               label: 'Firmados',
                                               value: '$signedCount',
-                                              icon: Icons.verified_outlined,
+                                              icon: const Icon(
+                                                Icons.verified_outlined,
+                                              ),
                                               accent: const Color(0xFF3BAA6E),
                                             ),
                                           ),
@@ -305,7 +307,9 @@ class _PartesScreenState extends State<PartesScreen> {
                                             child: NavalgoMetricCard(
                                               label: 'Pendientes de firma',
                                               value: '$pendingSignatureCount',
-                                              icon: Icons.draw_outlined,
+                                              icon: const Icon(
+                                                Icons.draw_outlined,
+                                              ),
                                               accent: const Color(0xFFD55A4E),
                                             ),
                                           ),
@@ -314,7 +318,9 @@ class _PartesScreenState extends State<PartesScreen> {
                                             child: NavalgoMetricCard(
                                               label: 'Prioridad alta',
                                               value: '$highPriorityCount',
-                                              icon: Icons.priority_high_rounded,
+                                              icon: const Icon(
+                                                Icons.priority_high_rounded,
+                                              ),
                                               accent: const Color(0xFFD5A021),
                                             ),
                                           ),

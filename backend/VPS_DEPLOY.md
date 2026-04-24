@@ -94,6 +94,12 @@ Edita `backend/docker-compose.yml` y cambia al menos:
 psql "host=<HOST> port=25060 dbname=defaultdb user=doadmin sslmode=require" -f navalgo_backend_postgres.sql
 ```
 
+Si la base de produccion ya existe y solo vas a subir una nueva version del backend, aplica la migracion idempotente antes de levantar contenedores:
+
+```bash
+psql "host=<HOST> port=25060 dbname=defaultdb user=doadmin sslmode=require" -f navalgo_backend_postgres_migration.sql
+```
+
 ## 7) Levantar backend
 
 ```bash

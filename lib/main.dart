@@ -1,4 +1,5 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:navalgo/app/app_globals.dart';
@@ -36,9 +37,17 @@ Future<void> main() async {
     }
   } on UnsupportedError {
     // Firebase is not configured for every desktop target.
+  } catch (error, stackTrace) {
+    debugPrint('Firebase init failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
   }
   final sessionViewModel = SessionViewModel();
-  await sessionViewModel.restoreSession();
+  try {
+    await sessionViewModel.restoreSession();
+  } catch (error, stackTrace) {
+    debugPrint('Session restore failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
   ApiClient.configureSessionExpiredHandler((message) async {
     await sessionViewModel.expireSession(message: message);
 
@@ -106,7 +115,7 @@ Future<void> main() async {
           ),
         ),
       ],
-      child: const _PushNotificationBootstrap(child: MyApp()),
+      child: kIsWeb ? const MyApp() : const _PushNotificationBootstrap(child: MyApp()),
     ),
   );
 }

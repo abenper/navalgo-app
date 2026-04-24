@@ -48,6 +48,12 @@ CREATE DATABASE navalgo;
 psql -h localhost -U postgres -d navalgo -f navalgo_backend_postgres.sql
 ```
 
+Si la base ya existe y solo necesitas actualizarla al backend actual:
+
+```bash
+psql -h localhost -U postgres -d navalgo -f navalgo_backend_postgres_migration.sql
+```
+
 3. Definir variables de entorno principales:
 
 ```bash

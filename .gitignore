@@ -50,6 +50,7 @@ backend/target/
 # Secrets / local config – never commit
 *.env
 .env.*
+admin-firebase.json
 local.properties
 backend/src/main/resources/application-local.yml
 backend/src/main/resources/application-secrets.yml
