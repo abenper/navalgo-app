@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/worker_profile.dart';
@@ -77,15 +78,18 @@ class _EquipoScreenState extends State<EquipoScreen> {
       }
       final tempPwd = response.temporaryPassword;
       messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            tempPwd == null || tempPwd.isEmpty
-                ? 'Trabajador creado'
-                : 'Trabajador creado. Contraseña temporal: $tempPwd',
-          ),
-          duration: const Duration(seconds: 8),
-        ),
+        const SnackBar(content: Text('Trabajador creado')),
       );
+      if (tempPwd != null && tempPwd.isNotEmpty) {
+        await _showTemporaryPasswordDialog(
+          workerName: result.fullName,
+          workerEmail: result.email,
+          temporaryPassword: tempPwd,
+          title: 'Contraseña temporal generada',
+          subtitle:
+              'Entrégala al trabajador y recuérdale que deberá cambiarla al iniciar sesión.',
+        );
+      }
     } catch (e) {
       if (!mounted) {
         return;
@@ -148,21 +152,13 @@ class _EquipoScreenState extends State<EquipoScreen> {
   Future<void> _deleteWorker(WorkerProfile worker) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Eliminar trabajador'),
-        content: Text(
-          'Se eliminará a ${worker.fullName}. Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar'),
-          ),
-        ],
+      builder: (_) => NavalgoConfirmDialog(
+        title: 'Eliminar trabajador',
+        message:
+            'Se eliminará a ${worker.fullName}. Esta acción no se puede deshacer.',
+        confirmLabel: 'Eliminar',
+        destructive: true,
+        icon: Icons.person_remove_outlined,
       ),
     );
 
@@ -224,32 +220,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
     }
   }
 
-  Future<void> _toggleEditPermission(WorkerProfile worker, bool enabled) async {
-    final token = context.read<SessionViewModel>().token;
-    final workerService = context.read<WorkerService>();
-    final workersViewModel = context.read<WorkersViewModel>();
-    final messenger = ScaffoldMessenger.of(context);
-    if (token == null) {
-      return;
-    }
-
-    try {
-      await workerService.updateWorkOrderPermission(
-        token,
-        workerId: worker.id,
-        canEditWorkOrders: enabled,
-      );
-      await workersViewModel.loadWorkers();
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo actualizar permiso: $e')),
-      );
-    }
-  }
-
   Future<void> _resetPassword(WorkerProfile worker) async {
     final token = context.read<SessionViewModel>().token;
     final workerService = context.read<WorkerService>();
@@ -264,18 +234,18 @@ class _EquipoScreenState extends State<EquipoScreen> {
         token,
         workerId: worker.id,
       );
+      await workersViewModel.loadWorkers();
       if (!mounted) {
         return;
       }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            'Nueva contraseña temporal para ${worker.email}: $temporaryPassword',
-          ),
-          duration: const Duration(seconds: 10),
-        ),
+      await _showTemporaryPasswordDialog(
+        workerName: worker.fullName,
+        workerEmail: worker.email,
+        temporaryPassword: temporaryPassword,
+        title: 'Nueva contraseña temporal',
+        subtitle:
+            'Compártela de forma segura. El trabajador podrá sustituirla después desde su perfil.',
       );
-      await workersViewModel.loadWorkers();
     } catch (e) {
       if (!mounted) {
         return;
@@ -284,6 +254,25 @@ class _EquipoScreenState extends State<EquipoScreen> {
         SnackBar(content: Text('No se pudo restablecer la contraseña: $e')),
       );
     }
+  }
+
+  Future<void> _showTemporaryPasswordDialog({
+    required String workerName,
+    required String workerEmail,
+    required String temporaryPassword,
+    required String title,
+    required String subtitle,
+  }) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _TemporaryPasswordDialog(
+        workerName: workerName,
+        workerEmail: workerEmail,
+        temporaryPassword: temporaryPassword,
+        title: title,
+        subtitle: subtitle,
+      ),
+    );
   }
 
   @override
@@ -300,12 +289,10 @@ class _EquipoScreenState extends State<EquipoScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  TextField(
+                  NavalgoSearchField(
                     controller: _searchCtrl,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      labelText: 'Buscar trabajador',
-                    ),
+                    label: 'Buscar trabajador',
+                    hint: 'Nombre, correo o especialidad',
                   ),
                   const SizedBox(height: 14),
                   ValueListenableBuilder<TextEditingValue>(
@@ -331,79 +318,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
                       return Column(
                         children: filteredWorkers.map((worker) {
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: NavalgoColors.mist,
-                                child: const Icon(
-                                  Icons.person,
-                                  color: NavalgoColors.tide,
-                                ),
-                              ),
-                              title: Text(
-                                worker.fullName,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                '${worker.email}\n'
-                                '${worker.role} • ${worker.speciality ?? 'Sin especialidad'}\n'
-                                'Fecha de contratación: ${_fmtDate(worker.contractStartDate)} • '
-                                'Editar partes: ${worker.canEditWorkOrders ? 'Sí' : 'No'}',
-                              ),
-                              isThreeLine: true,
-                              trailing: PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  if (value == 'edit') {
-                                    _openEditWorkerDialog(worker);
-                                  }
-                                  if (value == 'delete') {
-                                    _deleteWorker(worker);
-                                  }
-                                  if (value == 'reset') {
-                                    _resetPassword(worker);
-                                  }
-                                  if (value == 'toggle_active') {
-                                    _toggleActive(worker, !worker.active);
-                                  }
-                                  if (value == 'toggle_edit') {
-                                    _toggleEditPermission(
-                                      worker,
-                                      !worker.canEditWorkOrders,
-                                    );
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem<String>(
-                                    value: 'edit',
-                                    child: Text('Editar trabajador'),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: 'delete',
-                                    child: Text('Eliminar trabajador'),
-                                  ),
-                                  PopupMenuItem<String>(
-                                    value: 'toggle_active',
-                                    child: Text(
-                                      worker.active ? 'Desactivar' : 'Activar',
-                                    ),
-                                  ),
-                                  PopupMenuItem<String>(
-                                    value: 'toggle_edit',
-                                    child: Text(
-                                      worker.canEditWorkOrders
-                                          ? 'Quitar permiso editar partes'
-                                          : 'Dar permiso editar partes',
-                                    ),
-                                  ),
-                                  const PopupMenuItem<String>(
-                                    value: 'reset',
-                                    child: Text('Restablecer contraseña'),
-                                  ),
-                                ],
-                              ),
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _WorkerCard(
+                              worker: worker,
+                              formattedDate: _fmtDate(worker.contractStartDate),
+                              onEdit: () => _openEditWorkerDialog(worker),
+                              onToggleActive: () =>
+                                  _toggleActive(worker, !worker.active),
+                              onResetPassword: () => _resetPassword(worker),
+                              onDelete: () => _deleteWorker(worker),
                             ),
                           );
                         }).toList(),
@@ -435,6 +359,272 @@ class _EquipoScreenState extends State<EquipoScreen> {
     final mm = date.month.toString().padLeft(2, '0');
     final yy = date.year.toString();
     return '$dd/$mm/$yy';
+  }
+}
+
+class _WorkerCard extends StatelessWidget {
+  const _WorkerCard({
+    required this.worker,
+    required this.formattedDate,
+    required this.onEdit,
+    required this.onToggleActive,
+    required this.onResetPassword,
+    required this.onDelete,
+  });
+
+  final WorkerProfile worker;
+  final String formattedDate;
+  final VoidCallback onEdit;
+  final VoidCallback onToggleActive;
+  final VoidCallback onResetPassword;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = worker.active
+        ? NavalgoColors.kelp
+        : NavalgoColors.coral;
+    return NavalgoPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: NavalgoColors.mist,
+                child: Icon(
+                  worker.role == 'ADMIN'
+                      ? Icons.admin_panel_settings_outlined
+                      : Icons.person_outline,
+                  color: NavalgoColors.tide,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      worker.fullName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: NavalgoColors.deepSea,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      worker.email,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        NavalgoStatusChip(
+                          label: worker.active ? 'Activo' : 'Inactivo',
+                          color: statusColor,
+                        ),
+                        NavalgoStatusChip(
+                          label: worker.role == 'ADMIN'
+                              ? 'Administrador'
+                              : 'Trabajador',
+                          color: NavalgoColors.tide,
+                        ),
+                        NavalgoStatusChip(
+                          label: worker.canEditWorkOrders
+                              ? 'Puede editar partes'
+                              : 'Sin edición de partes',
+                          color: worker.canEditWorkOrders
+                              ? NavalgoColors.harbor
+                              : NavalgoColors.storm,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: NavalgoColors.foam,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: NavalgoColors.border),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  worker.speciality?.trim().isNotEmpty == true
+                      ? worker.speciality!
+                      : 'Sin especialidad',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: NavalgoColors.deepSea,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Fecha de contratación: $formattedDate',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton.icon(
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: const Text('Editar'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onToggleActive,
+                icon: Icon(
+                  worker.active
+                      ? Icons.pause_circle_outline
+                      : Icons.play_circle_outline,
+                ),
+                label: Text(worker.active ? 'Desactivar' : 'Activar'),
+              ),
+              FilledButton.tonalIcon(
+                onPressed: onResetPassword,
+                icon: const Icon(Icons.password_outlined),
+                label: const Text('Contraseña temporal'),
+              ),
+              OutlinedButton.icon(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Eliminar'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: NavalgoColors.coral,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemporaryPasswordDialog extends StatelessWidget {
+  const _TemporaryPasswordDialog({
+    required this.workerName,
+    required this.workerEmail,
+    required this.temporaryPassword,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String workerName;
+  final String workerEmail;
+  final String temporaryPassword;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavalgoFormDialog(
+      eyebrow: 'SEGURIDAD',
+      title: title,
+      subtitle: subtitle,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        NavalgoGradientButton(
+          label: 'Copiar contraseña',
+          icon: Icons.content_copy_outlined,
+          onPressed: () async {
+            await Clipboard.setData(ClipboardData(text: temporaryPassword));
+            if (!context.mounted) {
+              return;
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Contraseña copiada al portapapeles'),
+              ),
+            );
+          },
+        ),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          NavalgoPanel(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: NavalgoColors.sand.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(
+                    Icons.key_outlined,
+                    color: NavalgoColors.deepSea,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        workerName,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: NavalgoColors.deepSea,
+                            ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(workerEmail),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          NavalgoFormFieldBlock(
+            label: 'Contraseña temporal',
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: NavalgoColors.border),
+              ),
+              child: SelectableText(
+                temporaryPassword,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: NavalgoColors.deepSea,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -501,7 +691,10 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
   @override
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
+      eyebrow: 'EQUIPO',
       title: 'Crear trabajador',
+      subtitle:
+          'Alta operativa del mecánico con rol, permisos y fecha de contratación.',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',
@@ -604,51 +797,26 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Permisos',
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.28),
-                  ),
-                ),
-                child: CheckboxListTile(
-                  value: _canEditWorkOrders,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  activeColor: NavalgoColors.tide,
-                  title: const Text('Permitir editar partes'),
-                  subtitle: const Text(
+              child: NavalgoCheckboxCard(
+                value: _canEditWorkOrders,
+                title: 'Permitir editar partes',
+                subtitle:
                     'Activa este permiso si podrá completar o modificar partes.',
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _canEditWorkOrders = value ?? false;
-                    });
-                  },
-                ),
+                onChanged: (value) {
+                  setState(() {
+                    _canEditWorkOrders = value ?? false;
+                  });
+                },
               ),
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Fecha de contratación',
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
+              child: NavalgoPickerField(
+                label: 'Fecha de contratación',
+                prefixIcon: const Icon(Icons.calendar_month_outlined),
+                value: _formatDate(_contractStartDate),
                 onTap: _pickDate,
-                child: InputDecorator(
-                  decoration: NavalgoFormStyles.inputDecoration(
-                    context,
-                    label: 'Fecha de contratación',
-                    prefixIcon: const Icon(Icons.calendar_month_outlined),
-                  ),
-                  child: Text(
-                    _formatDate(_contractStartDate),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: NavalgoColors.deepSea,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
               ),
             ),
           ],
@@ -741,16 +909,19 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
   @override
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
+      eyebrow: 'EQUIPO',
       title: 'Editar trabajador',
+      subtitle:
+          'Ajusta los datos visibles del perfil sin salir del panel de administración.',
       actions: [
-        TextButton(
+        NavalgoGhostButton(
+          label: 'Cancelar',
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
         ),
-        FilledButton.icon(
+        NavalgoGradientButton(
+          label: 'Guardar cambios',
+          icon: Icons.save_outlined,
           onPressed: _submit,
-          icon: const Icon(Icons.save_outlined),
-          label: const Text('Guardar cambios'),
         ),
       ],
       child: Form(
@@ -845,51 +1016,26 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Permisos',
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.28),
-                  ),
-                ),
-                child: CheckboxListTile(
-                  value: _canEditWorkOrders,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  activeColor: NavalgoColors.tide,
-                  title: const Text('Permitir editar partes'),
-                  subtitle: const Text(
+              child: NavalgoCheckboxCard(
+                value: _canEditWorkOrders,
+                title: 'Permitir editar partes',
+                subtitle:
                     'Activa este permiso si podrá completar o modificar partes.',
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _canEditWorkOrders = value ?? false;
-                    });
-                  },
-                ),
+                onChanged: (value) {
+                  setState(() {
+                    _canEditWorkOrders = value ?? false;
+                  });
+                },
               ),
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Fecha de contratación',
-              child: InkWell(
-                borderRadius: BorderRadius.circular(20),
+              child: NavalgoPickerField(
+                label: 'Fecha de contratación',
+                prefixIcon: const Icon(Icons.calendar_month_outlined),
+                value: _formatDate(_contractStartDate),
                 onTap: _pickDate,
-                child: InputDecorator(
-                  decoration: NavalgoFormStyles.inputDecoration(
-                    context,
-                    label: 'Fecha de contratación',
-                    prefixIcon: const Icon(Icons.calendar_month_outlined),
-                  ),
-                  child: Text(
-                    _formatDate(_contractStartDate),
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: NavalgoColors.deepSea,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
               ),
             ),
           ],

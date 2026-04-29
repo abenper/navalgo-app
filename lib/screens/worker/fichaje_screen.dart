@@ -38,8 +38,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
   String? _error;
   bool _isPunchedIn = false;
   List<TimeEntry> _entries = <TimeEntry>[];
-  List<TimeAdjustmentRequest> _adjustmentRequests =
-      <TimeAdjustmentRequest>[];
+  List<TimeAdjustmentRequest> _adjustmentRequests = <TimeAdjustmentRequest>[];
   TodayClockedWorkersSummary? _todaySummary;
   bool _adjustmentBusy = false;
 
@@ -303,16 +302,10 @@ class _FichajeScreenState extends State<FichajeScreen> {
                   busy: _adjustmentBusy,
                   canReview: isAdmin && request.isPending,
                   onApprove: isAdmin && request.isPending
-                      ? () => _reviewAdjustmentRequest(
-                          request,
-                          approve: true,
-                        )
+                      ? () => _reviewAdjustmentRequest(request, approve: true)
                       : null,
                   onReject: isAdmin && request.isPending
-                      ? () => _reviewAdjustmentRequest(
-                          request,
-                          approve: false,
-                        )
+                      ? () => _reviewAdjustmentRequest(request, approve: false)
                       : null,
                 ),
               );
@@ -593,10 +586,8 @@ class _FichajeScreenState extends State<FichajeScreen> {
               child: const Text('Cancelar'),
             ),
             FilledButton(
-              onPressed: () => Navigator.pop(
-                dialogContext,
-                commentController.text.trim(),
-              ),
+              onPressed: () =>
+                  Navigator.pop(dialogContext, commentController.text.trim()),
               child: Text(approve ? 'Aprobar' : 'Rechazar'),
             ),
           ],
@@ -670,6 +661,7 @@ class _TimeAdjustmentRequestDialog extends StatefulWidget {
 
 class _TimeAdjustmentRequestDialogState
     extends State<_TimeAdjustmentRequestDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   final TextEditingController _reasonController = TextEditingController();
   int? _selectedEntryId;
   late DateTime _workDate;
@@ -692,155 +684,207 @@ class _TimeAdjustmentRequestDialogState
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Solicitar ajuste de fichaje'),
-      content: SingleChildScrollView(
+    return NavalgoFormDialog(
+      title: 'Solicitar ajuste de fichaje',
+      subtitle:
+          'Replica el patrón de Partes para documentar la jornada corregida y dejar trazabilidad clara.',
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        NavalgoGradientButton(
+          label: 'Enviar solicitud',
+          icon: Icons.send_outlined,
+          onPressed: _submit,
+        ),
+      ],
+      child: Form(
+        key: _formKey,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DropdownButtonFormField<int?>(
-              initialValue: _selectedEntryId,
-              decoration: const InputDecoration(
-                labelText: 'Fichaje a ajustar',
-              ),
-              items: [
-                const DropdownMenuItem<int?>(
-                  value: null,
-                  child: Text('Sin registro existente'),
+            NavalgoFormFieldBlock(
+              label: 'Fichaje a ajustar',
+              caption:
+                  'Puedes vincular la corrección a un registro existente o crearla como ajuste independiente.',
+              child: DropdownButtonFormField<int?>(
+                initialValue: _selectedEntryId,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Fichaje a ajustar',
+                  prefixIcon: const Icon(Icons.fact_check_outlined),
                 ),
-                ...widget.entries.map(
-                  (entry) => DropdownMenuItem<int?>(
-                    value: entry.id,
-                    child: Text(
-                      '${_formatDialogDate(entry.clockIn)} · ${_workSiteLabelForDialog(entry.workSite)} · ${_formatDialogHour(entry.clockIn)} - ${entry.clockOut == null ? '--:--' : _formatDialogHour(entry.clockOut!)}',
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('Sin registro existente'),
+                  ),
+                  ...widget.entries.map(
+                    (entry) => DropdownMenuItem<int?>(
+                      value: entry.id,
+                      child: Text(
+                        '${_formatDialogDate(entry.clockIn)} · ${_workSiteLabelForDialog(entry.workSite)} · ${_formatDialogHour(entry.clockIn)} - ${entry.clockOut == null ? '--:--' : _formatDialogHour(entry.clockOut!)}',
+                      ),
                     ),
                   ),
-                ),
-              ],
-              onChanged: (value) {
-                final selectedEntry = widget.entries
-                    .where((entry) => entry.id == value)
-                    .cast<TimeEntry?>()
-                    .firstOrNull;
-                setState(() {
-                  _selectedEntryId = value;
-                  if (selectedEntry != null) {
-                    final localClockIn = selectedEntry.clockIn.toLocal();
-                    _workDate = DateTime(
-                      localClockIn.year,
-                      localClockIn.month,
-                      localClockIn.day,
-                    );
-                    _clockInTime = TimeOfDay.fromDateTime(localClockIn);
-                    _clockOutTime = selectedEntry.clockOut == null
-                        ? null
-                        : TimeOfDay.fromDateTime(selectedEntry.clockOut!.toLocal());
-                    _workSite = selectedEntry.workSite;
+                ],
+                onChanged: (value) {
+                  final selectedEntry = widget.entries
+                      .where((entry) => entry.id == value)
+                      .cast<TimeEntry?>()
+                      .firstOrNull;
+                  setState(() {
+                    _selectedEntryId = value;
+                    if (selectedEntry != null) {
+                      final localClockIn = selectedEntry.clockIn.toLocal();
+                      _workDate = DateTime(
+                        localClockIn.year,
+                        localClockIn.month,
+                        localClockIn.day,
+                      );
+                      _clockInTime = TimeOfDay.fromDateTime(localClockIn);
+                      _clockOutTime = selectedEntry.clockOut == null
+                          ? null
+                          : TimeOfDay.fromDateTime(
+                              selectedEntry.clockOut!.toLocal(),
+                            );
+                      _workSite = selectedEntry.workSite;
+                    }
+                    _error = null;
+                  });
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Fecha',
+              child: NavalgoPickerField(
+                label: 'Fecha',
+                prefixIcon: const Icon(Icons.event_outlined),
+                value: _formatDialogDate(_workDate),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: _workDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2100),
+                  );
+                  if (!mounted || picked == null) {
+                    return;
                   }
-                  _error = null;
-                });
-              },
+                  setState(() {
+                    _workDate = picked;
+                  });
+                },
+              ),
             ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _workDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime(2100),
-                );
-                if (!mounted || picked == null) {
-                  return;
-                }
-                setState(() {
-                  _workDate = picked;
-                });
-              },
-              icon: const Icon(Icons.event_outlined),
-              label: Text('Fecha: ${_formatDialogDate(_workDate)}'),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime:
-                            _clockInTime ??
-                            const TimeOfDay(hour: 8, minute: 0),
-                      );
-                      if (!mounted || picked == null) {
-                        return;
-                      }
-                      setState(() {
-                        _clockInTime = picked;
-                      });
-                    },
-                    icon: const Icon(Icons.login),
-                    label: Text(
-                      _clockInTime == null
-                          ? 'Entrada'
-                          : 'Entrada ${_clockInTime!.format(context)}',
+                  child: NavalgoFormFieldBlock(
+                    label: 'Entrada',
+                    child: NavalgoPickerField(
+                      label: 'Entrada',
+                      prefixIcon: const Icon(Icons.login),
+                      value: _clockInTime?.format(context),
+                      placeholder: 'Seleccionar hora',
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime:
+                              _clockInTime ??
+                              const TimeOfDay(hour: 8, minute: 0),
+                        );
+                        if (!mounted || picked == null) {
+                          return;
+                        }
+                        setState(() {
+                          _clockInTime = picked;
+                          _error = null;
+                        });
+                      },
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime:
-                            _clockOutTime ??
-                            const TimeOfDay(hour: 17, minute: 0),
-                      );
-                      if (!mounted || picked == null) {
-                        return;
-                      }
-                      setState(() {
-                        _clockOutTime = picked;
-                      });
-                    },
-                    icon: const Icon(Icons.logout),
-                    label: Text(
-                      _clockOutTime == null
-                          ? 'Salida'
-                          : 'Salida ${_clockOutTime!.format(context)}',
+                  child: NavalgoFormFieldBlock(
+                    label: 'Salida',
+                    child: NavalgoPickerField(
+                      label: 'Salida',
+                      prefixIcon: const Icon(Icons.logout),
+                      value: _clockOutTime?.format(context),
+                      placeholder: 'Seleccionar hora',
+                      onTap: () async {
+                        final picked = await showTimePicker(
+                          context: context,
+                          initialTime:
+                              _clockOutTime ??
+                              const TimeOfDay(hour: 17, minute: 0),
+                        );
+                        if (!mounted || picked == null) {
+                          return;
+                        }
+                        setState(() {
+                          _clockOutTime = picked;
+                          _error = null;
+                        });
+                      },
                     ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            DropdownButtonFormField<String>(
-              initialValue: _workSite,
-              decoration: const InputDecoration(labelText: 'Tipo de jornada'),
-              items: const [
-                DropdownMenuItem(value: 'WORKSHOP', child: Text('Taller')),
-                DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
-              ],
-              onChanged: (value) {
-                if (value == null) {
-                  return;
-                }
-                setState(() {
-                  _workSite = value;
-                });
-              },
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Tipo de jornada',
+              child: DropdownButtonFormField<String>(
+                initialValue: _workSite,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Tipo de jornada',
+                  prefixIcon: const Icon(Icons.route_outlined),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'WORKSHOP', child: Text('Taller')),
+                  DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
+                ],
+                onChanged: (value) {
+                  if (value == null) {
+                    return;
+                  }
+                  setState(() {
+                    _workSite = value;
+                  });
+                },
+              ),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _reasonController,
-              minLines: 3,
-              maxLines: 5,
-              decoration: const InputDecoration(
-                labelText: 'Motivo',
-                hintText:
-                    'Explica qué hora debe corregirse y por qué no quedó registrada correctamente.',
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Motivo',
+              caption:
+                  'Explica qué hora debe corregirse y por qué no quedó registrada correctamente.',
+              child: TextFormField(
+                controller: _reasonController,
+                minLines: 3,
+                maxLines: 5,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Motivo',
+                  hint: 'Describe el ajuste solicitado.',
+                  prefixIcon: const Icon(Icons.edit_note_outlined),
+                ),
+                validator: (value) {
+                  if ((value?.trim() ?? '').isEmpty) {
+                    return 'Debes indicar el motivo del ajuste.';
+                  }
+                  return null;
+                },
               ),
             ),
             if (_error != null) ...[
@@ -853,24 +897,12 @@ class _TimeAdjustmentRequestDialogState
           ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Enviar solicitud'),
-        ),
-      ],
     );
   }
 
   void _submit() {
-    if (_reasonController.text.trim().isEmpty) {
-      setState(() {
-        _error = 'Debes indicar el motivo del ajuste.';
-      });
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
       return;
     }
     if (_clockInTime == null && _clockOutTime == null) {

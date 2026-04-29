@@ -168,22 +168,13 @@ class _PartesScreenState extends State<PartesScreen> {
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Borrar parte'),
-        content: Text(
-          '¿Seguro que quieres borrar "${parte.title}"? Se eliminarán también firma y adjuntos.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Borrar'),
-          ),
-        ],
+      builder: (_) => NavalgoConfirmDialog(
+        title: 'Borrar parte',
+        message:
+            '¿Seguro que quieres borrar "${parte.title}"? Se eliminarán también firma y adjuntos.',
+        confirmLabel: 'Borrar',
+        destructive: true,
+        icon: Icons.delete_sweep_outlined,
       ),
     );
 
@@ -550,12 +541,14 @@ class _PartesScreenState extends State<PartesScreen> {
                                                   color: Color(0xFF738892),
                                                 ),
                                               ),
-                                              if (parte.closeDueDate != null) ...[
+                                              if (parte.closeDueDate !=
+                                                  null) ...[
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   'Cierre: ${_formatCalendarDate(parte.closeDueDate!)}',
                                                   style: TextStyle(
-                                                    color: _isOverdueWorkOrder(
+                                                    color:
+                                                        _isOverdueWorkOrder(
                                                           parte,
                                                         )
                                                         ? const Color(
@@ -638,7 +631,11 @@ class _PartesScreenState extends State<PartesScreen> {
     final today = DateTime.now();
     final normalizedToday = DateTime(today.year, today.month, today.day);
     final dueDate = workOrder.closeDueDate!;
-    final normalizedDueDate = DateTime(dueDate.year, dueDate.month, dueDate.day);
+    final normalizedDueDate = DateTime(
+      dueDate.year,
+      dueDate.month,
+      dueDate.day,
+    );
     return normalizedDueDate.isBefore(normalizedToday);
   }
 }
@@ -652,8 +649,18 @@ String _formatCalendarDate(DateTime dateTime) {
 }
 
 const List<String> _spanishMonthsLong = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre',
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
 ];
 
 String _formatHumanDate(DateTime dateTime) {
@@ -680,11 +687,7 @@ String _formatRelativeDate(DateTime dateTime) {
 }
 
 class _InfoTile extends StatelessWidget {
-  const _InfoTile({
-    required this.icon,
-    required this.value,
-    this.label,
-  });
+  const _InfoTile({required this.icon, required this.value, this.label});
 
   final IconData icon;
   final String? label;
@@ -976,10 +979,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          _workOrder.title,
-          style: textTheme.headlineSmall,
-        ),
+        Text(_workOrder.title, style: textTheme.headlineSmall),
         const SizedBox(height: 12),
         Wrap(
           spacing: 8,
@@ -1104,8 +1104,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         .where((item) => _materialChecks[item.id] ?? item.checked)
         .length;
     final total = checklist.items.length;
-    final pendingRequests =
-        _workOrder.materialRevisionRequests.where((r) => r.isPending).length;
+    final pendingRequests = _workOrder.materialRevisionRequests
+        .where((r) => r.isPending)
+        .length;
     final completedAll = checkedCount == total && total > 0;
 
     return NavalgoPanel(
@@ -1131,10 +1132,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             color: completedAll ? NavalgoColors.kelp : NavalgoColors.tide,
           ),
         ),
-        title: Text(
-          'Material',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        title: Text('Material', style: Theme.of(context).textTheme.titleMedium),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Wrap(
@@ -1228,16 +1226,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                   busy: _materialBusy,
                   canModerate: _isAdmin && request.isPending,
                   onApprove: _isAdmin && request.isPending
-                      ? () => _updateMaterialRevisionStatus(
-                          request,
-                          'APPROVED',
-                        )
+                      ? () => _updateMaterialRevisionStatus(request, 'APPROVED')
                       : null,
                   onReject: _isAdmin && request.isPending
-                      ? () => _updateMaterialRevisionStatus(
-                          request,
-                          'REJECTED',
-                        )
+                      ? () => _updateMaterialRevisionStatus(request, 'REJECTED')
                       : null,
                 ),
               );
@@ -1284,41 +1276,54 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _WorkLogFieldCard(
-            icon: const Icon(Icons.notes_outlined),
             title: 'Descripción',
+            caption:
+                'Escribe aquí el trabajo realizado, incidencias o material pendiente.',
+            editable: _canUpdateWorkLog && !_busy,
             child: TextField(
               controller: _observationsCtrl,
               readOnly: !_canUpdateWorkLog || _busy,
               maxLines: 4,
-              decoration: NavalgoFormStyles.inputDecoration(
+              decoration: _detailInputDecoration(
                 context,
                 label: 'Observaciones del trabajo',
-                hint: 'Avance real, incidencias, material pendiente…',
-                prefixIcon: const Icon(Icons.notes_outlined),
+                hint: 'Escribe aquí lo que se ha hecho en este parte',
+                helper: _canUpdateWorkLog && !_busy
+                    ? 'Toca dentro del recuadro para rellenar este campo.'
+                    : 'Solo lectura.',
+                readOnly: !_canUpdateWorkLog || _busy,
               ),
             ),
           ),
           const SizedBox(height: 14),
           _WorkLogFieldCard(
-            icon: const Icon(Icons.schedule_outlined),
             title: 'Horas de trabajo',
+            caption: 'Anota las horas totales invertidas en esta intervención.',
+            editable: _canUpdateWorkLog && !_busy,
             child: TextField(
               controller: _laborHoursCtrl,
               readOnly: !_canUpdateWorkLog || _busy,
               keyboardType: const TextInputType.numberWithOptions(
                 decimal: true,
               ),
-              decoration: NavalgoFormStyles.inputDecoration(
+              decoration: _detailInputDecoration(
                 context,
                 label: 'Horas de trabajo',
                 hint: 'Ej. 3.5',
-                prefixIcon: const Icon(Icons.schedule_outlined),
+                helper: _canUpdateWorkLog && !_busy
+                    ? 'Introduce solo números. Puedes usar decimales.'
+                    : 'Solo lectura.',
+                readOnly: !_canUpdateWorkLog || _busy,
               ).copyWith(suffixText: 'h'),
             ),
           ),
           const SizedBox(height: 14),
-          NavalgoFormFieldBlock(
-            label: 'Horas de motor',
+          _WorkLogFieldCard(
+            title: 'Horas de motor',
+            caption: _canUpdateWorkLog && !_busy
+                ? 'Rellena cada contador dentro de su recuadro.'
+                : 'Solo lectura.',
+            editable: _canUpdateWorkLog && !_busy,
             child: _engineHoursControllers.isEmpty
                 ? Text(
                     'Sin motores disponibles para este parte.',
@@ -1377,8 +1382,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             _InfoTile(
               icon: Icons.person_pin_circle_outlined,
               label: 'Firmado por',
-              value:
-                  _workOrder.signedByWorkerName ?? 'Usuario no disponible',
+              value: _workOrder.signedByWorkerName ?? 'Usuario no disponible',
             ),
             if (_workOrder.signedAt != null)
               _InfoTile(
@@ -1522,7 +1526,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                   ],
                 ),
               ),
-              if (_canDeleteMedia && !kIsWeb) ...[
+              if (_canDeleteMedia && _canCaptureWorkProgressMedia(context)) ...[
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: _busy || _signing
@@ -1535,7 +1539,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             ],
           ),
           const SizedBox(height: 12),
-          if (kIsWeb)
+          if (kIsWeb && !_isMobileWebDevice(context))
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
@@ -1782,8 +1786,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
           builder: (dialogContext, setDialogState) {
             return NavalgoFormDialog(
               title: 'Solicitud de revisión',
-              subtitle:
-                  'Indica qué artículo o referencia no encaja.',
+              subtitle: 'Indica qué artículo o referencia no encaja.',
               maxWidth: 640,
               actions: [
                 NavalgoGhostButton(
@@ -2048,10 +2051,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }
 
   Future<void> _captureWorkProgressPhoto() async {
-    if (kIsWeb) {
+    if (kIsWeb && !_isMobileWebDevice(context)) {
       AppToast.warning(
         context,
-        'Las fotos de avance solo se pueden capturar desde la app móvil.',
+        'Las fotos de avance solo se pueden capturar desde la app móvil o desde la web abierta en un móvil.',
       );
       return;
     }
@@ -2160,6 +2163,56 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     if (!_sigController.isNotEmpty) {
       AppToast.warning(context, 'Dibuja tu firma antes de enviar.');
       return;
+    }
+
+    final laborHours = _parseLaborHours(_laborHoursCtrl.text);
+    if (_laborHoursCtrl.text.trim().isEmpty) {
+      AppToast.warning(
+        context,
+        'Rellena las horas de trabajo antes de firmar el parte.',
+      );
+      return;
+    }
+    if (laborHours == null) {
+      AppToast.warning(
+        context,
+        'Las horas de trabajo deben ser un número válido antes de firmar.',
+      );
+      return;
+    }
+
+    for (final entry in _engineHoursControllers.entries) {
+      final rawValue = entry.value.text.trim();
+      if (rawValue.isEmpty) {
+        AppToast.warning(
+          context,
+          'Rellena todas las horas de motor antes de firmar el parte.',
+        );
+        return;
+      }
+      if (int.tryParse(rawValue) == null) {
+        AppToast.warning(
+          context,
+          'Las horas de motor deben ser números enteros antes de firmar.',
+        );
+        return;
+      }
+    }
+
+    if (_attachments.isEmpty) {
+      final continueWithoutMedia = await showDialog<bool>(
+        context: context,
+        builder: (_) => const NavalgoConfirmDialog(
+          title: 'Parte sin multimedia',
+          message:
+              'Este parte no tiene archivos multimedia adjuntos. ¿Estás seguro de que quieres continuar sin adjuntar evidencia?',
+          confirmLabel: 'Continuar sin adjuntos',
+          icon: Icons.perm_media_outlined,
+        ),
+      );
+      if (!mounted || continueWithoutMedia != true) {
+        return;
+      }
     }
 
     final token = context.read<SessionViewModel>().token;
@@ -2291,22 +2344,13 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   Future<void> _deleteWorkOrder() async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Borrar parte'),
-        content: Text(
-          '¿Seguro que quieres eliminar "${_workOrder.title}"? Esta acción no se puede deshacer.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Borrar'),
-          ),
-        ],
+      builder: (_) => NavalgoConfirmDialog(
+        title: 'Borrar parte',
+        message:
+            '¿Seguro que quieres eliminar "${_workOrder.title}"? Esta acción no se puede deshacer.',
+        confirmLabel: 'Borrar',
+        destructive: true,
+        icon: Icons.delete_forever_outlined,
       ),
     );
 
@@ -2382,19 +2426,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
 
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Borrar adjunto'),
-        content: const Text('Esta acción no se puede deshacer. ¿Continuar?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Borrar'),
-          ),
-        ],
+      builder: (_) => const NavalgoConfirmDialog(
+        title: 'Borrar adjunto',
+        message: 'Esta acción no se puede deshacer. ¿Continuar?',
+        confirmLabel: 'Borrar',
+        destructive: true,
+        icon: Icons.attachment_outlined,
       ),
     );
 
@@ -2546,6 +2583,24 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }
 }
 
+bool _isMobileWebDevice(BuildContext context) {
+  if (!kIsWeb) {
+    return false;
+  }
+  final platform = defaultTargetPlatform;
+  if (platform == TargetPlatform.android || platform == TargetPlatform.iOS) {
+    return true;
+  }
+  return MediaQuery.of(context).size.shortestSide < 700;
+}
+
+bool _canCaptureWorkProgressMedia(BuildContext context) {
+  if (!kIsWeb) {
+    return true;
+  }
+  return _isMobileWebDevice(context);
+}
+
 class _DetailRow extends StatelessWidget {
   const _DetailRow({required this.label, required this.value});
 
@@ -2639,7 +2694,9 @@ class _EngineHourInputCard extends StatelessWidget {
     final icon = _engineIconForLabel(engineLabel);
     return NavalgoPanel(
       padding: const EdgeInsets.all(14),
-      tint: Colors.white.withValues(alpha: 0.96),
+      tint: readOnly
+          ? Colors.white.withValues(alpha: 0.96)
+          : const Color(0xFFF5F7F8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -2653,9 +2710,7 @@ class _EngineHourInputCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: IconTheme(
-                  data: const IconThemeData(
-                    color: NavalgoColors.deepSea,
-                  ),
+                  data: const IconThemeData(color: NavalgoColors.deepSea),
                   child: Center(child: icon),
                 ),
               ),
@@ -2673,8 +2728,9 @@ class _EngineHourInputCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       _engineCaptionForLabel(engineLabel),
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: NavalgoColors.storm,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -2687,11 +2743,14 @@ class _EngineHourInputCard extends StatelessWidget {
             controller: controller,
             readOnly: readOnly,
             keyboardType: TextInputType.number,
-            decoration: NavalgoFormStyles.inputDecoration(
+            decoration: _detailInputDecoration(
               context,
               label: 'Horas actuales',
               hint: 'Introduce el contador actual',
-              prefixIcon: const Icon(Icons.av_timer_outlined),
+              helper: readOnly
+                  ? 'Solo lectura.'
+                  : 'Toca dentro del recuadro y escribe las horas actuales.',
+              readOnly: readOnly,
             ).copyWith(suffixText: 'h'),
           ),
         ],
@@ -2702,40 +2761,30 @@ class _EngineHourInputCard extends StatelessWidget {
 
 class _WorkLogFieldCard extends StatelessWidget {
   const _WorkLogFieldCard({
-    required this.icon,
     required this.title,
+    required this.editable,
     required this.child,
+    this.caption,
   });
 
-  final Widget icon;
   final String title;
+  final bool editable;
   final Widget child;
+  final String? caption;
 
   @override
   Widget build(BuildContext context) {
     return NavalgoPanel(
       padding: const EdgeInsets.all(14),
-      tint: Colors.white.withValues(alpha: 0.96),
+      tint: editable
+          ? const Color(0xFFF5F7F8)
+          : Colors.white.withValues(alpha: 0.96),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: NavalgoColors.deepSea.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: IconTheme(
-                  data: const IconThemeData(
-                    color: NavalgoColors.deepSea,
-                  ),
-                  child: Center(child: icon),
-                ),
-              ),
-              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2746,6 +2795,16 @@ class _WorkLogFieldCard extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if (caption != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        caption!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: NavalgoColors.storm,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -2757,6 +2816,49 @@ class _WorkLogFieldCard extends StatelessWidget {
       ),
     );
   }
+}
+
+InputDecoration _detailInputDecoration(
+  BuildContext context, {
+  required String label,
+  required bool readOnly,
+  String? hint,
+  String? helper,
+}) {
+  final base = NavalgoFormStyles.inputDecoration(
+    context,
+    label: label,
+    hint: hint,
+    helper: helper,
+  );
+
+  const activeBorderColor = Color(0xFF93A3AB);
+  const activeFillColor = Color(0xFFF8FAFB);
+  final fillColor = readOnly ? Colors.white : activeFillColor;
+  final borderColor = readOnly ? NavalgoColors.border : activeBorderColor;
+
+  return base.copyWith(
+    fillColor: fillColor,
+    helperStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+      color: NavalgoColors.deepSea,
+      fontWeight: FontWeight.w600,
+    ),
+    hintStyle: Theme.of(
+      context,
+    ).textTheme.bodyLarge?.copyWith(color: NavalgoColors.storm),
+    labelStyle: Theme.of(context).textTheme.bodyLarge?.copyWith(
+      color: NavalgoColors.deepSea,
+      fontWeight: FontWeight.w600,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(20),
+      borderSide: BorderSide(color: borderColor, width: readOnly ? 1 : 2),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(20),
+      borderSide: const BorderSide(color: Color(0xFF7E9098), width: 2.2),
+    ),
+  );
 }
 
 class _WorkerAssignmentList extends StatelessWidget {

@@ -355,6 +355,7 @@ class NavalgoFormDialog extends StatelessWidget {
     this.eyebrow,
     this.actions,
     this.maxWidth = 560,
+    this.bodyInPanel = true,
   });
 
   final String title;
@@ -363,6 +364,7 @@ class NavalgoFormDialog extends StatelessWidget {
   final Widget child;
   final List<Widget>? actions;
   final double maxWidth;
+  final bool bodyInPanel;
 
   @override
   Widget build(BuildContext context) {
@@ -374,6 +376,7 @@ class NavalgoFormDialog extends StatelessWidget {
     final maxHeight =
         (screenSize.height - viewInsets.bottom) * (compact ? 0.92 : 0.88);
     final hasActions = actions != null && actions!.isNotEmpty;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: compact
@@ -382,67 +385,99 @@ class NavalgoFormDialog extends StatelessWidget {
       child: Container(
         constraints: BoxConstraints(maxWidth: maxWidth, maxHeight: maxHeight),
         decoration: BoxDecoration(
-          gradient: NavalgoColors.heroGradient,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(compact ? 26 : 32),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          border: Border.all(color: NavalgoColors.border),
           boxShadow: [
             BoxShadow(
-              color: NavalgoColors.deepSea.withValues(alpha: 0.26),
-              blurRadius: 40,
-              offset: const Offset(0, 24),
+              color: NavalgoColors.deepSea.withValues(alpha: 0.16),
+              blurRadius: 34,
+              offset: const Offset(0, 20),
             ),
           ],
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Flexible(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(
-                  padding,
-                  padding,
-                  padding,
-                  hasActions ? 0 : padding,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (eyebrow != null) ...[
-                      Text(
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.fromLTRB(padding, padding, padding, 22),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(bottom: BorderSide(color: NavalgoColors.border)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (eyebrow != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: NavalgoColors.mist,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
                         eyebrow!,
                         style: textTheme.labelLarge?.copyWith(
-                          color: NavalgoColors.sand,
-                          letterSpacing: 1.1,
+                          color: NavalgoColors.tide,
+                          letterSpacing: 0.6,
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    Text(
-                      title,
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w800,
                       ),
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 10),
-                      Text(
-                        subtitle!,
-                        style: textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.84),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-                    child,
+                    const SizedBox(height: 14),
                   ],
+                  Text(
+                    title,
+                    style: textTheme.headlineSmall?.copyWith(
+                      color: NavalgoColors.deepSea,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      subtitle!,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: NavalgoColors.storm,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Flexible(
+              child: DecoratedBox(
+                decoration: const BoxDecoration(
+                  gradient: NavalgoColors.pageGradient,
+                ),
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    padding,
+                    22,
+                    padding,
+                    hasActions ? 20 : padding,
+                  ),
+                  child: bodyInPanel
+                      ? NavalgoPanel(
+                          padding: EdgeInsets.all(compact ? 16 : 18),
+                          child: child,
+                        )
+                      : child,
                 ),
               ),
             ),
             if (hasActions)
-              Padding(
+              Container(
+                width: double.infinity,
                 padding: EdgeInsets.all(padding),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  border: Border(top: BorderSide(color: NavalgoColors.border)),
+                ),
                 child: Wrap(
                   spacing: 12,
                   runSpacing: 12,
@@ -471,14 +506,14 @@ class NavalgoFormStyles {
     final theme = Theme.of(context);
     final border = OutlineInputBorder(
       borderRadius: BorderRadius.circular(20),
-      borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
+      borderSide: const BorderSide(color: NavalgoColors.border),
     );
 
     return InputDecoration(
       hintText: hint ?? label,
       helperText: helper,
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.94),
+      fillColor: Colors.white,
       prefixIcon: prefixIcon,
       suffixIcon: suffixIcon,
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
@@ -486,14 +521,17 @@ class NavalgoFormStyles {
         color: NavalgoColors.storm,
       ),
       helperStyle: theme.textTheme.bodySmall?.copyWith(
-        color: Colors.white.withValues(alpha: 0.78),
+        color: NavalgoColors.storm,
+      ),
+      labelStyle: theme.textTheme.bodyMedium?.copyWith(
+        color: NavalgoColors.storm,
       ),
       prefixIconColor: NavalgoColors.tide,
       suffixIconColor: NavalgoColors.tide,
       border: border,
       enabledBorder: border,
       focusedBorder: border.copyWith(
-        borderSide: const BorderSide(color: NavalgoColors.sand, width: 1.5),
+        borderSide: const BorderSide(color: NavalgoColors.harbor, width: 1.5),
       ),
       errorBorder: border.copyWith(
         borderSide: const BorderSide(color: NavalgoColors.alert),
@@ -511,7 +549,7 @@ class NavalgoFormFieldBlock extends StatelessWidget {
     required this.label,
     required this.child,
     this.caption,
-    this.inverse = true,
+    this.inverse = false,
   });
 
   final String label;
@@ -549,6 +587,176 @@ class NavalgoFormFieldBlock extends StatelessWidget {
         const SizedBox(height: 8),
         child,
       ],
+    );
+  }
+}
+
+class NavalgoSearchField extends StatelessWidget {
+  const NavalgoSearchField({
+    super.key,
+    required this.controller,
+    required this.label,
+    this.hint,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final String? hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      textInputAction: TextInputAction.search,
+      decoration: NavalgoFormStyles.inputDecoration(
+        context,
+        label: label,
+        hint: hint ?? label,
+        prefixIcon: const Icon(Icons.search),
+      ),
+    );
+  }
+}
+
+class NavalgoPickerField extends StatelessWidget {
+  const NavalgoPickerField({
+    super.key,
+    required this.label,
+    required this.prefixIcon,
+    required this.onTap,
+    this.value,
+    this.placeholder,
+  });
+
+  final String label;
+  final Widget prefixIcon;
+  final VoidCallback? onTap;
+  final String? value;
+  final String? placeholder;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = value != null && value!.trim().isNotEmpty;
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: onTap,
+      child: InputDecorator(
+        decoration: NavalgoFormStyles.inputDecoration(
+          context,
+          label: label,
+          hint: placeholder ?? 'Seleccionar',
+          prefixIcon: prefixIcon,
+        ),
+        child: Text(
+          hasValue ? value! : (placeholder ?? 'Seleccionar'),
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: hasValue ? NavalgoColors.deepSea : NavalgoColors.storm,
+            fontWeight: hasValue ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class NavalgoCheckboxCard extends StatelessWidget {
+  const NavalgoCheckboxCard({
+    super.key,
+    required this.value,
+    required this.onChanged,
+    required this.title,
+    this.subtitle,
+  });
+
+  final bool value;
+  final ValueChanged<bool?>? onChanged;
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return NavalgoPanel(
+      tint: Colors.white.withValues(alpha: 0.96),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      child: CheckboxListTile(
+        value: value,
+        onChanged: onChanged,
+        contentPadding: EdgeInsets.zero,
+        controlAffinity: ListTileControlAffinity.leading,
+        activeColor: NavalgoColors.tide,
+        title: Text(title),
+        subtitle: subtitle == null ? null : Text(subtitle!),
+      ),
+    );
+  }
+}
+
+class NavalgoConfirmDialog extends StatelessWidget {
+  const NavalgoConfirmDialog({
+    super.key,
+    required this.title,
+    required this.message,
+    this.confirmLabel = 'Confirmar',
+    this.cancelLabel = 'Cancelar',
+    this.icon = Icons.help_outline_rounded,
+    this.destructive = false,
+  });
+
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final String cancelLabel;
+  final IconData icon;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = destructive ? NavalgoColors.coral : NavalgoColors.tide;
+
+    return NavalgoFormDialog(
+      title: title,
+      maxWidth: 520,
+      bodyInPanel: false,
+      actions: [
+        NavalgoGhostButton(
+          label: cancelLabel,
+          onPressed: () => Navigator.pop(context, false),
+        ),
+        FilledButton.icon(
+          onPressed: () => Navigator.pop(context, true),
+          icon: Icon(destructive ? Icons.delete_outline : Icons.check),
+          label: Text(confirmLabel),
+          style: FilledButton.styleFrom(
+            backgroundColor: accent,
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+      child: NavalgoPanel(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: accent),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: NavalgoColors.deepSea),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -632,9 +840,9 @@ class NavalgoGhostButton extends StatelessWidget {
       icon: icon == null ? const SizedBox.shrink() : Icon(icon),
       label: Text(label),
       style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.white,
-        side: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
-        backgroundColor: Colors.white.withValues(alpha: 0.08),
+        foregroundColor: NavalgoColors.deepSea,
+        side: const BorderSide(color: NavalgoColors.border),
+        backgroundColor: Colors.white,
         minimumSize: const Size(0, 56),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),

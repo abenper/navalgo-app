@@ -169,19 +169,12 @@ class _FlotaScreenState extends State<FlotaScreen> {
   Future<void> _deleteOwner(Owner owner) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Eliminar propietario'),
-        content: Text('Se eliminara a ${owner.displayName}.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar'),
-          ),
-        ],
+      builder: (_) => NavalgoConfirmDialog(
+        title: 'Eliminar propietario',
+        message: 'Se eliminará a ${owner.displayName}.',
+        confirmLabel: 'Eliminar',
+        destructive: true,
+        icon: Icons.person_off_outlined,
       ),
     );
 
@@ -319,21 +312,12 @@ class _FlotaScreenState extends State<FlotaScreen> {
   Future<void> _deleteVessel(Vessel vessel) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Eliminar embarcación'),
-        content: Text(
-          'Se eliminará ${vessel.name} (${vessel.registrationNumber}).',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Eliminar'),
-          ),
-        ],
+      builder: (_) => NavalgoConfirmDialog(
+        title: 'Eliminar embarcación',
+        message: 'Se eliminará ${vessel.name} (${vessel.registrationNumber}).',
+        confirmLabel: 'Eliminar',
+        destructive: true,
+        icon: Icons.directions_boat_filled_outlined,
       ),
     );
 
@@ -398,12 +382,10 @@ class _FlotaScreenState extends State<FlotaScreen> {
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 12),
-                  TextField(
+                  NavalgoSearchField(
                     controller: _ownerSearchCtrl,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      labelText: 'Filtrar por propietario',
-                    ),
+                    label: 'Filtrar por propietario',
+                    hint: 'Nombre o documento del cliente',
                   ),
                   const SizedBox(height: 10),
                   ValueListenableBuilder<TextEditingValue>(
@@ -644,12 +626,10 @@ class _FlotaScreenState extends State<FlotaScreen> {
                   const SizedBox(height: 18),
                   const NavalgoSectionHeader(title: 'Embarcaciones'),
                   const SizedBox(height: 10),
-                  TextField(
+                  NavalgoSearchField(
                     controller: _vesselSearchCtrl,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      labelText: 'Filtrar por embarcación o propietario',
-                    ),
+                    label: 'Filtrar por embarcación o propietario',
+                    hint: 'Nombre, matrícula o propietario',
                   ),
                   if (selectedOwner != null) ...[
                     const SizedBox(height: 10),
@@ -872,7 +852,10 @@ class _OwnerDialogState extends State<_OwnerDialog> {
     final isEditing = widget.initialOwner != null;
 
     return NavalgoFormDialog(
+      eyebrow: 'FLOTA',
       title: isEditing ? 'Editar propietario' : 'Nuevo propietario',
+      subtitle:
+          'Gestiona la ficha del cliente con la misma lectura clara que usamos en Partes.',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',
@@ -1098,8 +1081,11 @@ class _VesselDialogState extends State<_VesselDialog> {
     final isEditing = widget.initialVessel != null;
 
     return NavalgoFormDialog(
+      eyebrow: 'FLOTA',
       title: isEditing ? 'Editar embarcación' : 'Nueva embarcación',
       maxWidth: 680,
+      subtitle:
+          'Configura la embarcación, sus motores y el propietario desde una única ficha operativa.',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',
@@ -1245,7 +1231,8 @@ class _VesselDialogState extends State<_VesselDialog> {
                                   ),
                                 ),
                                 selectedItemBuilder: (context) {
-                                  return _FlotaScreenState._enginePositionOptions
+                                  return _FlotaScreenState
+                                      ._enginePositionOptions
                                       .map(
                                         (position) => Align(
                                           alignment: Alignment.centerLeft,
@@ -1286,7 +1273,8 @@ class _VesselDialogState extends State<_VesselDialog> {
                                 decoration: NavalgoFormStyles.inputDecoration(
                                   context,
                                   label: 'Número de serie',
-                                  hint: 'Introduce el número de serie del motor',
+                                  hint:
+                                      'Introduce el número de serie del motor',
                                   prefixIcon: const Icon(Icons.dialpad),
                                 ),
                               ),
@@ -1525,7 +1513,10 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
         : vessel.engineLabels.join(', ');
 
     return NavalgoFormDialog(
+      eyebrow: 'FLOTA',
       title: vessel.name,
+      subtitle:
+          'Ficha técnica resumida con los datos que después reutiliza el flujo de Partes.',
       actions: [
         NavalgoGhostButton(
           label: 'Cerrar',

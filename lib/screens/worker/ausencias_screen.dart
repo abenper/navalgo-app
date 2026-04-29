@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../theme/navalgo_theme.dart';
+import '../../widgets/navalgo_ui.dart';
+
 class AusenciasScreen extends StatefulWidget {
   const AusenciasScreen({super.key});
 
@@ -8,20 +11,27 @@ class AusenciasScreen extends StatefulWidget {
 }
 
 class _AusenciasScreenState extends State<AusenciasScreen> {
-  // Simulador de peticiones de ausencias
   final List<Map<String, dynamic>> _requests = [
-    {'fecha': '15 Ago - 30 Ago', 'estado': 'Aprobada', 'color': Colors.green, 'motivo': 'Vacaciones'},
-    {'fecha': '24 Dic', 'estado': 'Pendiente', 'color': Colors.orange, 'motivo': 'Asuntos Propios'},
+    {
+      'fecha': '15 Ago - 30 Ago',
+      'estado': 'Aprobada',
+      'color': NavalgoColors.kelp,
+      'motivo': 'Vacaciones',
+    },
+    {
+      'fecha': '24 Dic',
+      'estado': 'Pendiente',
+      'color': NavalgoColors.sand,
+      'motivo': 'Asuntos Propios',
+    },
   ];
 
-  void _mostrarFormulario() async {
-    // Abrimos el nuevo diálogo y esperamos su resultado
+  Future<void> _mostrarFormulario() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => const _FormularioAusenciaDialog(),
     );
 
-    // Si el usuario guardó (no canceló), lo añadimos a la lista
     if (result != null) {
       setState(() {
         _requests.insert(0, result);
@@ -42,20 +52,28 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         itemCount: _requests.length,
         itemBuilder: (context, index) {
           final req = _requests[index];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: (req['color'] as Color).withValues(alpha: 0.1),
-                child: Icon(Icons.event_note, color: req['color'] as Color),
-              ),
-              title: Text('Fechas: ${req['fecha']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text('Motivo: ${req['motivo']}'),
-              trailing: Chip(
-                label: Text(req['estado'] as String),
-                backgroundColor: (req['color'] as Color).withValues(alpha: 0.1),
-                labelStyle: TextStyle(color: req['color'] as Color, fontWeight: FontWeight.bold),
-                side: BorderSide.none,
+          final color = req['color'] as Color;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: NavalgoPanel(
+              child: ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: CircleAvatar(
+                  backgroundColor: color.withValues(alpha: 0.12),
+                  child: Icon(Icons.event_note_outlined, color: color),
+                ),
+                title: Text(
+                  'Fechas: ${req['fecha']}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text('Motivo: ${req['motivo']}'),
+                ),
+                trailing: NavalgoStatusChip(
+                  label: req['estado'] as String,
+                  color: color,
+                ),
               ),
             ),
           );
@@ -64,9 +82,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _mostrarFormulario,
         icon: const Icon(Icons.add),
-        label: const Text('Solicitar Ausencia'),
-        backgroundColor: Colors.blue.shade900,
-        foregroundColor: Colors.white,
+        label: const Text('Solicitar ausencia'),
       ),
     );
   }
@@ -76,10 +92,12 @@ class _FormularioAusenciaDialog extends StatefulWidget {
   const _FormularioAusenciaDialog();
 
   @override
-  State<_FormularioAusenciaDialog> createState() => _FormularioAusenciaDialogState();
+  State<_FormularioAusenciaDialog> createState() =>
+      _FormularioAusenciaDialogState();
 }
 
 class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
   String _motivo = 'Vacaciones';
   DateTimeRange? _fechas;
 
@@ -88,35 +106,62 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
     'Médico',
     'Maternidad/Paternidad',
     'Asuntos Propios',
-    'Otro'
+    'Otro',
   ];
 
   String _format(DateTime d) {
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const months = [
+      'Ene',
+      'Feb',
+      'Mar',
+      'Abr',
+      'May',
+      'Jun',
+      'Jul',
+      'Ago',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dic',
+    ];
     return '${d.day} ${months[d.month - 1]}';
   }
 
   String get _textoFechas {
-    if (_fechas == null) return 'Toca para seleccionar fechas...';
-    // Si es el mismo día de inicio y fin, mostramos solo un día
-    if (_fechas!.start == _fechas!.end) return _format(_fechas!.start);
+    if (_fechas == null) {
+      return 'Toca para seleccionar fechas';
+    }
+    if (_fechas!.start == _fechas!.end) {
+      return _format(_fechas!.start);
+    }
     return '${_format(_fechas!.start)} - ${_format(_fechas!.end)}';
   }
 
   Future<void> _seleccionarFechas() async {
-    final DateTime now = DateTime.now();
-    final DateTimeRange? picked = await showDateRangePicker(
+    final now = DateTime.now();
+    final picked = await showDateRangePicker(
       context: context,
       firstDate: now,
       lastDate: now.add(const Duration(days: 365)),
       initialDateRange: _fechas,
-      helpText: 'SELECCIONA FECHAS (Toca 2 veces para 1 solo día)',
-      confirmText: 'GUARDAR', // Botón de confirmación en español
-      cancelText: 'CANCELAR', // Botón de cancelar en español
+      helpText: 'Selecciona fechas',
+      confirmText: 'Guardar',
+      cancelText: 'Cancelar',
+      saveText: 'Guardar',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(primary: Colors.blue.shade900),
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: NavalgoColors.tide,
+              onPrimary: Colors.white,
+              surface: Colors.white,
+              onSurface: NavalgoColors.ink,
+            ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(
+                foregroundColor: NavalgoColors.deepSea,
+              ),
+            ),
           ),
           child: child!,
         );
@@ -127,70 +172,85 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
     }
   }
 
+  void _submit() {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      return;
+    }
+    if (_fechas == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Por favor, selecciona las fechas')),
+      );
+      return;
+    }
+
+    Navigator.pop(context, {
+      'fecha': _textoFechas,
+      'estado': 'Pendiente',
+      'color': NavalgoColors.sand,
+      'motivo': _motivo,
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Solicitar Ausencia', style: TextStyle(fontWeight: FontWeight.bold)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Motivo', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _motivo,
-            decoration: InputDecoration(
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            ),
-            items: _motivos.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
-            onChanged: (val) => setState(() => _motivo = val!),
-          ),
-          const SizedBox(height: 20),
-          const Text('Fechas', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.maxFinite,
-            child: OutlinedButton.icon(
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                alignment: Alignment.centerLeft,
-              ),
-              icon: const Icon(Icons.calendar_today),
-              label: Text(_textoFechas, style: const TextStyle(fontSize: 16, color: Colors.black87)),
-              onPressed: _seleccionarFechas,
-            ),
-          ),
-        ],
-      ),
+    return NavalgoFormDialog(
+      title: 'Solicitar ausencia',
+      subtitle:
+          'Usa la misma estructura del sistema para indicar motivo y rango de fechas.',
       actions: [
-        TextButton(
+        NavalgoGhostButton(
+          label: 'Cancelar',
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancelar', style: TextStyle(color: Colors.grey)),
         ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue.shade900,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
-          onPressed: () {
-            if (_fechas == null) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Por favor, selecciona las fechas')));
-              return;
-            }
-            Navigator.pop(context, {
-              'fecha': _textoFechas,
-              'estado': 'Pendiente',
-              'color': Colors.orange,
-              'motivo': _motivo,
-            });
-          },
-          child: const Text('Solicitar'),
+        NavalgoGradientButton(
+          label: 'Solicitar',
+          icon: Icons.event_available_outlined,
+          onPressed: _submit,
         ),
       ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            NavalgoFormFieldBlock(
+              label: 'Motivo',
+              child: DropdownButtonFormField<String>(
+                initialValue: _motivo,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Motivo',
+                  prefixIcon: const Icon(Icons.fact_check_outlined),
+                ),
+                items: _motivos
+                    .map(
+                      (motivo) =>
+                          DropdownMenuItem(value: motivo, child: Text(motivo)),
+                    )
+                    .toList(),
+                onChanged: (value) =>
+                    setState(() => _motivo = value ?? _motivo),
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Fechas',
+              caption:
+                  'Selecciona un rango o toca dos veces el mismo día para una ausencia de una sola jornada.',
+              child: NavalgoPickerField(
+                label: 'Fechas',
+                prefixIcon: const Icon(Icons.calendar_today_outlined),
+                value: _fechas == null ? null : _textoFechas,
+                placeholder: 'Toca para seleccionar fechas',
+                onTap: _seleccionarFechas,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
