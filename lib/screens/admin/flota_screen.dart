@@ -393,20 +393,11 @@ class _FlotaScreenState extends State<FlotaScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  const NavalgoPageIntro(
-                    eyebrow: 'CLIENTES Y EMBARCACIONES',
-                    title:
-                        'Consulta propietarios, embarcaciones y motores desde una misma vista.',
-                    subtitle:
-                        'Mantén actualizada la información de clientes y flota para la planificación y el seguimiento técnico.',
+                  Text(
+                    'Propietarios',
+                    style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                  const SizedBox(height: 18),
-                  const NavalgoSectionHeader(
-                    title: 'Propietarios',
-                    subtitle:
-                        'Consulta, filtra y actualiza clientes particulares y empresas.',
-                  ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
                   TextField(
                     controller: _ownerSearchCtrl,
                     decoration: const InputDecoration(
@@ -651,11 +642,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
                     },
                   ),
                   const SizedBox(height: 18),
-                  const NavalgoSectionHeader(
-                    title: 'Embarcaciones',
-                    subtitle:
-                        'Filtra unidades, propietarios y configuración de motores.',
-                  ),
+                  const NavalgoSectionHeader(title: 'Embarcaciones'),
                   const SizedBox(height: 10),
                   TextField(
                     controller: _vesselSearchCtrl,
@@ -885,10 +872,7 @@ class _OwnerDialogState extends State<_OwnerDialog> {
     final isEditing = widget.initialOwner != null;
 
     return NavalgoFormDialog(
-      eyebrow: 'FLOTA',
       title: isEditing ? 'Editar propietario' : 'Nuevo propietario',
-      subtitle:
-          'Registra los datos fiscales y de contacto con el mismo formato visual del resto de formularios principales.',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',
@@ -1114,10 +1098,7 @@ class _VesselDialogState extends State<_VesselDialog> {
     final isEditing = widget.initialVessel != null;
 
     return NavalgoFormDialog(
-      eyebrow: 'FLOTA',
       title: isEditing ? 'Editar embarcación' : 'Nueva embarcación',
-      subtitle:
-          'Define la ficha técnica y asigna el propietario con la misma estética del formulario de perfil.',
       maxWidth: 680,
       actions: [
         NavalgoGhostButton(
@@ -1544,10 +1525,7 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
         : vessel.engineLabels.join(', ');
 
     return NavalgoFormDialog(
-      eyebrow: 'EMBARCACIÓN',
       title: vessel.name,
-      subtitle:
-          'Consulta la ficha técnica completa y los datos del cliente asociado.',
       actions: [
         NavalgoGhostButton(
           label: 'Cerrar',

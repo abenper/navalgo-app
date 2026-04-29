@@ -106,6 +106,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final workerName = context.watch<SessionViewModel>().user?.name ?? '';
+    final firstName = workerName.split(' ').first;
+    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       body: RefreshIndicator(
@@ -113,17 +115,14 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         child: CustomScrollView(
           slivers: [
             SliverPadding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
               sliver: SliverToBoxAdapter(
-                child: NavalgoPageIntro(
-                  eyebrow: 'PANEL PERSONAL',
-                  title: 'Hola, $workerName',
-                  subtitle:
-                      'Consulta tus partes, tus horas de hoy y tus días disponibles desde un mismo panel.',
+                child: Text(
+                  firstName.isEmpty ? 'Hola' : 'Hola, $firstName',
+                  style: textTheme.headlineMedium,
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
             if (_isLoading)
               const SliverFillRemaining(
                 child: Center(child: CircularProgressIndicator()),
@@ -217,9 +216,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       '$available d',
       const Icon(Icons.beach_access_rounded),
       NavalgoColors.harbor,
-      note: bonus > 0
-          ? 'Días naturales · +$bonus extra por viaje'
-          : 'Días naturales disponibles',
+      note: bonus > 0 ? '+$bonus días extra por viaje' : null,
     );
   }
 

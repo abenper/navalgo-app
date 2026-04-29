@@ -6,7 +6,7 @@ class NavalgoPageIntro extends StatelessWidget {
   const NavalgoPageIntro({
     super.key,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.eyebrow,
     this.trailing,
     this.footer,
@@ -14,7 +14,7 @@ class NavalgoPageIntro extends StatelessWidget {
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final String? eyebrow;
   final Widget? trailing;
   final Widget? footer;
@@ -47,13 +47,15 @@ class NavalgoPageIntro extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 10),
-            Text(
-              subtitle,
-              style: textTheme.bodyLarge?.copyWith(
-                color: Colors.white.withValues(alpha: 0.82),
+            if (subtitle != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                subtitle!,
+                style: textTheme.bodyLarge?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.82),
+                ),
               ),
-            ),
+            ],
             if (footer != null) ...[const SizedBox(height: 18), footer!],
           ],
         );
@@ -101,12 +103,12 @@ class NavalgoSectionHeader extends StatelessWidget {
   const NavalgoSectionHeader({
     super.key,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.action,
   });
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final Widget? action;
 
   @override
@@ -120,8 +122,10 @@ class NavalgoSectionHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: textTheme.headlineSmall),
-              const SizedBox(height: 6),
-              Text(subtitle, style: textTheme.bodyMedium),
+              if (subtitle != null) ...[
+                const SizedBox(height: 6),
+                Text(subtitle!, style: textTheme.bodyMedium),
+              ],
             ],
           ),
         ),

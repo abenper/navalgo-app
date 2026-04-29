@@ -38,21 +38,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   ];
 
   final List<String> _titles = const [
-    'Panel de control',
-    'Gestión de partes',
-    'Clientes y Flota',
+    'Panel',
+    'Partes',
+    'Flota',
     'Equipo',
-    'Control horario',
+    'Fichaje',
     'Ausencias',
-  ];
-
-  final List<String> _subtitles = const [
-    'Visión general de actividad, equipo y prioridades.',
-    'Firmas, evidencias y seguimiento técnico.',
-    'Propietarios, embarcaciones y motores al día.',
-    'Altas, permisos y estado del personal.',
-    'Entradas, salidas y jornada registrada.',
-    'Solicitudes, aprobaciones y planificación.',
   ];
 
   final List<IconData> _sectionIcons = const [
@@ -159,12 +150,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   children: [
                     Row(
                       children: [
-                        const Text(
+                        Text(
                           'Notificaciones',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const Spacer(),
                         TextButton(
@@ -177,11 +165,14 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Expanded(
                       child: notifications.isEmpty
-                          ? const Center(
-                              child: Text('No tienes notificaciones'),
+                          ? Center(
+                              child: Text(
+                                'No tienes notificaciones',
+                                style: Theme.of(context).textTheme.bodyLarge,
+                              ),
                             )
                           : ListView.builder(
                               itemCount: notifications.length,
@@ -248,11 +239,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       (session) => session.user?.photoUrl,
     );
     final width = MediaQuery.of(context).size.width;
-    final showSubtitle = width >= 760;
     final showName = width >= 1080;
+    final textTheme = Theme.of(context).textTheme;
 
     return AppBar(
-      toolbarHeight: showSubtitle ? 86 : 74,
+      toolbarHeight: 72,
       titleSpacing: 14,
       title: Row(
         children: [
@@ -261,7 +252,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
             height: 44,
             decoration: BoxDecoration(
               color: NavalgoColors.mist,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               _sectionIcons[_selectedIndex],
@@ -270,24 +261,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _titles[_selectedIndex],
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                if (showSubtitle)
-                  Text(
-                    _subtitles[_selectedIndex],
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-              ],
+            child: Text(
+              _titles[_selectedIndex],
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: textTheme.titleLarge,
             ),
           ),
         ],
@@ -337,9 +315,9 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   borderRadius: BorderRadius.circular(999),
                   onTap: _openAccountMenu,
                   child: Container(
-                    height: 46,
+                    height: 48,
                     padding: EdgeInsets.symmetric(
-                      horizontal: showName ? 8 : 4,
+                      horizontal: showName ? 10 : 6,
                       vertical: 4,
                     ),
                     decoration: BoxDecoration(
@@ -391,8 +369,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: Container(
-            width: 46,
-            height: 46,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -455,29 +433,14 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      gradient: NavalgoColors.heroGradient,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 4, 8, 20),
                     child: Row(
                       children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: Center(
-                            child: _buildAvatarWidget(
-                              user.photoUrl,
-                              radius: 22,
-                              iconSize: 22,
-                            ),
-                          ),
+                        _buildAvatarWidget(
+                          user.photoUrl,
+                          radius: 26,
+                          iconSize: 24,
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -488,21 +451,14 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                                 user.name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context).textTheme.titleLarge
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                    ),
+                                style: Theme.of(context).textTheme.titleLarge,
                               ),
-                              const SizedBox(height: 4),
+                              const SizedBox(height: 2),
                               Text(
-                                'Administrador de NavalGO',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.82,
-                                      ),
-                                    ),
+                                user.email,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
                             ],
                           ),
@@ -510,29 +466,25 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 16),
                   _buildAccountAction(
                     context: sheetContext,
                     value: 'profile',
                     icon: Icons.person_outline_rounded,
                     title: 'Mi perfil',
-                    subtitle: 'Consulta tus datos y permisos actuales.',
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _buildAccountAction(
                     context: sheetContext,
                     value: 'password',
                     icon: Icons.lock_outline_rounded,
                     title: 'Cambiar contraseña',
-                    subtitle: 'Actualiza tus credenciales de acceso.',
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   _buildAccountAction(
                     context: sheetContext,
                     value: 'logout',
                     icon: Icons.logout_rounded,
                     title: 'Cerrar sesión',
-                    subtitle: 'Salir de NavalGO en este dispositivo.',
                     accent: NavalgoColors.coral,
                   ),
                 ],
@@ -571,50 +523,36 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     required String value,
     required IconData icon,
     required String title,
-    required String subtitle,
     Color accent = NavalgoColors.tide,
   }) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         onTap: () => Navigator.of(context).pop(value),
         child: Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: accent.withValues(alpha: 0.14)),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: NavalgoColors.border),
           ),
           child: Row(
             children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(icon, color: accent),
-              ),
+              Icon(icon, color: accent, size: 22),
               const SizedBox(width: 14),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
+                child: Text(
+                  title,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ),
-              Icon(Icons.arrow_forward_ios_rounded, size: 16, color: accent),
+              Icon(
+                Icons.arrow_forward_ios_rounded,
+                size: 14,
+                color: NavalgoColors.storm,
+              ),
             ],
           ),
         ),

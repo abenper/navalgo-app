@@ -300,20 +300,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  const NavalgoPageIntro(
-                    eyebrow: 'EQUIPO TÉCNICO',
-                    title:
-                        'Administra trabajadores, permisos y datos de acceso del equipo.',
-                    subtitle:
-                        'Consulta la plantilla, actualiza perfiles y revisa permisos, especialidades y estado contractual.',
-                  ),
-                  const SizedBox(height: 18),
-                  const NavalgoSectionHeader(
-                    title: 'Plantilla activa',
-                    subtitle:
-                        'Busca perfiles, revisa permisos y actúa sobre cada trabajador.',
-                  ),
-                  const SizedBox(height: 10),
                   TextField(
                     controller: _searchCtrl,
                     decoration: const InputDecoration(
@@ -515,10 +501,7 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
   @override
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
-      eyebrow: 'EQUIPO',
       title: 'Crear trabajador',
-      subtitle:
-          'Da de alta un nuevo perfil del equipo con el mismo formato visual del resto de formularios principales.',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',
@@ -759,9 +742,6 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
       title: 'Editar trabajador',
-      eyebrow: 'GESTIÓN DE EQUIPO',
-      subtitle:
-          'Ajusta los datos del trabajador con la misma estructura visual que el resto de formularios del panel.',
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),

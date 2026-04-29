@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -29,18 +31,16 @@ import 'screens/common/login_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-    }
-  } on UnsupportedError {
-    // Firebase is not configured for every desktop target.
-  } catch (error, stackTrace) {
-    debugPrint('Firebase init failed: $error');
-    debugPrintStack(stackTrace: stackTrace);
+
+  // On web, Firebase init can hang silently when the Service Worker is
+  // blocked (e.g. site served over HTTP). Don't await it on the critical
+  // path so login renders immediately even if FCM is unavailable.
+  if (kIsWeb) {
+    unawaited(_initFirebaseSafely());
+  } else {
+    await _initFirebaseSafely();
   }
+
   final sessionViewModel = SessionViewModel();
   try {
     await sessionViewModel.restoreSession();
@@ -115,9 +115,32 @@ Future<void> main() async {
           ),
         ),
       ],
-      child: kIsWeb ? const MyApp() : const _PushNotificationBootstrap(child: MyApp()),
+      child: const _PushNotificationBootstrap(child: MyApp()),
     ),
   );
+}
+
+Future<void> _initFirebaseSafely() async {
+  try {
+    if (Firebase.apps.isNotEmpty) {
+      return;
+    }
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(
+      const Duration(seconds: 3),
+      onTimeout: () {
+        throw TimeoutException('Firebase init exceeded 3s');
+      },
+    );
+  } on UnsupportedError {
+    // Firebase is not configured for every desktop target.
+  } on TimeoutException catch (error) {
+    debugPrint('Firebase init timeout: $error');
+  } catch (error, stackTrace) {
+    debugPrint('Firebase init failed: $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
 }
 
 class _PushNotificationBootstrap extends StatefulWidget {

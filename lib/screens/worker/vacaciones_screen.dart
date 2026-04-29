@@ -1134,16 +1134,6 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            NavalgoPageIntro(
-              eyebrow: _isAdmin ? 'PLANIFICACIÓN DE AUSENCIAS' : 'MI DESCANSO',
-              title: _isAdmin
-                  ? 'Supervisa y asigna ausencias con una lectura inmediata.'
-                  : 'Consulta tus días naturales disponibles y gestiona tus ausencias.',
-              subtitle: _isAdmin
-                  ? 'Una vista unificada para validar solicitudes, asignar descansos y detectar estados al instante.'
-                  : 'Tu saldo disponible, las solicitudes enviadas y su estado quedan reunidos en una sola pantalla.',
-            ),
-            const SizedBox(height: 18),
             if (_isAdmin) ...[
               _buildAdminCalendar(),
               const SizedBox(height: 18),
@@ -1338,10 +1328,7 @@ class _FormularioAusenciaDialogState extends State<_FormularioAusenciaDialog> {
   @override
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
-      eyebrow: 'AUSENCIAS',
       title: widget.title,
-      subtitle:
-          'Selecciona el motivo, añade contexto cuando sea necesario y fija el rango exacto de fechas.',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',
@@ -1489,10 +1476,7 @@ class _AdminAssignLeaveDialogState extends State<_AdminAssignLeaveDialog> {
   @override
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
-      eyebrow: 'PLANIFICACIÓN',
-      title: 'Asignar ausencia aceptada',
-      subtitle:
-          'Reserva directamente días de ausencia para el trabajador seleccionado y deja el motivo claro desde el calendario operativo.',
+      title: 'Asignar ausencia',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',

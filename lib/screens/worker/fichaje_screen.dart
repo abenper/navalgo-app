@@ -183,13 +183,6 @@ class _FichajeScreenState extends State<FichajeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const NavalgoPageIntro(
-            eyebrow: 'CONTROL HORARIO',
-            title: 'Registra tu jornada y el tipo de servicio de forma clara.',
-            subtitle:
-                'Indica si trabajas en taller o en viaje, revisa el tiempo acumulado y consulta los últimos movimientos del día.',
-          ),
-          const SizedBox(height: 18),
           NavalgoPanel(
             child: Column(
               children: [
@@ -254,11 +247,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
           ),
           if (isAdmin && _todaySummary != null) ...[
             const SizedBox(height: 18),
-            const NavalgoSectionHeader(
-              title: 'Resumen del día',
-              subtitle:
-                  'Vista rápida del personal que ya ha registrado actividad hoy.',
-            ),
+            const NavalgoSectionHeader(title: 'Resumen del día'),
             const SizedBox(height: 12),
             NavalgoPanel(
               child: Column(
@@ -329,10 +318,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
               );
             }),
           const SizedBox(height: 18),
-          const NavalgoSectionHeader(
-            title: 'Últimos registros',
-            subtitle: 'Entradas y salidas recientes de la jornada.',
-          ),
+          const NavalgoSectionHeader(title: 'Últimos registros'),
           const SizedBox(height: 12),
           ..._entries.take(6).map((item) {
             final duration = _durationForEntry(item);

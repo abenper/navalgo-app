@@ -8,6 +8,11 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../firebase_options.dart';
 import 'notification_service.dart';
 
+// VAPID public key from Firebase Console > Project Settings > Cloud Messaging
+// > Web Push certificates. Required for getToken() on web.
+const String _firebaseWebVapidKey =
+    'BDi2-Q05VzIhbIm73QBGbteqMoYDeVNEoLnmiQWqvjdLiiI6XyvK8i8SXHv9krSJbgcpVTcwnbvKc5bf0AvkCuM';
+
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
@@ -63,10 +68,6 @@ class PushNotificationService {
     _refreshNotifications = refreshNotifications;
     _authToken = currentAuthToken;
 
-    if (kIsWeb) {
-      return;
-    }
-
     await _ensureInitialized();
     if (!_firebaseAvailable) {
       return;
@@ -86,11 +87,6 @@ class PushNotificationService {
     }
     _setupAttempted = true;
 
-    if (kIsWeb) {
-      _firebaseAvailable = false;
-      return;
-    }
-
     try {
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp(
@@ -98,27 +94,35 @@ class PushNotificationService {
         );
       }
 
-      await _localNotifications.initialize(
-        const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-          iOS: DarwinInitializationSettings(),
-        ),
-      );
+      // Local notifications and onBackgroundMessage only apply to mobile.
+      // On web, the browser + firebase-messaging-sw.js handle background
+      // notifications natively.
+      if (!kIsWeb) {
+        await _localNotifications.initialize(
+          const InitializationSettings(
+            android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+            iOS: DarwinInitializationSettings(),
+          ),
+        );
 
-      FirebaseMessaging.onBackgroundMessage(
-        firebaseMessagingBackgroundHandler,
-      );
+        FirebaseMessaging.onBackgroundMessage(
+          firebaseMessagingBackgroundHandler,
+        );
+      }
 
       await _messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
-      await _messaging.setForegroundNotificationPresentationOptions(
-        alert: true,
-        badge: true,
-        sound: true,
-      );
+
+      if (!kIsWeb) {
+        await _messaging.setForegroundNotificationPresentationOptions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
 
       _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
         unawaited(_handleForegroundMessage(message));
@@ -147,6 +151,12 @@ class PushNotificationService {
     final refreshNotifications = _refreshNotifications;
     if (refreshNotifications != null) {
       await refreshNotifications();
+    }
+
+    // On web the browser surfaces foreground messages itself when the SW is
+    // registered; flutter_local_notifications doesn't support web.
+    if (kIsWeb) {
+      return;
     }
 
     final notification = message.notification;
@@ -191,7 +201,10 @@ class PushNotificationService {
       return;
     }
 
-    final pushToken = explicitToken ?? await _messaging.getToken();
+    final pushToken = explicitToken ??
+        await _messaging.getToken(
+          vapidKey: kIsWeb ? _firebaseWebVapidKey : null,
+        );
     if (pushToken == null || pushToken.isEmpty) {
       return;
     }

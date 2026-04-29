@@ -8,6 +8,8 @@ class SessionViewModel extends ChangeNotifier {
   static const _rememberMeKey = 'remember_me';
   static const _rememberedEmailKey = 'remembered_email';
   static const _userSessionKey = 'user_session';
+  static const _sessionStartedAtKey = 'session_started_at';
+  static const _maxSessionAge = Duration(days: 30);
 
   User? _user;
   bool _isReady = false;
@@ -39,14 +41,16 @@ class SessionViewModel extends ChangeNotifier {
         try {
           final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
           _user = User.fromJson(decoded);
-          if (_isJwtExpired(_user?.token)) {
+          if (_isJwtExpired(_user?.token) || _isMaxAgeExpired(prefs)) {
             _user = null;
             _pendingNotice = 'Tu sesión ha expirado. Inicia sesión de nuevo.';
             await prefs.remove(_userSessionKey);
+            await prefs.remove(_sessionStartedAtKey);
           }
         } catch (_) {
           _user = null;
           await prefs.remove(_userSessionKey);
+          await prefs.remove(_sessionStartedAtKey);
         }
       }
     }
@@ -67,8 +71,13 @@ class SessionViewModel extends ChangeNotifier {
 
     if (rememberMe) {
       await prefs.setString(_userSessionKey, jsonEncode(user.toJson()));
+      await prefs.setInt(
+        _sessionStartedAtKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } else {
       await prefs.remove(_userSessionKey);
+      await prefs.remove(_sessionStartedAtKey);
     }
 
     notifyListeners();
@@ -80,6 +89,7 @@ class SessionViewModel extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userSessionKey);
+    await prefs.remove(_sessionStartedAtKey);
     await prefs.setBool(_rememberMeKey, false);
     await prefs.remove(_rememberedEmailKey);
 
@@ -95,8 +105,18 @@ class SessionViewModel extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_userSessionKey);
+    await prefs.remove(_sessionStartedAtKey);
 
     notifyListeners();
+  }
+
+  bool _isMaxAgeExpired(SharedPreferences prefs) {
+    final startedAt = prefs.getInt(_sessionStartedAtKey);
+    if (startedAt == null) {
+      return false;
+    }
+    final started = DateTime.fromMillisecondsSinceEpoch(startedAt);
+    return DateTime.now().difference(started) >= _maxSessionAge;
   }
 
   Future<void> updateUser(User user) async {

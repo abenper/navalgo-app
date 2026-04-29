@@ -106,28 +106,21 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const NavalgoPageIntro(
-              eyebrow: 'RESUMEN OPERATIVO',
-              title:
-                  'Supervisa carga de trabajo, equipo y avisos desde un mismo panel.',
-              subtitle:
-                  'Consulta partes pendientes, fichajes del día y ausencias por revisar al inicio de la jornada.',
-            ),
-            const SizedBox(height: 18),
             if (_isLoading)
               const Padding(
-                padding: EdgeInsets.symmetric(vertical: 32),
+                padding: EdgeInsets.symmetric(vertical: 64),
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (_error != null)
               NavalgoPanel(child: Text('No se pudo cargar el panel: $_error'))
-            else
+            else ...[
               LayoutBuilder(
                 builder: (context, constraints) {
                   final crossAxisCount = constraints.maxWidth >= 980
@@ -147,13 +140,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     ),
                     children: [
                       _buildStatCard(
-                        'Partes Pendientes',
+                        'Partes pendientes',
                         '$_pendingWorkOrders',
                         const Icon(Icons.assignment_outlined),
                         NavalgoColors.sand,
                       ),
                       _buildStatCard(
-                        'Partes Urgentes',
+                        'Partes urgentes',
                         '$_urgentWorkOrders',
                         const Icon(Icons.warning_amber_rounded),
                         NavalgoColors.coral,
@@ -164,11 +157,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         const Icon(Icons.engineering),
                         NavalgoColors.tide,
                         note: _workersClockedTodayNames.isEmpty
-                            ? 'Sin fichajes registrados hoy.'
+                            ? null
                             : _workersClockedTodayNames.join(', '),
                       ),
                       _buildStatCard(
-                        'Ausencias Pendientes',
+                        'Ausencias pendientes',
                         '$_pendingLeaves',
                         const Icon(Icons.event_busy),
                         NavalgoColors.harbor,
@@ -177,35 +170,43 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   );
                 },
               ),
-            const SizedBox(height: 18),
-            NavalgoPanel(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: NavalgoColors.foam,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: const Icon(
-                    Icons.event_available,
-                    color: NavalgoColors.kelp,
-                  ),
+              const SizedBox(height: 16),
+              NavalgoPanel(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 18,
                 ),
-                title: const Text('Ausencias aprobadas hoy'),
-                subtitle: const Text(
-                  'Visión rápida de asignaciones ya confirmadas.',
-                ),
-                trailing: Text(
-                  '$_approvedLeavesToday',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: NavalgoColors.kelp.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        Icons.event_available,
+                        color: NavalgoColors.kelp,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Text(
+                        'Ausencias aprobadas hoy',
+                        style: textTheme.titleMedium,
+                      ),
+                    ),
+                    Text(
+                      '$_approvedLeavesToday',
+                      style: textTheme.headlineMedium?.copyWith(
+                        color: NavalgoColors.kelp,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),
