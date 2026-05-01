@@ -7,6 +7,7 @@ public record MaterialRevisionRequestDto(
         Long checklistItemSnapshotId,
         Long sourceTemplateId,
         Long sourceTemplateItemId,
+        Long productId,
         String articleName,
         String reference,
         String observations,

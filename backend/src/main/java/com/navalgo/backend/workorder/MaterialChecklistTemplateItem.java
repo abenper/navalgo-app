@@ -14,6 +14,10 @@ public class MaterialChecklistTemplateItem {
     @JoinColumn(name = "template_id", nullable = false)
     private MaterialChecklistTemplate template;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "product_id", nullable = false)
+    private MaterialProduct product;
+
     @Column(nullable = false, length = 255)
     private String articleName;
 
@@ -28,6 +32,9 @@ public class MaterialChecklistTemplateItem {
 
     public MaterialChecklistTemplate getTemplate() { return template; }
     public void setTemplate(MaterialChecklistTemplate template) { this.template = template; }
+
+    public MaterialProduct getProduct() { return product; }
+    public void setProduct(MaterialProduct product) { this.product = product; }
 
     public String getArticleName() { return articleName; }
     public void setArticleName(String articleName) { this.articleName = articleName; }

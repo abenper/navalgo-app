@@ -391,6 +391,7 @@ public class WorkOrderService {
         revisionRequest.setChecklistItemSnapshotId(checklistItem.getId());
         revisionRequest.setSourceTemplateId(checklist.getSourceTemplateId());
         revisionRequest.setSourceTemplateItemId(checklistItem.getSourceTemplateItemId());
+        revisionRequest.setProductId(checklistItem.getProductId());
         revisionRequest.setArticleName(checklistItem.getArticleName());
         revisionRequest.setReference(checklistItem.getReference());
         revisionRequest.setObservations(
@@ -711,17 +712,20 @@ public class WorkOrderService {
         targetChecklist.setSourceTemplateName(template.getName());
         targetChecklist.setAssignedAt(Instant.now());
 
-        template.getItems().stream()
-                .sorted(Comparator.comparingInt(MaterialChecklistTemplateItem::getSortOrder).thenComparing(MaterialChecklistTemplateItem::getId))
-                .forEach(templateItem -> {
-                    WorkOrderChecklistItem checklistItem = new WorkOrderChecklistItem();
-                    checklistItem.setChecklist(targetChecklist);
-                    checklistItem.setSourceTemplateItemId(templateItem.getId());
-                    checklistItem.setArticleName(templateItem.getArticleName());
-                    checklistItem.setReference(templateItem.getReference());
-                    checklistItem.setSortOrder(templateItem.getSortOrder());
-                    targetChecklist.getItems().add(checklistItem);
-                });
+        List<MaterialChecklistTemplateItem> resolvedTemplateItems = resolveChecklistTemplateItems(template);
+        for (int index = 0; index < resolvedTemplateItems.size(); index += 1) {
+            MaterialChecklistTemplateItem templateItem = resolvedTemplateItems.get(index);
+            WorkOrderChecklistItem checklistItem = new WorkOrderChecklistItem();
+            checklistItem.setChecklist(targetChecklist);
+            checklistItem.setSourceTemplateItemId(templateItem.getId());
+            checklistItem.setProductId(
+                    templateItem.getProduct() != null ? templateItem.getProduct().getId() : null
+            );
+            checklistItem.setArticleName(templateItem.getArticleName());
+            checklistItem.setReference(templateItem.getReference());
+            checklistItem.setSortOrder(index);
+            targetChecklist.getItems().add(checklistItem);
+        }
     }
 
     private WorkOrderChecklistDto toChecklistDto(WorkOrderChecklist checklist) {
@@ -743,6 +747,7 @@ public class WorkOrderService {
         return new WorkOrderChecklistItemDto(
                 item.getId(),
                 item.getSourceTemplateItemId(),
+                item.getProductId(),
                 item.getArticleName(),
                 item.getReference(),
                 item.isChecked(),
@@ -759,6 +764,7 @@ public class WorkOrderService {
                 request.getChecklistItemSnapshotId(),
                 request.getSourceTemplateId(),
                 request.getSourceTemplateItemId(),
+                request.getProductId(),
                 request.getArticleName(),
                 request.getReference(),
                 request.getObservations(),
@@ -771,6 +777,35 @@ public class WorkOrderService {
                 request.getReviewedAt(),
                 request.getResolutionNote()
         );
+    }
+
+    private List<MaterialChecklistTemplateItem> resolveChecklistTemplateItems(MaterialChecklistTemplate template) {
+        LinkedHashMap<String, MaterialChecklistTemplateItem> itemsByKey = new LinkedHashMap<>();
+        collectChecklistTemplateItems(template, new HashSet<>(), itemsByKey);
+        return List.copyOf(itemsByKey.values());
+    }
+
+    private void collectChecklistTemplateItems(MaterialChecklistTemplate template,
+                                               Set<Long> visitedTemplateIds,
+                                               Map<String, MaterialChecklistTemplateItem> itemsByKey) {
+        if (template.getId() != null && !visitedTemplateIds.add(template.getId())) {
+            return;
+        }
+
+        if (template.getTemplateType() == MaterialChecklistTemplateType.COMPLETE && template.getBaseTemplate() != null) {
+            collectChecklistTemplateItems(template.getBaseTemplate(), visitedTemplateIds, itemsByKey);
+        }
+
+        template.getItems().stream()
+                .sorted(Comparator.comparingInt(MaterialChecklistTemplateItem::getSortOrder).thenComparing(MaterialChecklistTemplateItem::getId))
+                .forEach(item -> itemsByKey.putIfAbsent(buildTemplateItemKey(item), item));
+    }
+
+    private String buildTemplateItemKey(MaterialChecklistTemplateItem item) {
+        if (item.getProduct() != null && item.getProduct().getId() != null) {
+            return "product:" + item.getProduct().getId();
+        }
+        return "reference:" + item.getReference().trim().toLowerCase(Locale.ROOT);
     }
 
     private WorkOrderAttachment mapAttachmentRequest(WorkOrder workOrder, AttachmentRequest item) {

@@ -145,12 +145,14 @@ class MaterialTemplateIncidentAlert {
 class MaterialChecklistTemplateItem {
   const MaterialChecklistTemplateItem({
     this.id,
+    this.productId,
     required this.articleName,
     required this.reference,
     required this.sortOrder,
   });
 
   final int? id;
+  final int? productId;
   final String articleName;
   final String reference;
   final int sortOrder;
@@ -158,6 +160,7 @@ class MaterialChecklistTemplateItem {
   factory MaterialChecklistTemplateItem.fromJson(Map<String, dynamic> json) {
     return MaterialChecklistTemplateItem(
       id: (json['id'] as num?)?.toInt(),
+      productId: (json['productId'] as num?)?.toInt(),
       articleName: (json['articleName']?.toString() ?? '').trim(),
       reference: (json['reference']?.toString() ?? '').trim(),
       sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
@@ -167,6 +170,7 @@ class MaterialChecklistTemplateItem {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'productId': productId,
       'articleName': articleName,
       'reference': reference,
       'sortOrder': sortOrder,
@@ -179,7 +183,11 @@ class MaterialChecklistTemplate {
     this.id,
     required this.name,
     this.description,
+    required this.templateType,
+    this.baseTemplateId,
+    this.baseTemplateName,
     required this.items,
+    required this.effectiveItemCount,
     this.createdAt,
     this.updatedAt,
     this.latestIncident,
@@ -188,7 +196,11 @@ class MaterialChecklistTemplate {
   final int? id;
   final String name;
   final String? description;
+  final String templateType;
+  final int? baseTemplateId;
+  final String? baseTemplateName;
   final List<MaterialChecklistTemplateItem> items;
+  final int effectiveItemCount;
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final MaterialTemplateIncidentAlert? latestIncident;
@@ -209,12 +221,18 @@ class MaterialChecklistTemplate {
       id: (json['id'] as num?)?.toInt(),
       name: (json['name']?.toString() ?? '').trim(),
       description: json['description']?.toString(),
+      templateType: (json['templateType']?.toString() ?? 'BASIC').trim(),
+      baseTemplateId: (json['baseTemplateId'] as num?)?.toInt(),
+      baseTemplateName: json['baseTemplateName']?.toString(),
       items: rawItems is List
           ? rawItems
                 .whereType<Map<String, dynamic>>()
                 .map(MaterialChecklistTemplateItem.fromJson)
                 .toList()
           : const <MaterialChecklistTemplateItem>[],
+      effectiveItemCount:
+          (json['effectiveItemCount'] as num?)?.toInt() ??
+          (rawItems is List ? rawItems.length : 0),
       createdAt: parseDate(json['createdAt']),
       updatedAt: parseDate(json['updatedAt']),
       latestIncident: json['latestIncident'] is Map<String, dynamic>
@@ -230,6 +248,7 @@ class WorkOrderMaterialChecklistItem {
   const WorkOrderMaterialChecklistItem({
     required this.id,
     this.sourceTemplateItemId,
+    this.productId,
     required this.articleName,
     required this.reference,
     required this.checked,
@@ -241,6 +260,7 @@ class WorkOrderMaterialChecklistItem {
 
   final int id;
   final int? sourceTemplateItemId;
+  final int? productId;
   final String articleName;
   final String reference;
   final bool checked;
@@ -254,6 +274,7 @@ class WorkOrderMaterialChecklistItem {
     return WorkOrderMaterialChecklistItem(
       id: (json['id'] as num?)?.toInt() ?? 0,
       sourceTemplateItemId: (json['sourceTemplateItemId'] as num?)?.toInt(),
+      productId: (json['productId'] as num?)?.toInt(),
       articleName: (json['articleName']?.toString() ?? '').trim(),
       reference: (json['reference']?.toString() ?? '').trim(),
       checked: json['checked'] == true,
@@ -318,6 +339,7 @@ class MaterialRevisionRequest {
     this.checklistItemSnapshotId,
     this.sourceTemplateId,
     this.sourceTemplateItemId,
+    this.productId,
     required this.articleName,
     required this.reference,
     required this.observations,
@@ -335,6 +357,7 @@ class MaterialRevisionRequest {
   final int? checklistItemSnapshotId;
   final int? sourceTemplateId;
   final int? sourceTemplateItemId;
+  final int? productId;
   final String articleName;
   final String reference;
   final String observations;
@@ -366,6 +389,7 @@ class MaterialRevisionRequest {
           ?.toInt(),
       sourceTemplateId: (json['sourceTemplateId'] as num?)?.toInt(),
       sourceTemplateItemId: (json['sourceTemplateItemId'] as num?)?.toInt(),
+      productId: (json['productId'] as num?)?.toInt(),
       articleName: (json['articleName']?.toString() ?? '').trim(),
       reference: (json['reference']?.toString() ?? '').trim(),
       observations: (json['observations']?.toString() ?? '').trim(),
@@ -457,13 +481,13 @@ class WorkOrder {
 
     final rawCloseDueDate = json['closeDueDate'];
     final DateTime? closeDueDate = rawCloseDueDate is String
-      ? DateTime.tryParse(rawCloseDueDate)
-      : rawCloseDueDate is num
-      ? DateTime.fromMillisecondsSinceEpoch(
-        rawCloseDueDate.toInt(),
-        isUtc: true,
-        )
-      : null;
+        ? DateTime.tryParse(rawCloseDueDate)
+        : rawCloseDueDate is num
+        ? DateTime.fromMillisecondsSinceEpoch(
+            rawCloseDueDate.toInt(),
+            isUtc: true,
+          )
+        : null;
 
     final rawWorkerIds = json['workerIds'];
     final List<int> workerIds = rawWorkerIds is List
@@ -547,7 +571,7 @@ class WorkOrder {
       engineHours: engineHours,
       attachmentUrls: attachmentUrls,
       attachments: attachments,
-        closeDueDate: closeDueDate,
+      closeDueDate: closeDueDate,
       createdAt: createdAt,
       signatureUrl: asNullableString(json['signatureUrl']),
       signedAt: signedAt,

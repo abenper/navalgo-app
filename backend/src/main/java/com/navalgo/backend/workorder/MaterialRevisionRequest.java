@@ -26,6 +26,9 @@ public class MaterialRevisionRequest {
     @Column(name = "source_template_item_id")
     private Long sourceTemplateItemId;
 
+    @Column(name = "product_id")
+    private Long productId;
+
     @Column(nullable = false, length = 255)
     private String articleName;
 
@@ -69,6 +72,9 @@ public class MaterialRevisionRequest {
 
     public Long getSourceTemplateItemId() { return sourceTemplateItemId; }
     public void setSourceTemplateItemId(Long sourceTemplateItemId) { this.sourceTemplateItemId = sourceTemplateItemId; }
+
+    public Long getProductId() { return productId; }
+    public void setProductId(Long productId) { this.productId = productId; }
 
     public String getArticleName() { return articleName; }
     public void setArticleName(String articleName) { this.articleName = articleName; }

@@ -20,6 +20,14 @@ public class MaterialChecklistTemplate {
     @Column(length = 1000)
     private String description;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "template_type", nullable = false, length = 20)
+    private MaterialChecklistTemplateType templateType = MaterialChecklistTemplateType.BASIC;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "base_template_id")
+    private MaterialChecklistTemplate baseTemplate;
+
     @OneToMany(mappedBy = "template", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("sortOrder ASC, id ASC")
     private Set<MaterialChecklistTemplateItem> items = new LinkedHashSet<>();
@@ -43,6 +51,12 @@ public class MaterialChecklistTemplate {
 
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
+    public MaterialChecklistTemplateType getTemplateType() { return templateType; }
+    public void setTemplateType(MaterialChecklistTemplateType templateType) { this.templateType = templateType; }
+
+    public MaterialChecklistTemplate getBaseTemplate() { return baseTemplate; }
+    public void setBaseTemplate(MaterialChecklistTemplate baseTemplate) { this.baseTemplate = baseTemplate; }
 
     public Set<MaterialChecklistTemplateItem> getItems() { return items; }
     public void setItems(Set<MaterialChecklistTemplateItem> items) { this.items = items; }

@@ -28,6 +28,8 @@ class MaterialChecklistTemplateService {
     String token, {
     required String name,
     String? description,
+    required String templateType,
+    int? baseTemplateId,
     required List<MaterialChecklistTemplateItem> items,
   }) async {
     final data = await _apiClient.post(
@@ -36,6 +38,8 @@ class MaterialChecklistTemplateService {
       body: {
         'name': name,
         'description': description,
+        'templateType': templateType,
+        'baseTemplateId': baseTemplateId,
         'items': items.map((item) => item.toJson()).toList(),
       },
     );
@@ -48,6 +52,8 @@ class MaterialChecklistTemplateService {
     required int templateId,
     required String name,
     String? description,
+    required String templateType,
+    int? baseTemplateId,
     required List<MaterialChecklistTemplateItem> items,
   }) async {
     final data = await _apiClient.patch(
@@ -56,6 +62,8 @@ class MaterialChecklistTemplateService {
       body: {
         'name': name,
         'description': description,
+        'templateType': templateType,
+        'baseTemplateId': baseTemplateId,
         'items': items.map((item) => item.toJson()).toList(),
       },
     );

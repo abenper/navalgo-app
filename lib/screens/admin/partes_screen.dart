@@ -3237,13 +3237,14 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                 });
               },
             ),
-            if (_validationError != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _validationError!,
-                style: TextStyle(color: Theme.of(context).colorScheme.error),
+            if (_validationError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(
+                  _validationError!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
               ),
-            ],
           ],
         ),
       ),
@@ -4009,7 +4010,9 @@ class _MaterialTemplateAssignmentFieldState
                             ..._templates.map(
                               (template) => DropdownMenuItem<int?>(
                                 value: template.id,
-                                child: Text(template.name),
+                                child: Text(
+                                  _materialTemplateDisplayName(template),
+                                ),
                               ),
                             ),
                           ],
@@ -4216,7 +4219,9 @@ class _ManageMaterialTemplatesDialogState
                                             CrossAxisAlignment.start,
                                         children: [
                                           Text(
-                                            template.name,
+                                            _materialTemplateDisplayName(
+                                              template,
+                                            ),
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .titleMedium
@@ -4238,12 +4243,43 @@ class _ManageMaterialTemplatesDialogState
                                         ],
                                       ),
                                     ),
-                                    NavalgoStatusChip(
-                                      label: '${template.items.length} items',
-                                      color: NavalgoColors.harbor,
+                                    Wrap(
+                                      spacing: 8,
+                                      runSpacing: 8,
+                                      children: [
+                                        NavalgoStatusChip(
+                                          label: _materialTemplateTypeLabel(
+                                            template.templateType,
+                                          ),
+                                          color:
+                                              template.templateType ==
+                                                  'COMPLETE'
+                                              ? NavalgoColors.coral
+                                              : NavalgoColors.harbor,
+                                        ),
+                                        NavalgoStatusChip(
+                                          label:
+                                              '${template.effectiveItemCount} items',
+                                          color: NavalgoColors.harbor,
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
+                                if (template.templateType == 'COMPLETE' &&
+                                    (template.baseTemplateName ?? '')
+                                        .trim()
+                                        .isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Incluye la revisión básica: ${template.baseTemplateName}',
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(
+                                          color: NavalgoColors.deepSea
+                                              .withValues(alpha: 0.68),
+                                        ),
+                                  ),
+                                ],
                                 if (template.latestIncident != null) ...[
                                   const SizedBox(height: 10),
                                   Container(
@@ -4313,8 +4349,13 @@ class _MaterialTemplateEditorDialogState
   late final TextEditingController _nameCtrl;
   late final TextEditingController _descriptionCtrl;
   late final List<_MaterialTemplateItemDraft> _items;
+  late String _templateType;
+  int? _baseTemplateId;
+  List<MaterialChecklistTemplate> _availableBaseTemplates =
+      const <MaterialChecklistTemplate>[];
   String? _error;
   bool _saving = false;
+  bool _loadingTemplates = false;
 
   @override
   void initState() {
@@ -4323,6 +4364,8 @@ class _MaterialTemplateEditorDialogState
     _descriptionCtrl = TextEditingController(
       text: widget.template?.description ?? '',
     );
+    _templateType = widget.template?.templateType ?? 'BASIC';
+    _baseTemplateId = widget.template?.baseTemplateId;
     _items = (widget.template?.items ?? const <MaterialChecklistTemplateItem>[])
         .map(
           (item) => _MaterialTemplateItemDraft(
@@ -4331,9 +4374,10 @@ class _MaterialTemplateEditorDialogState
           ),
         )
         .toList();
-    if (_items.isEmpty) {
+    if (_items.isEmpty && _templateType == 'BASIC') {
       _items.add(_MaterialTemplateItemDraft());
     }
+    Future<void>.microtask(_loadBaseTemplates);
   }
 
   @override
@@ -4346,6 +4390,59 @@ class _MaterialTemplateEditorDialogState
     super.dispose();
   }
 
+  Future<void> _loadBaseTemplates() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() {
+      _loadingTemplates = true;
+      _error = null;
+    });
+
+    try {
+      final templates = await context
+          .read<MaterialChecklistTemplateService>()
+          .getTemplates(token);
+      if (!mounted) {
+        return;
+      }
+
+      final basicTemplates = templates
+          .where(
+            (template) =>
+                template.templateType == 'BASIC' &&
+                template.id != widget.template?.id,
+          )
+          .toList();
+
+      setState(() {
+        _availableBaseTemplates = basicTemplates;
+        if (_templateType == 'COMPLETE' &&
+            _baseTemplateId != null &&
+            !_availableBaseTemplates.any(
+              (item) => item.id == _baseTemplateId,
+            )) {
+          _baseTemplateId = null;
+        }
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _error = '$e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingTemplates = false;
+        });
+      }
+    }
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -4356,6 +4453,9 @@ class _MaterialTemplateEditorDialogState
       final draft = _items[index];
       final article = draft.articleController.text.trim();
       final reference = draft.referenceController.text.trim();
+      if (article.isEmpty && reference.isEmpty) {
+        continue;
+      }
       if (article.isEmpty || reference.isEmpty) {
         setState(() {
           _error = 'Cada item debe tener artículo y referencia.';
@@ -4369,6 +4469,20 @@ class _MaterialTemplateEditorDialogState
           sortOrder: index,
         ),
       );
+    }
+
+    if (_templateType == 'BASIC' && normalizedItems.isEmpty) {
+      setState(() {
+        _error = 'Una plantilla básica debe tener al menos un material.';
+      });
+      return;
+    }
+
+    if (_templateType == 'COMPLETE' && _baseTemplateId == null) {
+      setState(() {
+        _error = 'Selecciona la plantilla básica asociada.';
+      });
+      return;
     }
 
     final token = context.read<SessionViewModel>().token;
@@ -4387,6 +4501,10 @@ class _MaterialTemplateEditorDialogState
               token,
               name: _nameCtrl.text.trim(),
               description: _descriptionCtrl.text.trim(),
+              templateType: _templateType,
+              baseTemplateId: _templateType == 'COMPLETE'
+                  ? _baseTemplateId
+                  : null,
               items: normalizedItems,
             )
           : await service.updateTemplate(
@@ -4394,6 +4512,10 @@ class _MaterialTemplateEditorDialogState
               templateId: widget.template!.id!,
               name: _nameCtrl.text.trim(),
               description: _descriptionCtrl.text.trim(),
+              templateType: _templateType,
+              baseTemplateId: _templateType == 'COMPLETE'
+                  ? _baseTemplateId
+                  : null,
               items: normalizedItems,
             );
       if (!mounted) {
@@ -4467,12 +4589,92 @@ class _MaterialTemplateEditorDialogState
                 ),
               ),
             ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Tipo de revisión',
+              child: DropdownButtonFormField<String>(
+                initialValue: _templateType,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Tipo de revisión',
+                  prefixIcon: const Icon(Icons.layers_outlined),
+                ),
+                items: const [
+                  DropdownMenuItem<String>(
+                    value: 'BASIC',
+                    child: Text('Revisión básica'),
+                  ),
+                  DropdownMenuItem<String>(
+                    value: 'COMPLETE',
+                    child: Text('Revisión completa'),
+                  ),
+                ],
+                onChanged: _saving
+                    ? null
+                    : (value) {
+                        if (value == null) {
+                          return;
+                        }
+                        setState(() {
+                          _templateType = value;
+                          if (_templateType == 'BASIC') {
+                            _baseTemplateId = null;
+                            if (_items.isEmpty) {
+                              _items.add(_MaterialTemplateItemDraft());
+                            }
+                          }
+                        });
+                      },
+              ),
+            ),
+            if (_templateType == 'COMPLETE') ...[
+              const SizedBox(height: 14),
+              NavalgoFormFieldBlock(
+                label: 'Revisión básica asociada',
+                caption:
+                    'La revisión completa incluirá automáticamente los materiales de esta plantilla básica.',
+                child: _loadingTemplates
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 10),
+                        child: LinearProgressIndicator(),
+                      )
+                    : DropdownButtonFormField<int?>(
+                        initialValue: _baseTemplateId,
+                        dropdownColor: NavalgoColors.shell,
+                        decoration: NavalgoFormStyles.inputDecoration(
+                          context,
+                          label: 'Plantilla básica',
+                          prefixIcon: const Icon(Icons.link_outlined),
+                        ),
+                        items: [
+                          const DropdownMenuItem<int?>(
+                            value: null,
+                            child: Text('Selecciona una plantilla básica'),
+                          ),
+                          ..._availableBaseTemplates.map(
+                            (template) => DropdownMenuItem<int?>(
+                              value: template.id,
+                              child: Text(template.name),
+                            ),
+                          ),
+                        ],
+                        onChanged: _saving
+                            ? null
+                            : (value) => setState(() {
+                                _baseTemplateId = value;
+                              }),
+                      ),
+              ),
+            ],
             const SizedBox(height: 18),
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    'Elementos de la plantilla',
+                    _templateType == 'COMPLETE'
+                        ? 'Materiales exclusivos de la revisión completa'
+                        : 'Elementos de la plantilla',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
@@ -4486,11 +4688,25 @@ class _MaterialTemplateEditorDialogState
                           _items.add(_MaterialTemplateItemDraft());
                         }),
                   icon: const Icon(Icons.add_outlined),
-                  label: const Text('Añadir item'),
+                  label: Text(
+                    _templateType == 'COMPLETE'
+                        ? 'Añadir item exclusivo'
+                        : 'Añadir item',
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 12),
+            if (_templateType == 'COMPLETE')
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Text(
+                  'Si no añades items aquí, la revisión completa reutilizará solo los materiales de la básica vinculada.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: NavalgoColors.deepSea.withValues(alpha: 0.68),
+                  ),
+                ),
+              ),
             ..._items.asMap().entries.map((entry) {
               final index = entry.key;
               final item = entry.value;
@@ -4505,11 +4721,13 @@ class _MaterialTemplateEditorDialogState
                         children: [
                           Expanded(
                             child: Text(
-                              'Artículo ${index + 1}',
+                              _templateType == 'COMPLETE'
+                                  ? 'Item exclusivo ${index + 1}'
+                                  : 'Artículo ${index + 1}',
                               style: Theme.of(context).textTheme.labelLarge,
                             ),
                           ),
-                          if (_items.length > 1)
+                          if (_items.length > 1 || _templateType == 'COMPLETE')
                             IconButton(
                               onPressed: _saving
                                   ? null
@@ -4530,9 +4748,17 @@ class _MaterialTemplateEditorDialogState
                           hint: 'Nombre del repuesto o consumible',
                           prefixIcon: const Icon(Icons.build_circle_outlined),
                         ),
-                        validator: (value) => (value?.trim() ?? '').isEmpty
-                            ? 'El artículo es obligatorio.'
-                            : null,
+                        validator: (value) {
+                          final article = value?.trim() ?? '';
+                          final reference = item.referenceController.text
+                              .trim();
+                          if (article.isEmpty && reference.isEmpty) {
+                            return null;
+                          }
+                          return article.isEmpty
+                              ? 'El artículo es obligatorio.'
+                              : null;
+                        },
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -4543,9 +4769,16 @@ class _MaterialTemplateEditorDialogState
                           hint: 'SKU o código de pieza',
                           prefixIcon: const Icon(Icons.qr_code_outlined),
                         ),
-                        validator: (value) => (value?.trim() ?? '').isEmpty
-                            ? 'La referencia es obligatoria.'
-                            : null,
+                        validator: (value) {
+                          final reference = value?.trim() ?? '';
+                          final article = item.articleController.text.trim();
+                          if (article.isEmpty && reference.isEmpty) {
+                            return null;
+                          }
+                          return reference.isEmpty
+                              ? 'La referencia es obligatoria.'
+                              : null;
+                        },
                       ),
                     ],
                   ),
@@ -4580,6 +4813,25 @@ class _MaterialTemplateItemDraft {
     articleController.dispose();
     referenceController.dispose();
   }
+}
+
+String _materialTemplateTypeLabel(String templateType) {
+  switch (templateType) {
+    case 'COMPLETE':
+      return 'Completa';
+    case 'BASIC':
+    default:
+      return 'Básica';
+  }
+}
+
+String _materialTemplateDisplayName(MaterialChecklistTemplate template) {
+  final typeLabel = _materialTemplateTypeLabel(template.templateType);
+  if (template.templateType == 'COMPLETE' &&
+      (template.baseTemplateName ?? '').trim().isNotEmpty) {
+    return '$typeLabel · ${template.name} · Base ${template.baseTemplateName}';
+  }
+  return '$typeLabel · ${template.name}';
 }
 
 Color _materialRevisionStatusColor(String status) {

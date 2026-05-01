@@ -5,6 +5,7 @@ import java.time.Instant;
 public record WorkOrderChecklistItemDto(
         Long id,
         Long sourceTemplateItemId,
+        Long productId,
         String articleName,
         String reference,
         boolean checked,
