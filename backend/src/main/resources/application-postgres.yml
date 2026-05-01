@@ -18,6 +18,10 @@ spring:
     multipart:
       max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:25MB}
       max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:30MB}
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/postgres-startup-schema.sql
 
 app:
   jwt:
