@@ -24,6 +24,12 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Navalgo necesita acceder a la cámara para capturar fotos de avance y adjuntarlas a los partes.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Navalgo necesita tu ubicación para guardar las fotos de avance con geolocalización y marca de agua.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Navalgo necesita acceso a tus fotos para subir imágenes de perfil y adjuntos desde la galería.</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIBackgroundModes</key>

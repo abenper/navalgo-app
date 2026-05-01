@@ -2074,22 +2074,22 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       return;
     }
 
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.camera,
-      preferredCameraDevice: CameraDevice.rear,
-      imageQuality: 92,
-    );
-    if (picked == null) {
-      return;
-    }
-
-    final bytes = await picked.readAsBytes();
-    final mime = picked.mimeType ?? _guessMimeType(picked.name);
-    final capturedAt = DateTime.now().toUtc();
-
-    setState(() => _busy = true);
     try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
+        imageQuality: 92,
+      );
+      if (picked == null) {
+        return;
+      }
+
+      final bytes = await picked.readAsBytes();
+      final mime = picked.mimeType ?? _guessMimeType(picked.name);
+      final capturedAt = DateTime.now().toUtc();
+
+      setState(() => _busy = true);
       final updated = await mediaService.attachToWorkOrder(
         token,
         workOrderId: _workOrder.id,
@@ -2111,6 +2111,16 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       AppToast.success(context, 'Foto de avance guardada.');
     } catch (e) {
       if (!mounted) {
+        return;
+      }
+      final error = '$e';
+      if (error.contains('camera_access_denied') ||
+          error.contains('permission') ||
+          error.contains('photo_access_denied')) {
+        AppToast.error(
+          context,
+          'No se pudo abrir la cámara. Revisa los permisos de cámara y ubicación del dispositivo.',
+        );
         return;
       }
       AppToast.error(context, 'No se pudo subir la foto de avance: $e');
