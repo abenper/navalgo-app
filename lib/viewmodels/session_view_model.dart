@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user.dart';
@@ -7,7 +6,7 @@ import '../models/user.dart';
 class SessionViewModel extends ChangeNotifier {
   static const _rememberMeKey = 'remember_me';
   static const _rememberedEmailKey = 'remembered_email';
-  static const _userSessionKey = 'user_session';
+  static const _legacyUserSessionKey = 'user_session';
   static const _sessionStartedAtKey = 'session_started_at';
   static const _maxSessionAge = Duration(days: 30);
 
@@ -35,25 +34,13 @@ class SessionViewModel extends ChangeNotifier {
     _rememberMeEnabled = prefs.getBool(_rememberMeKey) ?? false;
     _rememberedEmail = prefs.getString(_rememberedEmailKey) ?? '';
 
-    if (_rememberMeEnabled) {
-      final rawSession = prefs.getString(_userSessionKey);
-      if (rawSession != null && rawSession.isNotEmpty) {
-        try {
-          final decoded = jsonDecode(rawSession) as Map<String, dynamic>;
-          _user = User.fromJson(decoded);
-          if (_isJwtExpired(_user?.token) || _isMaxAgeExpired(prefs)) {
-            _user = null;
-            _pendingNotice = 'Tu sesión ha expirado. Inicia sesión de nuevo.';
-            await prefs.remove(_userSessionKey);
-            await prefs.remove(_sessionStartedAtKey);
-          }
-        } catch (_) {
-          _user = null;
-          await prefs.remove(_userSessionKey);
-          await prefs.remove(_sessionStartedAtKey);
-        }
-      }
+    if (_rememberMeEnabled && _isMaxAgeExpired(prefs)) {
+      _pendingNotice = 'Tu sesiÃ³n ha expirado. Inicia sesiÃ³n de nuevo.';
+      await prefs.remove(_sessionStartedAtKey);
     }
+
+    _user = null;
+    await prefs.remove(_legacyUserSessionKey);
 
     _isReady = true;
     notifyListeners();
@@ -68,15 +55,14 @@ class SessionViewModel extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_rememberMeKey, rememberMe);
     await prefs.setString(_rememberedEmailKey, user.email);
+    await prefs.remove(_legacyUserSessionKey);
 
     if (rememberMe) {
-      await prefs.setString(_userSessionKey, jsonEncode(user.toJson()));
       await prefs.setInt(
         _sessionStartedAtKey,
         DateTime.now().millisecondsSinceEpoch,
       );
     } else {
-      await prefs.remove(_userSessionKey);
       await prefs.remove(_sessionStartedAtKey);
     }
 
@@ -88,7 +74,7 @@ class SessionViewModel extends ChangeNotifier {
     _pendingNotice = null;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userSessionKey);
+    await prefs.remove(_legacyUserSessionKey);
     await prefs.remove(_sessionStartedAtKey);
     await prefs.setBool(_rememberMeKey, false);
     await prefs.remove(_rememberedEmailKey);
@@ -101,10 +87,10 @@ class SessionViewModel extends ChangeNotifier {
   Future<void> expireSession({String? message}) async {
     _user = null;
     _pendingNotice =
-        message ?? 'Tu sesión ha expirado. Inicia sesión de nuevo.';
+        message ?? 'Tu sesiÃ³n ha expirado. Inicia sesiÃ³n de nuevo.';
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_userSessionKey);
+    await prefs.remove(_legacyUserSessionKey);
     await prefs.remove(_sessionStartedAtKey);
 
     notifyListeners();
@@ -123,49 +109,10 @@ class SessionViewModel extends ChangeNotifier {
     _user = user;
 
     final prefs = await SharedPreferences.getInstance();
-    if (_rememberMeEnabled) {
-      await prefs.setString(_userSessionKey, jsonEncode(user.toJson()));
-      await prefs.setString(_rememberedEmailKey, user.email);
-    }
+    await prefs.setString(_rememberedEmailKey, user.email);
+    await prefs.remove(_legacyUserSessionKey);
 
     _rememberedEmail = user.email;
     notifyListeners();
-  }
-
-  bool _isJwtExpired(String? token) {
-    if (token == null || token.isEmpty) {
-      return false;
-    }
-
-    try {
-      final parts = token.split('.');
-      if (parts.length < 2) {
-        return false;
-      }
-
-      final payload = utf8.decode(
-        base64Url.decode(base64Url.normalize(parts[1])),
-      );
-      final decoded = jsonDecode(payload);
-      if (decoded is! Map<String, dynamic>) {
-        return false;
-      }
-
-      final rawExp = decoded['exp'];
-      final expSeconds = rawExp is num
-          ? rawExp.toInt()
-          : int.tryParse('$rawExp');
-      if (expSeconds == null) {
-        return false;
-      }
-
-      final expiry = DateTime.fromMillisecondsSinceEpoch(
-        expSeconds * 1000,
-        isUtc: true,
-      );
-      return !expiry.isAfter(DateTime.now().toUtc());
-    } catch (_) {
-      return false;
-    }
   }
 }

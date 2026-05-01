@@ -115,6 +115,18 @@ ALTER TABLE vessels
     ALTER COLUMN engine_serial_numbers TYPE VARCHAR(1000);
 
 ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS jet_labels VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS jet_serial_numbers VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS gearbox_labels VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS gearbox_serial_numbers VARCHAR(1000);
+
+ALTER TABLE vessels
     DROP COLUMN IF EXISTS engine_serial_number;
 
 CREATE TABLE IF NOT EXISTS time_adjustment_requests (

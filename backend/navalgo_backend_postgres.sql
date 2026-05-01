@@ -51,6 +51,10 @@ CREATE TABLE IF NOT EXISTS vessels (
     engine_count INTEGER,
     engine_labels VARCHAR(1000),
     engine_serial_numbers VARCHAR(1000),
+    jet_labels VARCHAR(1000),
+    jet_serial_numbers VARCHAR(1000),
+    gearbox_labels VARCHAR(1000),
+    gearbox_serial_numbers VARCHAR(1000),
     length_meters DOUBLE PRECISION,
     owner_id BIGINT NOT NULL,
     CONSTRAINT fk_vessels_owner FOREIGN KEY (owner_id) REFERENCES owners(id)
@@ -415,6 +419,18 @@ ALTER TABLE vessels
 
 ALTER TABLE vessels
     ALTER COLUMN engine_serial_numbers TYPE VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS jet_labels VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS jet_serial_numbers VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS gearbox_labels VARCHAR(1000);
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS gearbox_serial_numbers VARCHAR(1000);
 
 ALTER TABLE vessels
     DROP COLUMN IF EXISTS engine_serial_number;

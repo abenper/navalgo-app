@@ -29,6 +29,18 @@ public class Vessel {
     @Column(name = "engine_serial_numbers", length = 1000)
     private String engineSerialNumbers;
 
+    @Column(name = "jet_labels", length = 1000)
+    private String jetLabels;
+
+    @Column(name = "jet_serial_numbers", length = 1000)
+    private String jetSerialNumbers;
+
+    @Column(name = "gearbox_labels", length = 1000)
+    private String gearboxLabels;
+
+    @Column(name = "gearbox_serial_numbers", length = 1000)
+    private String gearboxSerialNumbers;
+
     private Double lengthMeters;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
@@ -117,9 +129,106 @@ public class Vessel {
                 .collect(Collectors.joining("|"));
     }
 
+    public List<String> getJetLabels() {
+        return parseLabels(jetLabels);
+    }
+
+    public void setJetLabels(List<String> jetLabels) {
+        this.jetLabels = joinLabels(jetLabels);
+    }
+
+    public List<String> getJetSerialNumbers() {
+        return parseSerialNumbers(jetSerialNumbers);
+    }
+
+    public void setJetSerialNumbers(List<String> jetSerialNumbers) {
+        this.jetSerialNumbers = joinSerialNumbers(jetSerialNumbers);
+    }
+
+    public List<String> getGearboxLabels() {
+        return parseLabels(gearboxLabels);
+    }
+
+    public void setGearboxLabels(List<String> gearboxLabels) {
+        this.gearboxLabels = joinLabels(gearboxLabels);
+    }
+
+    public List<String> getGearboxSerialNumbers() {
+        return parseSerialNumbers(gearboxSerialNumbers);
+    }
+
+    public void setGearboxSerialNumbers(List<String> gearboxSerialNumbers) {
+        this.gearboxSerialNumbers = joinSerialNumbers(gearboxSerialNumbers);
+    }
+
     public Double getLengthMeters() { return lengthMeters; }
     public void setLengthMeters(Double lengthMeters) { this.lengthMeters = lengthMeters; }
 
     public Owner getOwner() { return owner; }
     public void setOwner(Owner owner) { this.owner = owner; }
+
+    private List<String> parseLabels(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(rawValue.split("\\|"))
+                .map(String::trim)
+                .filter(label -> !label.isEmpty())
+                .toList();
+    }
+
+    private String joinLabels(List<String> labels) {
+        if (labels == null || labels.isEmpty()) {
+            return null;
+        }
+        return labels.stream()
+                .map(String::trim)
+                .filter(label -> !label.isEmpty())
+                .collect(Collectors.joining("|"));
+    }
+
+    private List<String> parseSerialNumbers(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return List.of();
+        }
+
+        String[] rawValues = rawValue.contains("|")
+                ? rawValue.split("\\|", -1)
+                : rawValue.split("\\s*,\\s*", -1);
+
+        int lastNonBlankIndex = rawValues.length - 1;
+        while (lastNonBlankIndex >= 0 && rawValues[lastNonBlankIndex].trim().isEmpty()) {
+            lastNonBlankIndex--;
+        }
+
+        if (lastNonBlankIndex < 0) {
+            return List.of();
+        }
+
+        return Arrays.stream(rawValues, 0, lastNonBlankIndex + 1)
+                .map(value -> value == null ? "" : value.trim())
+                .toList();
+    }
+
+    private String joinSerialNumbers(List<String> serialNumbers) {
+        if (serialNumbers == null || serialNumbers.isEmpty()) {
+            return null;
+        }
+
+        List<String> normalized = serialNumbers.stream()
+                .map(value -> value == null ? "" : value.trim())
+                .toList();
+
+        int lastNonBlankIndex = normalized.size() - 1;
+        while (lastNonBlankIndex >= 0 && normalized.get(lastNonBlankIndex).isEmpty()) {
+            lastNonBlankIndex--;
+        }
+
+        if (lastNonBlankIndex < 0) {
+            return null;
+        }
+
+        return normalized.subList(0, lastNonBlankIndex + 1).stream()
+                .collect(Collectors.joining("|"));
+    }
 }

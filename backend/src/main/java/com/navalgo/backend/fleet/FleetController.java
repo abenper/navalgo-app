@@ -15,9 +15,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/fleet")
@@ -140,12 +143,32 @@ public class FleetController {
         List<String> engineSerialNumbers = normalizeEngineSerialNumbers(
             request.engineSerialNumbers(),
             request.engineCount());
+        List<String> jetLabels = resolveAssociatedComponentLabels(engineLabels, request.hasJets(), "jets");
+        List<String> jetSerialNumbers = normalizeAssociatedComponentSerialNumbers(
+                request.jetSerialNumbers(),
+                jetLabels,
+                "jets"
+        );
+        List<String> gearboxLabels = resolveAssociatedComponentLabels(
+                engineLabels,
+                request.hasGearboxes(),
+                "reductoras"
+        );
+        List<String> gearboxSerialNumbers = normalizeAssociatedComponentSerialNumbers(
+                request.gearboxSerialNumbers(),
+                gearboxLabels,
+                "reductoras"
+        );
         vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
         vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
         vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
         vessel.setEngineSerialNumbers(engineSerialNumbers);
+        vessel.setJetLabels(jetLabels);
+        vessel.setJetSerialNumbers(jetSerialNumbers);
+        vessel.setGearboxLabels(gearboxLabels);
+        vessel.setGearboxSerialNumbers(gearboxSerialNumbers);
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
@@ -191,6 +214,22 @@ public class FleetController {
         List<String> engineSerialNumbers = normalizeEngineSerialNumbers(
             request.engineSerialNumbers(),
             request.engineCount());
+        List<String> jetLabels = resolveAssociatedComponentLabels(engineLabels, request.hasJets(), "jets");
+        List<String> jetSerialNumbers = normalizeAssociatedComponentSerialNumbers(
+                request.jetSerialNumbers(),
+                jetLabels,
+                "jets"
+        );
+        List<String> gearboxLabels = resolveAssociatedComponentLabels(
+                engineLabels,
+                request.hasGearboxes(),
+                "reductoras"
+        );
+        List<String> gearboxSerialNumbers = normalizeAssociatedComponentSerialNumbers(
+                request.gearboxSerialNumbers(),
+                gearboxLabels,
+                "reductoras"
+        );
 
         vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
         vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
@@ -198,6 +237,10 @@ public class FleetController {
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
         vessel.setEngineSerialNumbers(engineSerialNumbers);
+        vessel.setJetLabels(jetLabels);
+        vessel.setJetSerialNumbers(jetSerialNumbers);
+        vessel.setGearboxLabels(gearboxLabels);
+        vessel.setGearboxSerialNumbers(gearboxSerialNumbers);
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
@@ -247,5 +290,71 @@ public class FleetController {
         }
 
         return normalized;
+    }
+
+    private List<String> resolveAssociatedComponentLabels(List<String> engineLabels,
+                                                          Boolean enabled,
+                                                          String componentName) {
+        if (!Boolean.TRUE.equals(enabled)) {
+            return List.of();
+        }
+
+        if (engineLabels == null || engineLabels.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "No se pueden configurar " + componentName + " sin motores en posiciones compatibles"
+            );
+        }
+
+        List<String> eligibleLabels = engineLabels.stream()
+                .filter(this::isEligibleAssociatedEngineLabel)
+                .toList();
+
+        if (eligibleLabels.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Solo se pueden configurar " + componentName
+                            + " cuando exista motor central, babor o estribor"
+            );
+        }
+
+        return eligibleLabels;
+    }
+
+    private List<String> normalizeAssociatedComponentSerialNumbers(List<String> serialNumbers,
+                                                                   List<String> labels,
+                                                                   String componentName) {
+        if (labels.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> normalized = serialNumbers == null
+                ? List.of()
+                : serialNumbers.stream()
+                .map(value -> inputSanitizer.optionalText(value, 255))
+                .map(value -> value == null ? "" : value.trim())
+                .toList();
+
+        if (normalized.size() > labels.size()) {
+            throw new IllegalArgumentException(
+                    "La cantidad de numeros de serie no coincide con las posiciones de " + componentName
+            );
+        }
+
+        if (normalized.size() < labels.size()) {
+            List<String> padded = new ArrayList<>(normalized);
+            while (padded.size() < labels.size()) {
+                padded.add("");
+            }
+            return padded;
+        }
+
+        return normalized;
+    }
+
+    private boolean isEligibleAssociatedEngineLabel(String label) {
+        String baseLabel = label == null
+                ? ""
+                : label.replaceAll("\\s+\\d+$", "").trim();
+        Set<String> eligibleLabels = new HashSet<>(Arrays.asList("Motor central", "Babor", "Estribor"));
+        return eligibleLabels.contains(baseLabel);
     }
 }

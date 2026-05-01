@@ -3,6 +3,8 @@ package com.navalgo.backend.auth;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -44,8 +46,10 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response) {
-        authService.logout(request);
+    public ResponseEntity<Void> logout(HttpServletRequest request,
+                                       HttpServletResponse response,
+                                       Authentication authentication) {
+        authService.logout(request, authentication == null ? null : authentication.getName());
         response.addHeader(HttpHeaders.SET_COOKIE, authService.clearRefreshCookie().toString());
         return ResponseEntity.noContent().build();
     }
@@ -59,10 +63,47 @@ public class AuthController {
     }
 
     private String extractClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+        if (isTrustedProxy(remoteAddr)) {
+            String forwarded = firstIpFromHeader(request.getHeader("X-Forwarded-For"));
+            if (forwarded != null) {
+                return forwarded;
+            }
+            String realIp = firstIpFromHeader(request.getHeader("X-Real-IP"));
+            if (realIp != null) {
+                return realIp;
+            }
         }
-        return request.getRemoteAddr();
+        return remoteAddr;
+    }
+
+    private String firstIpFromHeader(String headerValue) {
+        if (headerValue == null || headerValue.isBlank()) {
+            return null;
+        }
+        String candidate = headerValue.split(",")[0].trim();
+        if (candidate.isEmpty()) {
+            return null;
+        }
+        try {
+            InetAddress.getByName(candidate);
+            return candidate;
+        } catch (UnknownHostException exception) {
+            return null;
+        }
+    }
+
+    private boolean isTrustedProxy(String remoteAddr) {
+        if (remoteAddr == null || remoteAddr.isBlank()) {
+            return false;
+        }
+        try {
+            InetAddress address = InetAddress.getByName(remoteAddr.trim());
+            return address.isLoopbackAddress()
+                    || address.isSiteLocalAddress()
+                    || address.isLinkLocalAddress();
+        } catch (UnknownHostException exception) {
+            return false;
+        }
     }
 }

@@ -13,6 +13,10 @@ public record CreateVesselRequest(
         Integer engineCount,
         List<String> engineLabels,
         List<@Size(max = 255) String> engineSerialNumbers,
+        Boolean hasJets,
+        List<@Size(max = 255) String> jetSerialNumbers,
+        Boolean hasGearboxes,
+        List<@Size(max = 255) String> gearboxSerialNumbers,
         Double lengthMeters,
         @NotNull Long ownerId
 ) {

@@ -246,6 +246,10 @@ class _FlotaScreenState extends State<FlotaScreen> {
         engineCount: input.engineCount,
         engineLabels: input.engineLabels,
         engineSerialNumbers: input.engineSerialNumbers,
+        hasJets: input.hasJets,
+        jetSerialNumbers: input.jetSerialNumbers,
+        hasGearboxes: input.hasGearboxes,
+        gearboxSerialNumbers: input.gearboxSerialNumbers,
         lengthMeters: input.lengthMeters,
         ownerId: input.ownerId,
       );
@@ -289,6 +293,10 @@ class _FlotaScreenState extends State<FlotaScreen> {
         engineCount: input.engineCount,
         engineLabels: input.engineLabels,
         engineSerialNumbers: input.engineSerialNumbers,
+        hasJets: input.hasJets,
+        jetSerialNumbers: input.jetSerialNumbers,
+        hasGearboxes: input.hasGearboxes,
+        gearboxSerialNumbers: input.gearboxSerialNumbers,
         lengthMeters: input.lengthMeters,
         ownerId: input.ownerId,
       );
@@ -995,6 +1003,10 @@ class _VesselInput {
     this.engineCount,
     required this.engineLabels,
     required this.engineSerialNumbers,
+    required this.hasJets,
+    required this.jetSerialNumbers,
+    required this.hasGearboxes,
+    required this.gearboxSerialNumbers,
     this.lengthMeters,
     required this.ownerId,
   });
@@ -1005,6 +1017,10 @@ class _VesselInput {
   final int? engineCount;
   final List<String> engineLabels;
   final List<String> engineSerialNumbers;
+  final bool hasJets;
+  final List<String> jetSerialNumbers;
+  final bool hasGearboxes;
+  final List<String> gearboxSerialNumbers;
   final double? lengthMeters;
   final int ownerId;
 }
@@ -1029,6 +1045,12 @@ class _VesselDialogState extends State<_VesselDialog> {
   late int _ownerId;
   List<String> _enginePositions = <String>[];
   final List<TextEditingController> _engineSerialCtrls =
+      <TextEditingController>[];
+  bool _hasJets = false;
+  bool _hasGearboxes = false;
+  List<String> _associatedComponentLabels = <String>[];
+  final List<TextEditingController> _jetSerialCtrls = <TextEditingController>[];
+  final List<TextEditingController> _gearboxSerialCtrls =
       <TextEditingController>[];
 
   @override
@@ -1061,6 +1083,23 @@ class _VesselDialogState extends State<_VesselDialog> {
         initial?.engineSerialNumbers ?? const <String>[],
       ),
     );
+    _associatedComponentLabels = _buildAssociatedComponentLabels();
+    _hasJets = initial?.hasJets ?? false;
+    _hasGearboxes = initial?.hasGearboxes ?? false;
+    _syncAssociatedComponentControllers(
+      _jetSerialCtrls,
+      labels: _associatedComponentLabels,
+      serialNumbers: initial?.jetSerialNumbers ?? const <String>[],
+    );
+    _syncAssociatedComponentControllers(
+      _gearboxSerialCtrls,
+      labels: _associatedComponentLabels,
+      serialNumbers: initial?.gearboxSerialNumbers ?? const <String>[],
+    );
+    if (_associatedComponentLabels.isEmpty) {
+      _hasJets = false;
+      _hasGearboxes = false;
+    }
   }
 
   @override
@@ -1071,6 +1110,12 @@ class _VesselDialogState extends State<_VesselDialog> {
     _engineCtrl.dispose();
     _lengthCtrl.dispose();
     for (final controller in _engineSerialCtrls) {
+      controller.dispose();
+    }
+    for (final controller in _jetSerialCtrls) {
+      controller.dispose();
+    }
+    for (final controller in _gearboxSerialCtrls) {
       controller.dispose();
     }
     super.dispose();
@@ -1111,6 +1156,14 @@ class _VesselDialogState extends State<_VesselDialog> {
                 engineCount: int.tryParse(_engineCtrl.text.trim()),
                 engineLabels: _buildEngineLabels(_enginePositions),
                 engineSerialNumbers: _engineSerialCtrls
+                    .map((controller) => controller.text.trim())
+                    .toList(),
+                hasJets: _hasJets,
+                jetSerialNumbers: _jetSerialCtrls
+                    .map((controller) => controller.text.trim())
+                    .toList(),
+                hasGearboxes: _hasGearboxes,
+                gearboxSerialNumbers: _gearboxSerialCtrls
                     .map((controller) => controller.text.trim())
                     .toList(),
                 lengthMeters: double.tryParse(_lengthCtrl.text.trim()),
@@ -1263,6 +1316,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                                   setState(() {
                                     _enginePositions[index] =
                                         _sanitizeEnginePosition(value);
+                                    _refreshAssociatedComponentControls();
                                   });
                                 },
                               ),
@@ -1287,6 +1341,36 @@ class _VesselDialogState extends State<_VesselDialog> {
                 ),
               ),
             ],
+            const SizedBox(height: 14),
+            _buildAssociatedComponentSection(
+              title: 'Jets',
+              value: _hasJets,
+              onChanged: _associatedComponentLabels.isEmpty
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _hasJets = value ?? false;
+                      });
+                    },
+              serialControllers: _jetSerialCtrls,
+              serialFieldLabel: (index) =>
+                  'Número de serie del jet ${_associatedComponentLabels[index]}',
+            ),
+            const SizedBox(height: 14),
+            _buildAssociatedComponentSection(
+              title: 'Reductoras',
+              value: _hasGearboxes,
+              onChanged: _associatedComponentLabels.isEmpty
+                  ? null
+                  : (value) {
+                      setState(() {
+                        _hasGearboxes = value ?? false;
+                      });
+                    },
+              serialControllers: _gearboxSerialCtrls,
+              serialFieldLabel: (index) =>
+                  'Número de serie de la reductora ${_associatedComponentLabels[index]}',
+            ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Eslora (m)',
@@ -1406,6 +1490,8 @@ class _VesselDialogState extends State<_VesselDialog> {
           _engineSerialCtrls[index].text = normalizedSerials[index];
         }
       }
+
+      _refreshAssociatedComponentControls();
     });
   }
 
@@ -1466,6 +1552,141 @@ class _VesselDialogState extends State<_VesselDialog> {
       ...list,
       ...List<String>.filled(count - list.length, 'Fuera borda'),
     ];
+  }
+
+  List<String> _buildAssociatedComponentLabels() {
+    return _buildEngineLabels(
+      _enginePositions,
+    ).where((label) => _isAssociatedComponentPosition(label)).toList();
+  }
+
+  bool _isAssociatedComponentPosition(String label) {
+    final baseLabel = label.replaceAll(RegExp(r'\s+\d+$'), '').trim();
+    return baseLabel == 'Motor central' ||
+        baseLabel == 'Babor' ||
+        baseLabel == 'Estribor';
+  }
+
+  void _refreshAssociatedComponentControls() {
+    final previousLabels = _associatedComponentLabels;
+    final updatedLabels = _buildAssociatedComponentLabels();
+    final jetValues = _mapControllerValues(previousLabels, _jetSerialCtrls);
+    final gearboxValues = _mapControllerValues(
+      previousLabels,
+      _gearboxSerialCtrls,
+    );
+
+    _associatedComponentLabels = updatedLabels;
+    _syncAssociatedComponentControllers(
+      _jetSerialCtrls,
+      labels: updatedLabels,
+      valuesByLabel: jetValues,
+    );
+    _syncAssociatedComponentControllers(
+      _gearboxSerialCtrls,
+      labels: updatedLabels,
+      valuesByLabel: gearboxValues,
+    );
+
+    if (updatedLabels.isEmpty) {
+      _hasJets = false;
+      _hasGearboxes = false;
+    }
+  }
+
+  Map<String, String> _mapControllerValues(
+    List<String> labels,
+    List<TextEditingController> controllers,
+  ) {
+    final values = <String, String>{};
+    for (
+      var index = 0;
+      index < labels.length && index < controllers.length;
+      index++
+    ) {
+      values[labels[index]] = controllers[index].text.trim();
+    }
+    return values;
+  }
+
+  void _syncAssociatedComponentControllers(
+    List<TextEditingController> controllers, {
+    required List<String> labels,
+    List<String>? serialNumbers,
+    Map<String, String>? valuesByLabel,
+  }) {
+    final normalizedSerials = serialNumbers != null
+        ? _resizeEngineSerialNumbers(labels.length, serialNumbers)
+        : labels.map((label) => valuesByLabel?[label] ?? '').toList();
+
+    while (controllers.length > labels.length) {
+      controllers.removeLast().dispose();
+    }
+
+    while (controllers.length < labels.length) {
+      controllers.add(TextEditingController());
+    }
+
+    for (var index = 0; index < labels.length; index++) {
+      if (controllers[index].text != normalizedSerials[index]) {
+        controllers[index].text = normalizedSerials[index];
+      }
+    }
+  }
+
+  Widget _buildAssociatedComponentSection({
+    required String title,
+    required bool value,
+    required ValueChanged<bool?>? onChanged,
+    required List<TextEditingController> serialControllers,
+    required String Function(int index) serialFieldLabel,
+  }) {
+    final hasEligibleMotors = _associatedComponentLabels.isNotEmpty;
+    return NavalgoFormFieldBlock(
+      label: title,
+      caption: hasEligibleMotors
+          ? 'Se asociarán automáticamente según la posición del motor.'
+          : 'Solo disponible cuando exista motor central, babor o estribor.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          NavalgoPanel(
+            tint: Colors.white.withValues(alpha: 0.96),
+            child: CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              value: value,
+              onChanged: onChanged,
+              title: Text('¿Tiene $title?'),
+              subtitle: Text(
+                hasEligibleMotors
+                    ? 'Posiciones detectadas: ${_associatedComponentLabels.join(', ')}.'
+                    : 'No hay motores compatibles configurados.',
+              ),
+            ),
+          ),
+          if (value && serialControllers.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            ...List<Widget>.generate(serialControllers.length, (index) {
+              return Padding(
+                padding: EdgeInsets.only(
+                  bottom: index == serialControllers.length - 1 ? 0 : 12,
+                ),
+                child: TextFormField(
+                  controller: serialControllers[index],
+                  textInputAction: TextInputAction.next,
+                  decoration: NavalgoFormStyles.inputDecoration(
+                    context,
+                    label: serialFieldLabel(index),
+                    hint: 'Introduce el número de serie',
+                    prefixIcon: const Icon(Icons.confirmation_number_outlined),
+                  ),
+                ),
+              );
+            }),
+          ],
+        ],
+      ),
+    );
   }
 }
 
@@ -1578,6 +1799,30 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
           ),
           const SizedBox(height: 14),
           NavalgoFormFieldBlock(
+            label: 'Jets',
+            child: _VesselDetailValue(
+              icon: Icons.settings_input_component_outlined,
+              value: _buildAssociatedSerialSummary(
+                labels: vessel.jetLabels,
+                serialNumbers: vessel.jetSerialNumbers,
+                emptyLabel: 'No configurados',
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Reductoras',
+            child: _VesselDetailValue(
+              icon: Icons.precision_manufacturing_outlined,
+              value: _buildAssociatedSerialSummary(
+                labels: vessel.gearboxLabels,
+                serialNumbers: vessel.gearboxSerialNumbers,
+                emptyLabel: 'No configuradas',
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
             label: 'Posiciones / tipología',
             child: _VesselDetailValue(
               icon: Icons.tune_outlined,
@@ -1675,4 +1920,19 @@ String _buildEngineSerialSummary(Vessel vessel) {
   });
 
   return lines.join('\n');
+}
+
+String _buildAssociatedSerialSummary({
+  required List<String> labels,
+  required List<String> serialNumbers,
+  required String emptyLabel,
+}) {
+  if (labels.isEmpty) {
+    return emptyLabel;
+  }
+
+  return List<String>.generate(labels.length, (index) {
+    final serial = index < serialNumbers.length ? serialNumbers[index] : '';
+    return '${labels[index]}: ${serial.trim().isEmpty ? 'No indicado' : serial.trim()}';
+  }).join('\n');
 }

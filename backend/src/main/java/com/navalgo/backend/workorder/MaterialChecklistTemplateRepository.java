@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface MaterialChecklistTemplateRepository extends JpaRepository<MaterialChecklistTemplate, Long> {
     List<MaterialChecklistTemplate> findAllByOrderByUpdatedAtDesc();
+    List<MaterialChecklistTemplate> findAllByBaseTemplateIdOrderByUpdatedAtDesc(Long baseTemplateId);
+    boolean existsByBaseTemplateId(Long baseTemplateId);
 }

@@ -27,6 +27,12 @@ class Vessel {
     this.engineCount,
     required this.engineLabels,
     required this.engineSerialNumbers,
+    required this.hasJets,
+    required this.jetLabels,
+    required this.jetSerialNumbers,
+    required this.hasGearboxes,
+    required this.gearboxLabels,
+    required this.gearboxSerialNumbers,
     this.lengthMeters,
     required this.ownerId,
     required this.ownerName,
@@ -39,6 +45,12 @@ class Vessel {
   final int? engineCount;
   final List<String> engineLabels;
   final List<String> engineSerialNumbers;
+  final bool hasJets;
+  final List<String> jetLabels;
+  final List<String> jetSerialNumbers;
+  final bool hasGearboxes;
+  final List<String> gearboxLabels;
+  final List<String> gearboxSerialNumbers;
   final double? lengthMeters;
   final int ownerId;
   final String ownerName;
@@ -56,6 +68,23 @@ class Vessel {
               .toList(),
       engineSerialNumbers:
           (json['engineSerialNumbers'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => '$item'.trim())
+              .toList(),
+      hasJets: json['hasJets'] == true,
+      jetLabels: (json['jetLabels'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => item as String)
+          .toList(),
+      jetSerialNumbers:
+          (json['jetSerialNumbers'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => '$item'.trim())
+              .toList(),
+      hasGearboxes: json['hasGearboxes'] == true,
+      gearboxLabels:
+          (json['gearboxLabels'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => item as String)
+              .toList(),
+      gearboxSerialNumbers:
+          (json['gearboxSerialNumbers'] as List<dynamic>? ?? const <dynamic>[])
               .map((item) => '$item'.trim())
               .toList(),
       lengthMeters: (json['lengthMeters'] as num?)?.toDouble(),

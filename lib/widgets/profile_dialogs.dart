@@ -431,11 +431,12 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
 
   Widget _buildProfileAvatar(BuildContext context, String initials) {
     final resolvedPhotoUrl = resolveMediaUrl(_photoUrl);
+    final token = context.read<SessionViewModel>().token;
     return CircleAvatar(
       radius: 32,
       backgroundColor: Colors.white,
       foregroundImage: resolvedPhotoUrl.isNotEmpty
-          ? NetworkImage(resolvedPhotoUrl)
+          ? NetworkImage(resolvedPhotoUrl, headers: buildMediaHeaders(token))
           : null,
       child: Text(
         initials,

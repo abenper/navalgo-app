@@ -6,6 +6,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,6 +26,7 @@ public class MediaProxyController {
     }
 
     @GetMapping("/proxy")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
     public ResponseEntity<InputStreamResource> proxy(
             @RequestParam("url") String fileUrl,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {

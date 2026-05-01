@@ -39,4 +39,20 @@ public class MaterialChecklistTemplateController {
     ) {
         return ResponseEntity.ok(service.update(id, request));
     }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<MaterialChecklistTemplateDto> replace(
+            @PathVariable Long id,
+            @RequestBody @Valid CreateMaterialChecklistTemplateRequest request
+    ) {
+        return ResponseEntity.ok(service.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        service.delete(id);
+        return ResponseEntity.noContent().build();
+    }
 }

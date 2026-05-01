@@ -248,11 +248,7 @@ public class WorkOrderMediaService {
                                                         String objectKey) throws IOException {
         Path inputFile = Files.createTempFile("navalgo-upload-", ".mp4");
         Path outputFile = Files.createTempFile("navalgo-upload-processed-", ".mp4");
-        byte[] originalBytes = file.getBytes();
         String watermarkText = buildVideoWatermarkText(worker.getFullName(), capturedAt, latitude, longitude);
-        String originalContentType = file.getContentType() == null || file.getContentType().isBlank()
-            ? "video/mp4"
-            : file.getContentType();
 
         try {
             file.transferTo(inputFile);
@@ -274,17 +270,9 @@ public class WorkOrderMediaService {
             int exit = waitFor(process);
 
             if (exit != 0) {
-                log.warn("Fallo ffmpeg al procesar video, se sube el original. Salida: {}", ffmpegOutput);
-                uploadToSpaces(objectKey, originalBytes, originalContentType);
-                return new UploadedAttachmentDto(
-                        buildPublicUrl(objectKey),
-                        "VIDEO",
-                        file.getOriginalFilename(),
-                        capturedAt,
-                        latitude,
-                        longitude,
-                        false,
-                        false
+                log.warn("Fallo ffmpeg al procesar video. Salida: {}", ffmpegOutput);
+                throw new IllegalStateException(
+                        "No se pudo procesar el video de forma segura. Vuelve a intentarlo con otro archivo."
                 );
             }
 

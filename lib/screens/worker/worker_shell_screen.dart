@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/auth_service.dart';
 import '../../services/worker_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
@@ -479,7 +480,11 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       return;
     }
 
-    await context.read<SessionViewModel>().clearSession();
+    final session = context.read<SessionViewModel>();
+    try {
+      await context.read<AuthService>().logout(token: session.token);
+    } catch (_) {}
+    await session.clearSession();
     if (!mounted) return;
     Navigator.of(
       context,
@@ -534,11 +539,15 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     double iconSize = 20,
   }) {
     final resolvedPhotoUrl = resolveMediaUrl(photoUrl);
+    final token = context.read<SessionViewModel>().token;
     if (resolvedPhotoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
         backgroundColor: NavalgoColors.mist,
-        foregroundImage: NetworkImage(resolvedPhotoUrl),
+        foregroundImage: NetworkImage(
+          resolvedPhotoUrl,
+          headers: buildMediaHeaders(token),
+        ),
         child: Icon(Icons.person, size: iconSize, color: NavalgoColors.tide),
       );
     }

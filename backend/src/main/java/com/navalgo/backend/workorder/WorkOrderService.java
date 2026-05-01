@@ -135,6 +135,7 @@ public class WorkOrderService {
             MaterialChecklistTemplate template = materialChecklistTemplateRepository.findById(request.materialTemplateId())
                 .orElseThrow(() -> new EntityNotFoundException("Plantilla de material no encontrada"));
             applyMaterialChecklistTemplate(workOrder, template);
+            workOrder.setDescription(mergeAutoMaterialObservations(workOrder.getDescription(), workOrder.getMaterialChecklist()));
         }
 
         if (request.workerIds() != null && !request.workerIds().isEmpty()) {
@@ -221,7 +222,10 @@ public class WorkOrderService {
             workOrder.setTitle(inputSanitizer.requiredText(request.title(), "El titulo", 255));
         }
         if (request.description() != null) {
-            workOrder.setDescription(inputSanitizer.optionalText(request.description(), 3000));
+            String sanitizedDescription = inputSanitizer.optionalText(request.description(), 3000);
+            workOrder.setDescription(
+                    mergeAutoMaterialObservations(sanitizedDescription, workOrder.getMaterialChecklist())
+            );
         }
         if (request.priority() != null) {
             workOrder.setPriority(request.priority());
@@ -255,6 +259,7 @@ public class WorkOrderService {
             MaterialChecklistTemplate template = materialChecklistTemplateRepository.findById(request.materialTemplateId())
                     .orElseThrow(() -> new EntityNotFoundException("Plantilla de material no encontrada"));
             applyMaterialChecklistTemplate(workOrder, template);
+            workOrder.setDescription(mergeAutoMaterialObservations(workOrder.getDescription(), workOrder.getMaterialChecklist()));
         }
 
         if (Boolean.TRUE.equals(request.clearMaterialChecklist())) {
@@ -262,6 +267,7 @@ public class WorkOrderService {
                 throw new AccessDeniedException("Solo un administrador puede desasignar plantillas de material");
             }
             workOrder.setMaterialChecklist(null);
+            workOrder.setDescription(mergeAutoMaterialObservations(workOrder.getDescription(), null));
         }
 
         if (request.ownerId() != null) {
@@ -726,6 +732,66 @@ public class WorkOrderService {
             checklistItem.setSortOrder(index);
             targetChecklist.getItems().add(checklistItem);
         }
+    }
+
+    private String mergeAutoMaterialObservations(String rawDescription, WorkOrderChecklist checklist) {
+        String manualDescription = stripAutoMaterialObservations(rawDescription);
+        String automaticSection = buildAutoMaterialObservations(checklist);
+
+        if (automaticSection == null) {
+            return manualDescription;
+        }
+        if (manualDescription == null || manualDescription.isBlank()) {
+            return automaticSection;
+        }
+        return manualDescription + "\n\n" + automaticSection;
+    }
+
+    private String stripAutoMaterialObservations(String rawDescription) {
+        if (rawDescription == null || rawDescription.isBlank()) {
+            return null;
+        }
+
+        String marker = "Observaciones automáticas de material:";
+        int markerIndex = rawDescription.indexOf(marker);
+        String normalized = markerIndex >= 0
+                ? rawDescription.substring(0, markerIndex).trim()
+                : rawDescription.trim();
+        return normalized.isEmpty() ? null : normalized;
+    }
+
+    private String buildAutoMaterialObservations(WorkOrderChecklist checklist) {
+        if (checklist == null || checklist.getItems() == null || checklist.getItems().isEmpty()) {
+            return null;
+        }
+
+        LinkedHashMap<String, Integer> quantitiesByItem = new LinkedHashMap<>();
+        for (WorkOrderChecklistItem item : checklist.getItems()) {
+            String key = (item.getArticleName() == null ? "" : item.getArticleName().trim())
+                    + "||"
+                    + (item.getReference() == null ? "" : item.getReference().trim());
+            quantitiesByItem.merge(key, 1, Integer::sum);
+        }
+
+        List<String> repeatedItems = quantitiesByItem.entrySet().stream()
+                .filter(entry -> entry.getValue() > 1)
+                .map(entry -> {
+                    String[] parts = entry.getKey().split("\\|\\|", 2);
+                    String articleName = parts.length > 0 ? parts[0].trim() : "";
+                    String reference = parts.length > 1 ? parts[1].trim() : "";
+                    String label = reference.isEmpty()
+                            ? articleName
+                            : articleName + " (" + reference + ")";
+                    return "- " + label + ": " + entry.getValue() + " unidades";
+                })
+                .toList();
+
+        if (repeatedItems.isEmpty()) {
+            return null;
+        }
+
+        return "Observaciones automáticas de material:\n"
+                + String.join("\n", repeatedItems);
     }
 
     private WorkOrderChecklistDto toChecklistDto(WorkOrderChecklist checklist) {

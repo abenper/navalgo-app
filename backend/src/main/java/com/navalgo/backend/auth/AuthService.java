@@ -82,8 +82,12 @@ public class AuthService {
     }
 
     @Transactional
-    public void logout(HttpServletRequest request) {
+    public void logout(HttpServletRequest request, String authenticatedEmail) {
         authCookieService.extractRefreshToken(request).ifPresent(refreshTokenService::revoke);
+        if (authenticatedEmail != null && !authenticatedEmail.isBlank()) {
+            workerRepository.findByEmailIgnoreCase(authenticatedEmail)
+                    .ifPresent(worker -> refreshTokenService.revokeAllForWorker(worker.getId()));
+        }
     }
 
     @Transactional

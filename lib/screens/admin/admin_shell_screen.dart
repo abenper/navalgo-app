@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../services/auth_service.dart';
 import '../../services/worker_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/media_url.dart';
@@ -14,6 +15,7 @@ import '../worker/vacaciones_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'equipo_screen.dart';
 import 'flota_screen.dart';
+import 'material_templates_screen.dart';
 import 'partes_screen.dart';
 
 class AdminShellScreen extends StatefulWidget {
@@ -31,6 +33,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   final List<Widget> _screens = [
     const AdminDashboardScreen(),
     const PartesScreen(),
+    const MaterialTemplatesScreen(),
     const FlotaScreen(),
     const EquipoScreen(),
     const FichajeScreen(),
@@ -40,6 +43,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   final List<String> _titles = const [
     'Panel',
     'Partes',
+    'Plantillas',
     'Flota',
     'Equipo',
     'Fichaje',
@@ -49,6 +53,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   final List<IconData> _sectionIcons = const [
     Icons.dashboard_outlined,
     Icons.assignment_outlined,
+    Icons.inventory_2_outlined,
     Icons.directions_boat_outlined,
     Icons.people_outline,
     Icons.access_time_outlined,
@@ -118,10 +123,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     switch (actionRoute) {
       case 'PARTES':
         return 1;
+      case 'PLANTILLAS':
+        return 2;
       case 'FICHAJES':
-        return 4;
-      case 'AUSENCIAS':
         return 5;
+      case 'AUSENCIAS':
+        return 6;
       default:
         return 0;
     }
@@ -397,11 +404,15 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     double iconSize = 18,
   }) {
     final resolvedPhotoUrl = resolveMediaUrl(photoUrl);
+    final token = context.read<SessionViewModel>().token;
     if (resolvedPhotoUrl.isNotEmpty) {
       return CircleAvatar(
         radius: radius,
         backgroundColor: NavalgoColors.mist,
-        foregroundImage: NetworkImage(resolvedPhotoUrl),
+        foregroundImage: NetworkImage(
+          resolvedPhotoUrl,
+          headers: buildMediaHeaders(token),
+        ),
         child: Icon(Icons.person, size: iconSize, color: NavalgoColors.tide),
       );
     }
@@ -509,7 +520,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       return;
     }
 
-    await context.read<SessionViewModel>().clearSession();
+    final session = context.read<SessionViewModel>();
+    try {
+      await context.read<AuthService>().logout(token: session.token);
+    } catch (_) {}
+    await session.clearSession();
     if (!mounted) {
       return;
     }
@@ -630,6 +645,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                             label: Text('Partes'),
                           ),
                           NavigationRailDestination(
+                            icon: Icon(Icons.inventory_2_outlined),
+                            selectedIcon: Icon(Icons.inventory_2),
+                            label: Text('Plantillas'),
+                          ),
+                          NavigationRailDestination(
                             icon: Icon(Icons.directions_boat_outlined),
                             selectedIcon: Icon(Icons.directions_boat),
                             label: Text('Flota'),
@@ -713,6 +733,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     icon: Icon(Icons.assignment_outlined),
                     selectedIcon: Icon(Icons.assignment),
                     label: 'Partes',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.inventory_2_outlined),
+                    selectedIcon: Icon(Icons.inventory_2),
+                    label: 'Plantillas',
                   ),
                   NavigationDestination(
                     icon: Icon(Icons.directions_boat_outlined),

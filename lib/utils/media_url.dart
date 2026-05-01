@@ -23,3 +23,11 @@ String resolveMediaUrl(String? rawUrl) {
 
   return '${ApiConfig.baseUrl}/media/proxy?url=${Uri.encodeQueryComponent(url)}';
 }
+
+Map<String, String>? buildMediaHeaders(String? token) {
+  final normalizedToken = token?.trim();
+  if (normalizedToken == null || normalizedToken.isEmpty) {
+    return null;
+  }
+  return {'Authorization': 'Bearer $normalizedToken'};
+}

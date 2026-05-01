@@ -25,6 +25,7 @@ import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/work_orders_view_model.dart';
 import '../../viewmodels/workers_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import 'material_templates_screen.dart';
 
 class PartesScreen extends StatefulWidget {
   const PartesScreen({super.key});
@@ -1401,6 +1402,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                 clipBehavior: Clip.antiAlias,
                 child: Image.network(
                   resolveMediaUrl(_workOrder.signatureUrl),
+                  headers: buildMediaHeaders(
+                    context.read<SessionViewModel>().token,
+                  ),
                   fit: BoxFit.contain,
                   errorBuilder: (_, _, _) =>
                       const Center(child: Text('No se pudo cargar la firma')),
@@ -2861,7 +2865,7 @@ InputDecoration _detailInputDecoration(
   );
 }
 
-class _WorkerAssignmentList extends StatelessWidget {
+class _WorkerAssignmentList extends StatefulWidget {
   const _WorkerAssignmentList({
     required this.workers,
     required this.selectedWorkers,
@@ -2873,8 +2877,44 @@ class _WorkerAssignmentList extends StatelessWidget {
   final void Function(int workerId, bool selected) onToggle;
 
   @override
+  State<_WorkerAssignmentList> createState() => _WorkerAssignmentListState();
+}
+
+class _WorkerAssignmentListState extends State<_WorkerAssignmentList> {
+  late final TextEditingController _searchCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<WorkerProfile> _filteredWorkers(String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.isEmpty) {
+      return widget.workers;
+    }
+
+    return widget.workers.where((worker) {
+      final haystack = <String>[
+        worker.fullName,
+        worker.email,
+        worker.role,
+        worker.speciality ?? '',
+      ].join(' ').toLowerCase();
+      return haystack.contains(normalizedQuery);
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (workers.isEmpty) {
+    if (widget.workers.isEmpty) {
       return const SizedBox(
         height: 120,
         child: Center(child: Text('No hay mecánicos disponibles.')),
@@ -2882,27 +2922,87 @@ class _WorkerAssignmentList extends StatelessWidget {
     }
 
     return SizedBox(
-      height: 220,
-      child: ListView.separated(
-        itemCount: workers.length,
-        separatorBuilder: (_, index) => Divider(
-          height: 1,
-          color: NavalgoColors.border.withValues(alpha: 0.55),
-        ),
-        itemBuilder: (context, index) {
-          final worker = workers[index];
-          final selected = selectedWorkers.contains(worker.id);
-          return CheckboxListTile(
-            value: selected,
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-            controlAffinity: ListTileControlAffinity.trailing,
-            secondary: _WorkerAvatar(worker: worker),
-            title: Text(
-              worker.fullName,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(worker.role),
-            onChanged: (value) => onToggle(worker.id, value ?? false),
+      height: 300,
+      child: ValueListenableBuilder<TextEditingValue>(
+        valueListenable: _searchCtrl,
+        builder: (context, value, _) {
+          final filteredWorkers = _filteredWorkers(value.text);
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                controller: _searchCtrl,
+                textInputAction: TextInputAction.search,
+                decoration:
+                    NavalgoFormStyles.inputDecoration(
+                      context,
+                      label: 'Buscar trabajador',
+                      hint: 'Nombre, email, rol o especialidad',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                    ).copyWith(
+                      suffixIcon: value.text.trim().isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: _searchCtrl.clear,
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                    ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                value.text.trim().isEmpty
+                    ? '${widget.selectedWorkers.length} seleccionados de ${widget.workers.length}'
+                    : '${filteredWorkers.length} resultados para "${value.text.trim()}"',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: NavalgoColors.deepSea.withValues(alpha: 0.72),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: filteredWorkers.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No hay trabajadores que coincidan con la bÃºsqueda.',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      )
+                    : ListView.separated(
+                        itemCount: filteredWorkers.length,
+                        separatorBuilder: (_, index) => Divider(
+                          height: 1,
+                          color: NavalgoColors.border.withValues(alpha: 0.55),
+                        ),
+                        itemBuilder: (context, index) {
+                          final worker = filteredWorkers[index];
+                          final selected = widget.selectedWorkers.contains(
+                            worker.id,
+                          );
+                          return CheckboxListTile(
+                            value: selected,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                            ),
+                            controlAffinity: ListTileControlAffinity.trailing,
+                            secondary: _WorkerAvatar(worker: worker),
+                            title: Text(
+                              worker.fullName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(worker.role),
+                            onChanged: (selectedValue) => widget.onToggle(
+                              worker.id,
+                              selectedValue ?? false,
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           );
         },
       ),
@@ -2919,11 +3019,12 @@ class _WorkerAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final photoUrl = worker.photoUrl?.trim();
     final resolvedPhotoUrl = resolveMediaUrl(photoUrl);
+    final token = context.read<SessionViewModel>().token;
     return CircleAvatar(
       radius: 22,
       backgroundColor: NavalgoColors.mist,
       foregroundImage: resolvedPhotoUrl.isNotEmpty
-          ? NetworkImage(resolvedPhotoUrl)
+          ? NetworkImage(resolvedPhotoUrl, headers: buildMediaHeaders(token))
           : null,
       child: Text(
         _workerInitials(worker.fullName),
@@ -3950,8 +4051,12 @@ class _MaterialTemplateAssignmentFieldState
       setState(() {
         _templates = templates;
       });
-      if (selectTemplateId != null) {
+      if (selectTemplateId != null &&
+          templates.any((item) => item.id == selectTemplateId)) {
         widget.onChanged(selectTemplateId);
+      } else if (widget.selectedTemplateId != null &&
+          !templates.any((item) => item.id == widget.selectedTemplateId)) {
+        widget.onChanged(null);
       }
     } catch (e) {
       if (!mounted) {
@@ -3969,12 +4074,47 @@ class _MaterialTemplateAssignmentFieldState
     }
   }
 
+  Future<void> _openTemplateSelector() async {
+    if (_loading) {
+      return;
+    }
+
+    final selection = await showDialog<_MaterialTemplateSelectionResult>(
+      context: context,
+      builder: (_) => _MaterialTemplatePickerDialog(
+        templates: _templates,
+        selectedTemplateId: widget.selectedTemplateId,
+      ),
+    );
+    if (!mounted || selection == null || !selection.changed) {
+      return;
+    }
+    widget.onChanged(selection.templateId);
+  }
+
+  Future<void> _openTemplateManager() async {
+    if (_loading) {
+      return;
+    }
+
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(builder: (_) => const MaterialTemplatesScreen()),
+    );
+    if (!mounted) {
+      return;
+    }
+    await _loadTemplates();
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedTemplate = _templates
         .where((item) => item.id == widget.selectedTemplateId)
         .cast<MaterialChecklistTemplate?>()
         .firstOrNull;
+    final selectedLabel = selectedTemplate == null
+        ? 'Sin plantilla'
+        : _materialTemplateDisplayName(selectedTemplate);
 
     return NavalgoFormFieldBlock(
       label: 'Plantilla de material',
@@ -3985,58 +4125,98 @@ class _MaterialTemplateAssignmentFieldState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: _loading
-                      ? const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 18),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
-                      : DropdownButtonFormField<int?>(
-                          initialValue: selectedTemplate?.id,
-                          dropdownColor: NavalgoColors.shell,
-                          decoration: NavalgoFormStyles.inputDecoration(
-                            context,
-                            label: 'Plantilla de material',
-                            prefixIcon: const Icon(Icons.fact_check_outlined),
-                          ),
-                          items: [
-                            const DropdownMenuItem<int?>(
-                              value: null,
-                              child: Text('Sin plantilla'),
-                            ),
-                            ..._templates.map(
-                              (template) => DropdownMenuItem<int?>(
-                                value: template.id,
-                                child: Text(
-                                  _materialTemplateDisplayName(template),
-                                ),
-                              ),
-                            ),
-                          ],
-                          onChanged: widget.onChanged,
-                        ),
+            InkWell(
+              borderRadius: BorderRadius.circular(20),
+              onTap: _loading ? null : _openTemplateSelector,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: NavalgoColors.border, width: 1.6),
                 ),
-                const SizedBox(width: 12),
+                child: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 42,
+                            height: 42,
+                            decoration: BoxDecoration(
+                              color: NavalgoColors.foam,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.fact_check_outlined,
+                              color: NavalgoColors.tide,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  selectedLabel,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  selectedTemplate == null
+                                      ? 'Pulsa para buscar una plantilla por nombre o por tipo de revisiÃ³n.'
+                                      : '${_materialTemplateTypeLabel(selectedTemplate.templateType)} Â· ${selectedTemplate.effectiveItemCount} items',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: NavalgoColors.deepSea.withValues(
+                                          alpha: 0.72,
+                                        ),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            color: NavalgoColors.deepSea.withValues(
+                              alpha: 0.72,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                FilledButton.icon(
+                  onPressed: _loading ? null : _openTemplateSelector,
+                  icon: const Icon(Icons.search_rounded),
+                  label: const Text('Buscar plantilla'),
+                ),
                 OutlinedButton.icon(
-                  onPressed: _loading
-                      ? null
-                      : () async {
-                          final selectedId = await showDialog<int?>(
-                            context: context,
-                            builder: (_) =>
-                                const _ManageMaterialTemplatesDialog(),
-                          );
-                          if (!mounted) {
-                            return;
-                          }
-                          await _loadTemplates(selectTemplateId: selectedId);
-                        },
+                  onPressed: _loading ? null : _openTemplateManager,
                   icon: const Icon(Icons.settings_outlined, size: 18),
                   label: const Text('Gestionar'),
                 ),
+                if (selectedTemplate != null)
+                  OutlinedButton.icon(
+                    onPressed: _loading ? null : () => widget.onChanged(null),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('Quitar'),
+                  ),
               ],
             ),
             if (_error != null) ...[
@@ -4089,6 +4269,291 @@ class _MaterialTemplateAssignmentFieldState
           ],
         ),
       ),
+    );
+  }
+}
+
+class _MaterialTemplateSelectionResult {
+  const _MaterialTemplateSelectionResult({
+    required this.changed,
+    required this.templateId,
+  });
+
+  final bool changed;
+  final int? templateId;
+}
+
+class _MaterialTemplatePickerDialog extends StatefulWidget {
+  const _MaterialTemplatePickerDialog({
+    required this.templates,
+    required this.selectedTemplateId,
+  });
+
+  final List<MaterialChecklistTemplate> templates;
+  final int? selectedTemplateId;
+
+  @override
+  State<_MaterialTemplatePickerDialog> createState() =>
+      _MaterialTemplatePickerDialogState();
+}
+
+class _MaterialTemplatePickerDialogState
+    extends State<_MaterialTemplatePickerDialog> {
+  late final TextEditingController _searchCtrl;
+  String _typeFilter = 'ALL';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchCtrl = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<MaterialChecklistTemplate> _filteredTemplates(String query) {
+    final normalizedQuery = query.trim().toLowerCase();
+    return widget.templates.where((template) {
+      if (_typeFilter != 'ALL' && template.templateType != _typeFilter) {
+        return false;
+      }
+      if (normalizedQuery.isEmpty) {
+        return true;
+      }
+      final haystack = <String>[
+        template.name,
+        template.description ?? '',
+        template.baseTemplateName ?? '',
+        _materialTemplateTypeLabel(template.templateType),
+        ...template.items.map((item) => item.articleName),
+        ...template.items.map((item) => item.reference),
+      ].join(' ').toLowerCase();
+      return haystack.contains(normalizedQuery);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return NavalgoFormDialog(
+      title: 'Seleccionar plantilla',
+      maxWidth: 860,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+      child: SizedBox(
+        height: 520,
+        child: ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _searchCtrl,
+          builder: (context, value, _) {
+            final filteredTemplates = _filteredTemplates(value.text);
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: _searchCtrl,
+                  textInputAction: TextInputAction.search,
+                  decoration:
+                      NavalgoFormStyles.inputDecoration(
+                        context,
+                        label: 'Buscar por nombre',
+                        hint:
+                            'Nombre, tipo, plantilla base, material o referencia',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                      ).copyWith(
+                        suffixIcon: value.text.trim().isEmpty
+                            ? null
+                            : IconButton(
+                                onPressed: _searchCtrl.clear,
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                      ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _TemplateFilterChip(
+                      label: 'Todas',
+                      selected: _typeFilter == 'ALL',
+                      onSelected: () => setState(() => _typeFilter = 'ALL'),
+                    ),
+                    _TemplateFilterChip(
+                      label: 'Básicas',
+                      selected: _typeFilter == 'BASIC',
+                      onSelected: () => setState(() => _typeFilter = 'BASIC'),
+                    ),
+                    _TemplateFilterChip(
+                      label: 'Completas',
+                      selected: _typeFilter == 'COMPLETE',
+                      onSelected: () =>
+                          setState(() => _typeFilter = 'COMPLETE'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                OutlinedButton.icon(
+                  onPressed: () => Navigator.pop(
+                    context,
+                    const _MaterialTemplateSelectionResult(
+                      changed: true,
+                      templateId: null,
+                    ),
+                  ),
+                  icon: const Icon(Icons.clear_all_rounded),
+                  label: const Text('Usar sin plantilla'),
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: filteredTemplates.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No hay plantillas que coincidan con los filtros.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: filteredTemplates.length,
+                          separatorBuilder: (_, index) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final template = filteredTemplates[index];
+                            final selected =
+                                widget.selectedTemplateId == template.id;
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(20),
+                              onTap: () => Navigator.pop(
+                                context,
+                                _MaterialTemplateSelectionResult(
+                                  changed: true,
+                                  templateId: template.id,
+                                ),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? NavalgoColors.foam
+                                      : Colors.white,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: selected
+                                        ? NavalgoColors.tide
+                                        : NavalgoColors.border,
+                                    width: selected ? 2 : 1.4,
+                                  ),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            _materialTemplateDisplayName(
+                                              template,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        NavalgoStatusChip(
+                                          label: _materialTemplateTypeLabel(
+                                            template.templateType,
+                                          ),
+                                          color:
+                                              template.templateType ==
+                                                  'COMPLETE'
+                                              ? NavalgoColors.coral
+                                              : NavalgoColors.harbor,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${template.effectiveItemCount} items',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: NavalgoColors.deepSea
+                                                .withValues(alpha: 0.72),
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    if ((template.description ?? '')
+                                        .trim()
+                                        .isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        template.description!.trim(),
+                                        maxLines: 2,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.bodyMedium,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _TemplateFilterChip extends StatelessWidget {
+  const _TemplateFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(),
+      selectedColor: NavalgoColors.deepSea,
+      backgroundColor: Colors.white,
+      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: selected ? Colors.white : NavalgoColors.deepSea,
+        fontWeight: FontWeight.w700,
+      ),
+      side: BorderSide(
+        color: selected ? NavalgoColors.deepSea : NavalgoColors.border,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
     );
   }
 }

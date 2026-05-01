@@ -44,8 +44,57 @@ public class MaterialChecklistTemplateService {
     public MaterialChecklistTemplateDto update(Long id, CreateMaterialChecklistTemplateRequest request) {
         MaterialChecklistTemplate template = templateRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Plantilla no encontrada"));
+        validateTemplateCanChangeType(template, request.templateType());
         applyRequest(template, request);
         return toDto(templateRepository.save(template));
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        MaterialChecklistTemplate template = templateRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Plantilla no encontrada"));
+
+        List<MaterialChecklistTemplate> dependentTemplates =
+                templateRepository.findAllByBaseTemplateIdOrderByUpdatedAtDesc(id);
+        if (!dependentTemplates.isEmpty()) {
+            String dependentNames = dependentTemplates.stream()
+                    .limit(3)
+                    .map(MaterialChecklistTemplate::getName)
+                    .filter(Objects::nonNull)
+                    .map(String::trim)
+                    .filter(name -> !name.isEmpty())
+                    .toList()
+                    .stream()
+                    .reduce((left, right) -> left + ", " + right)
+                    .orElse("otras revisiones completas");
+            String suffix = dependentTemplates.size() > 3 ? " y otras asociadas" : "";
+            throw new IllegalArgumentException(
+                    "No se puede borrar la plantilla porque esta vinculada a revisiones completas: "
+                            + dependentNames
+                            + suffix
+            );
+        }
+
+        templateRepository.delete(template);
+        templateRepository.flush();
+    }
+
+    private void validateTemplateCanChangeType(MaterialChecklistTemplate template,
+                                               MaterialChecklistTemplateType requestedType) {
+        MaterialChecklistTemplateType resolvedRequestedType = requestedType == null
+                ? MaterialChecklistTemplateType.BASIC
+                : requestedType;
+        if (template.getId() == null) {
+            return;
+        }
+
+        if (template.getTemplateType() == MaterialChecklistTemplateType.BASIC
+                && resolvedRequestedType != MaterialChecklistTemplateType.BASIC
+                && templateRepository.existsByBaseTemplateId(template.getId())) {
+            throw new IllegalArgumentException(
+                    "No se puede convertir esta plantilla en revision completa porque otras revisiones completas la usan como base"
+            );
+        }
     }
 
     private void applyRequest(MaterialChecklistTemplate template, CreateMaterialChecklistTemplateRequest request) {

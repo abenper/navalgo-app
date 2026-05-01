@@ -1,5 +1,6 @@
-import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import '../models/user.dart'; // Tu modelo de usuario
 import '../config/api_config.dart';
 import 'network/api_client.dart';
@@ -8,12 +9,13 @@ import 'network/api_exception.dart';
 class AuthService {
   AuthService({ApiClient? apiClient, http.Client? httpClient})
     : _apiClient =
-          apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl, httpClient: httpClient);
+          apiClient ??
+          ApiClient(baseUrl: ApiConfig.baseUrl, httpClient: httpClient);
 
   final ApiClient _apiClient;
 
   Future<User> login(String email, String password) async {
-    if (ApiConfig.useMockApi) {
+    if (ApiConfig.useMockApi && kDebugMode) {
       return _mockLogin(email, password);
     }
 
@@ -28,7 +30,9 @@ class AuthService {
     } on ApiException catch (e) {
       throw Exception(_mapLoginError(e));
     } on FormatException {
-      throw Exception('La respuesta del servidor no tiene el formato esperado.');
+      throw Exception(
+        'La respuesta del servidor no tiene el formato esperado.',
+      );
     }
   }
 
@@ -40,10 +44,16 @@ class AuthService {
     await _apiClient.post(
       '/auth/change-password',
       headers: {'Authorization': 'Bearer $token'},
-      body: {
-        'currentPassword': currentPassword,
-        'newPassword': newPassword,
-      },
+      body: {'currentPassword': currentPassword, 'newPassword': newPassword},
+    );
+  }
+
+  Future<void> logout({String? token}) async {
+    await _apiClient.post(
+      '/auth/logout',
+      headers: token == null || token.isEmpty
+          ? null
+          : {'Authorization': 'Bearer $token'},
     );
   }
 
@@ -56,8 +66,9 @@ class AuthService {
     // 1) { id, name, email, role, token }
     // 2) { user: { id, name, email, role }, token }
     if (responseData['user'] is Map<String, dynamic>) {
-      final Map<String, dynamic> user =
-          Map<String, dynamic>.from(responseData['user'] as Map);
+      final Map<String, dynamic> user = Map<String, dynamic>.from(
+        responseData['user'] as Map,
+      );
       user['token'] = responseData['token'];
       return user;
     }

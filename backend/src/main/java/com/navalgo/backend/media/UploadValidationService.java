@@ -6,6 +6,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Locale;
 import java.util.Set;
+import java.io.IOException;
+import java.io.InputStream;
 
 @Service
 public class UploadValidationService {
@@ -48,6 +50,7 @@ public class UploadValidationService {
         }
         if (allowVideo && ALLOWED_VIDEO_TYPES.contains(contentType)) {
             validateMaxSize(file, maxVideoBytes, "El video supera el tamano maximo permitido de 100MB");
+            validateVideoSignature(file);
             return;
         }
         throw new IllegalArgumentException("Tipo de archivo no permitido");
@@ -91,5 +94,47 @@ public class UploadValidationService {
         return file.getContentType() == null
                 ? ""
                 : file.getContentType().trim().toLowerCase(Locale.ROOT);
+    }
+
+    private void validateVideoSignature(MultipartFile file) {
+        try (InputStream stream = file.getInputStream()) {
+            byte[] header = stream.readNBytes(16);
+            if (looksLikeMp4Family(header) || looksLikeRiffAvi(header) || looksLikeWebm(header)) {
+                return;
+            }
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("No se pudo validar la cabecera binaria del video");
+        }
+        throw new IllegalArgumentException("El contenido binario del video no es valido");
+    }
+
+    private boolean looksLikeMp4Family(byte[] header) {
+        if (header.length < 12) {
+            return false;
+        }
+        return header[4] == 'f' && header[5] == 't' && header[6] == 'y' && header[7] == 'p';
+    }
+
+    private boolean looksLikeRiffAvi(byte[] header) {
+        if (header.length < 12) {
+            return false;
+        }
+        return header[0] == 'R'
+                && header[1] == 'I'
+                && header[2] == 'F'
+                && header[3] == 'F'
+                && header[8] == 'A'
+                && header[9] == 'V'
+                && header[10] == 'I';
+    }
+
+    private boolean looksLikeWebm(byte[] header) {
+        if (header.length < 4) {
+            return false;
+        }
+        return (header[0] & 0xFF) == 0x1A
+                && (header[1] & 0xFF) == 0x45
+                && (header[2] & 0xFF) == 0xDF
+                && (header[3] & 0xFF) == 0xA3;
     }
 }

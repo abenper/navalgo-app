@@ -56,7 +56,7 @@ class MaterialChecklistTemplateService {
     int? baseTemplateId,
     required List<MaterialChecklistTemplateItem> items,
   }) async {
-    final data = await _apiClient.patch(
+    final data = await _apiClient.put(
       '/work-order-material-templates/$templateId',
       headers: {'Authorization': 'Bearer $token'},
       body: {
@@ -69,5 +69,12 @@ class MaterialChecklistTemplateService {
     );
 
     return MaterialChecklistTemplate.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteTemplate(String token, {required int templateId}) async {
+    await _apiClient.delete(
+      '/work-order-material-templates/$templateId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
   }
 }
