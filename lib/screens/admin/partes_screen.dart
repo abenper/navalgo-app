@@ -1706,7 +1706,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     });
     await _persistMaterialChecklistDraft();
 
-    await _syncPendingMaterialChecklistItems();
+    // Silently try to sync without showing toast on every checkbox toggle
+    await _syncPendingMaterialChecklistItems(showErrorToast: false);
   }
 
   Future<void> _syncPendingMaterialChecklistItems({
