@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
@@ -526,6 +527,7 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         currentPassword: _currentController.text.trim(),
         newPassword: _newController.text.trim(),
       );
+      TextInput.finishAutofillContext(shouldSave: false);
 
       await session.updateUser(currentUser.copyWith(mustChangePassword: false));
 
@@ -555,7 +557,12 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',
-          onPressed: _isSaving ? null : () => Navigator.of(context).pop(false),
+          onPressed: _isSaving
+              ? null
+              : () {
+                  TextInput.finishAutofillContext(shouldSave: false);
+                  Navigator.of(context).pop(false);
+                },
         ),
         NavalgoGradientButton(
           label: _isSaving ? 'Guardando...' : 'Guardar',
@@ -574,6 +581,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _currentController,
                 obscureText: !_showCurrent,
                 textInputAction: TextInputAction.next,
+                autofillHints: null,
+                enableSuggestions: false,
+                autocorrect: false,
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Contraseña actual',
@@ -602,6 +612,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _newController,
                 obscureText: !_showNew,
                 textInputAction: TextInputAction.next,
+                autofillHints: null,
+                enableSuggestions: false,
+                autocorrect: false,
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Nueva contraseña',
@@ -632,6 +645,9 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
                 controller: _confirmController,
                 obscureText: !_showConfirm,
                 textInputAction: TextInputAction.done,
+                autofillHints: null,
+                enableSuggestions: false,
+                autocorrect: false,
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
                   label: 'Confirmar nueva contraseña',

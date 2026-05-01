@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'package:navalgo/services/auth_service.dart';
@@ -103,6 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       currentPassword: currentPassword,
                       newPassword: newPassword,
                     );
+                    TextInput.finishAutofillContext(shouldSave: false);
                     if (context.mounted) {
                       Navigator.of(context).pop(true);
                     }
@@ -128,6 +130,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: true,
                           enabled: !isSaving,
                           textInputAction: TextInputAction.next,
+                          autofillHints: null,
+                          enableSuggestions: false,
+                          autocorrect: false,
                           decoration: const InputDecoration(
                             labelText: 'Nueva contraseña',
                             helperText:
@@ -142,6 +147,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           obscureText: true,
                           enabled: !isSaving,
                           textInputAction: TextInputAction.done,
+                          autofillHints: null,
+                          enableSuggestions: false,
+                          autocorrect: false,
                           onSubmitted: (_) => isSaving ? null : submit(),
                           decoration: const InputDecoration(
                             labelText: 'Confirmar contraseña',
@@ -182,6 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       return result == true;
     } finally {
+      TextInput.finishAutofillContext(shouldSave: false);
       newPasswordController.dispose();
       confirmPasswordController.dispose();
     }
@@ -245,10 +254,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      AppToast.warning(
-        context,
-        'Completa correo y contraseña.',
-      );
+      AppToast.warning(context, 'Completa correo y contraseña.');
       return;
     }
 
@@ -318,7 +324,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
-                    autofillHints: const [AutofillHints.email],
+                    autofillHints: const [
+                      AutofillHints.username,
+                      AutofillHints.email,
+                    ],
                     decoration: const InputDecoration(
                       labelText: 'Correo electrónico',
                       prefixIcon: Icon(Icons.alternate_email_rounded),
@@ -330,6 +339,8 @@ class _LoginScreenState extends State<LoginScreen> {
                     obscureText: _obscurePassword,
                     textInputAction: TextInputAction.done,
                     autofillHints: const [AutofillHints.password],
+                    enableSuggestions: false,
+                    autocorrect: false,
                     onSubmitted: (_) => loginViewModel.isLoading
                         ? null
                         : _submit(loginViewModel),
