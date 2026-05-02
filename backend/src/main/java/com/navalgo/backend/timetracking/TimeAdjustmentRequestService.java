@@ -54,32 +54,9 @@ public class TimeAdjustmentRequestService {
     public TimeAdjustmentRequestDto create(Long currentWorkerId, CreateTimeAdjustmentRequest request) {
         Worker worker = workerRepository.findById(currentWorkerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
-
-        if (request.timeEntryId() == null
-                && request.requestedClockIn() == null
-                && request.requestedClockOut() == null) {
-            throw new IllegalArgumentException("Debes indicar al menos una hora solicitada");
-        }
-
-        validateChronology(request.requestedClockIn(), request.requestedClockOut());
-
-        TimeEntry linkedEntry = null;
-        if (request.timeEntryId() != null) {
-            linkedEntry = timeEntryRepository.findById(request.timeEntryId())
-                    .orElseThrow(() -> new EntityNotFoundException("Fichaje no encontrado"));
-            if (!linkedEntry.getWorker().getId().equals(currentWorkerId)) {
-                throw new AccessDeniedException("Solo puedes solicitar ajustes sobre tus propios fichajes");
-            }
-        }
-
         TimeAdjustmentRequest entity = new TimeAdjustmentRequest();
         entity.setWorker(worker);
-        entity.setTimeEntry(linkedEntry);
-        entity.setWorkDate(request.workDate());
-        entity.setRequestedClockIn(request.requestedClockIn());
-        entity.setRequestedClockOut(request.requestedClockOut());
-        entity.setWorkSite(request.workSite());
-        entity.setReason(request.reason().trim());
+        applyEditableFields(entity, currentWorkerId, request);
         entity.setStatus(TimeAdjustmentRequestStatus.PENDING);
         entity.setCreatedAt(Instant.now());
 
@@ -91,6 +68,61 @@ public class TimeAdjustmentRequestService {
                 NotificationType.WARNING
         );
         return TimeAdjustmentRequestDto.from(saved);
+    }
+
+    @Transactional
+    public TimeAdjustmentRequestDto update(Long requestId,
+                                           Long currentWorkerId,
+                                           CreateTimeAdjustmentRequest request) {
+        TimeAdjustmentRequest entity = timeAdjustmentRequestRepository.findById(requestId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud de ajuste no encontrada"));
+
+        if (!entity.getWorker().getId().equals(currentWorkerId)) {
+            throw new AccessDeniedException("Solo puedes editar tus propias solicitudes");
+        }
+        if (entity.getStatus() != TimeAdjustmentRequestStatus.PENDING) {
+            throw new IllegalArgumentException("Solo puedes editar solicitudes pendientes");
+        }
+
+        applyEditableFields(entity, currentWorkerId, request);
+        entity.setAdminComment(null);
+        entity.setReviewedAt(null);
+        entity.setReviewedByWorker(null);
+
+        TimeAdjustmentRequest saved = timeAdjustmentRequestRepository.save(entity);
+        notificationService.notifyAdmins(
+                "Solicitud de ajuste modificada",
+                entity.getWorker().getFullName() + " ha modificado un ajuste de fichaje del " + formatDate(saved.getWorkDate()) + ".",
+                "FICHAJES",
+                NotificationType.INFO
+        );
+        return TimeAdjustmentRequestDto.from(saved);
+    }
+
+    @Transactional
+    public void delete(Long requestId, Long currentWorkerId, boolean admin) {
+        TimeAdjustmentRequest entity = timeAdjustmentRequestRepository.findById(requestId)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud de ajuste no encontrada"));
+
+        if (!admin && !entity.getWorker().getId().equals(currentWorkerId)) {
+            throw new AccessDeniedException("Solo puedes eliminar tus propias solicitudes");
+        }
+        if (!admin && entity.getStatus() != TimeAdjustmentRequestStatus.PENDING) {
+            throw new IllegalArgumentException("Solo puedes eliminar solicitudes pendientes");
+        }
+
+        String workerName = entity.getWorker().getFullName();
+        LocalDate workDate = entity.getWorkDate();
+        timeAdjustmentRequestRepository.delete(entity);
+
+        if (!admin) {
+            notificationService.notifyAdmins(
+                    "Solicitud de ajuste eliminada",
+                    workerName + " ha eliminado un ajuste de fichaje del " + formatDate(workDate) + ".",
+                    "FICHAJES",
+                    NotificationType.WARNING
+            );
+        }
     }
 
     @Transactional
@@ -173,6 +205,34 @@ public class TimeAdjustmentRequestService {
         newEntry.setClockOut(request.getRequestedClockOut());
         newEntry.setWorkSite(request.getWorkSite());
         request.setTimeEntry(timeEntryRepository.save(newEntry));
+    }
+
+    private void applyEditableFields(TimeAdjustmentRequest entity,
+                                     Long currentWorkerId,
+                                     CreateTimeAdjustmentRequest request) {
+        if (request.timeEntryId() == null
+                && request.requestedClockIn() == null
+                && request.requestedClockOut() == null) {
+            throw new IllegalArgumentException("Debes indicar al menos una hora solicitada");
+        }
+
+        validateChronology(request.requestedClockIn(), request.requestedClockOut());
+
+        TimeEntry linkedEntry = null;
+        if (request.timeEntryId() != null) {
+            linkedEntry = timeEntryRepository.findById(request.timeEntryId())
+                    .orElseThrow(() -> new EntityNotFoundException("Fichaje no encontrado"));
+            if (!linkedEntry.getWorker().getId().equals(currentWorkerId)) {
+                throw new AccessDeniedException("Solo puedes solicitar ajustes sobre tus propios fichajes");
+            }
+        }
+
+        entity.setTimeEntry(linkedEntry);
+        entity.setWorkDate(request.workDate());
+        entity.setRequestedClockIn(request.requestedClockIn());
+        entity.setRequestedClockOut(request.requestedClockOut());
+        entity.setWorkSite(request.workSite());
+        entity.setReason(request.reason().trim());
     }
 
     private void validateChronology(Instant requestedClockIn, Instant requestedClockOut) {

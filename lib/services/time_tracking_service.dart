@@ -117,4 +117,39 @@ class TimeTrackingService {
     );
     return TimeAdjustmentRequest.fromJson(data as Map<String, dynamic>);
   }
+
+  Future<TimeAdjustmentRequest> updateAdjustmentRequest(
+    String token, {
+    required int requestId,
+    int? timeEntryId,
+    required DateTime workDate,
+    DateTime? requestedClockIn,
+    DateTime? requestedClockOut,
+    required String workSite,
+    required String reason,
+  }) async {
+    final data = await _apiClient.patch(
+      '/time-adjustments/$requestId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'timeEntryId': timeEntryId,
+        'workDate': _formatDate(workDate),
+        'requestedClockIn': requestedClockIn?.toUtc().toIso8601String(),
+        'requestedClockOut': requestedClockOut?.toUtc().toIso8601String(),
+        'workSite': workSite,
+        'reason': reason,
+      },
+    );
+    return TimeAdjustmentRequest.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAdjustmentRequest(
+    String token, {
+    required int requestId,
+  }) async {
+    await _apiClient.delete(
+      '/time-adjustments/$requestId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
 }

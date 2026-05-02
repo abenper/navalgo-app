@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -41,11 +43,27 @@ class _FichajeScreenState extends State<FichajeScreen> {
   List<TimeAdjustmentRequest> _adjustmentRequests = <TimeAdjustmentRequest>[];
   TodayClockedWorkersSummary? _todaySummary;
   bool _adjustmentBusy = false;
+  late final Timer _clockTimer;
+  DateTime _now = DateTime.now();
 
   @override
   void initState() {
     super.initState();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _now = DateTime.now();
+      });
+    });
     _loadEntries();
+  }
+
+  @override
+  void dispose() {
+    _clockTimer.cancel();
+    super.dispose();
   }
 
   Future<void> _loadEntries() async {
@@ -182,67 +200,11 @@ class _FichajeScreenState extends State<FichajeScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          NavalgoPanel(
-            child: Column(
-              children: [
-                Icon(
-                  _isPunchedIn ? Icons.timer : Icons.timer_off,
-                  size: 92,
-                  color: _isPunchedIn
-                      ? NavalgoColors.kelp
-                      : NavalgoColors.storm,
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  _isPunchedIn
-                      ? 'Estado: Trabajando'
-                      : 'Estado: Fuera de turno',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Total hoy: ${_formatDuration(totalToday)}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                if (activeEntry != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ubicación actual: ${_workSiteLabel(activeEntry.workSite)}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: _isPunchedIn
-                          ? NavalgoColors.coral
-                          : NavalgoColors.kelp,
-                    ),
-                    onPressed: _toggleClock,
-                    icon: Icon(_isPunchedIn ? Icons.stop : Icons.play_arrow),
-                    label: Text(
-                      _isPunchedIn ? 'Finalizar Turno' : 'Iniciar Turno',
-                    ),
-                  ),
-                ),
-                if (!isAdmin) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: _adjustmentBusy
-                          ? null
-                          : _openAdjustmentRequestDialog,
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const Text('Solicitar ajuste de fichaje'),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+          _buildClockControlPanel(
+            context,
+            isAdmin: isAdmin,
+            totalToday: totalToday,
+            activeEntry: activeEntry,
           ),
           if (isAdmin && _todaySummary != null) ...[
             const SizedBox(height: 18),
@@ -301,11 +263,19 @@ class _FichajeScreenState extends State<FichajeScreen> {
                   workSiteLabel: _workSiteLabel(request.workSite),
                   busy: _adjustmentBusy,
                   canReview: isAdmin && request.isPending,
+                  canEdit: !isAdmin && request.isPending,
+                  canDelete: !isAdmin && request.isPending,
                   onApprove: isAdmin && request.isPending
                       ? () => _reviewAdjustmentRequest(request, approve: true)
                       : null,
                   onReject: isAdmin && request.isPending
                       ? () => _reviewAdjustmentRequest(request, approve: false)
+                      : null,
+                  onEdit: !isAdmin && request.isPending
+                      ? () => _editAdjustmentRequest(request)
+                      : null,
+                  onDelete: !isAdmin && request.isPending
+                      ? () => _deleteAdjustmentRequest(request)
                       : null,
                 ),
               );
@@ -346,6 +316,145 @@ class _FichajeScreenState extends State<FichajeScreen> {
               ),
             );
           }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClockControlPanel(
+    BuildContext context, {
+    required bool isAdmin,
+    required Duration totalToday,
+    required TimeEntry? activeEntry,
+  }) {
+    final compact = MediaQuery.sizeOf(context).width < 860;
+    final stateColor = _isPunchedIn ? NavalgoColors.kelp : NavalgoColors.storm;
+
+    final clockBlock = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: stateColor.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(999),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _isPunchedIn ? Icons.radio_button_checked : Icons.timer_off,
+                size: 18,
+                color: stateColor,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                _isPunchedIn ? 'Trabajando' : 'Fuera de turno',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: stateColor,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          _fmtHourWithSeconds(_now),
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: NavalgoColors.deepSea,
+            height: 0.95,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          _fmtLongDate(_now),
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: NavalgoColors.storm,
+          ),
+        ),
+      ],
+    );
+
+    final actions = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: _isPunchedIn
+                ? NavalgoColors.coral
+                : NavalgoColors.kelp,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          ),
+          onPressed: _toggleClock,
+          icon: Icon(_isPunchedIn ? Icons.stop : Icons.play_arrow),
+          label: Text(_isPunchedIn ? 'Finalizar turno' : 'Iniciar turno'),
+        ),
+        if (!isAdmin) ...[
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _adjustmentBusy ? null : _openAdjustmentRequestDialog,
+            icon: const Icon(Icons.fact_check_outlined),
+            label: const Text('Solicitar ajuste'),
+          ),
+        ],
+      ],
+    );
+
+    return NavalgoPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    clockBlock,
+                    const SizedBox(height: 18),
+                    actions,
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 7, child: clockBlock),
+                    const SizedBox(width: 24),
+                    Expanded(flex: 5, child: actions),
+                  ],
+                ),
+          const SizedBox(height: 20),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: NavalgoColors.shell,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(color: NavalgoColors.border),
+            ),
+            child: Wrap(
+              spacing: 14,
+              runSpacing: 14,
+              children: [
+                _ClockInfoPill(
+                  label: 'Total hoy',
+                  value: _formatDuration(totalToday),
+                  icon: Icons.schedule_rounded,
+                ),
+                if (activeEntry != null)
+                  _ClockInfoPill(
+                    label: 'Ubicación actual',
+                    value: _workSiteLabel(activeEntry.workSite),
+                    icon: Icons.place_outlined,
+                  ),
+                _ClockInfoPill(
+                  label: 'Registros recientes',
+                  value: '${_entries.length}',
+                  icon: Icons.receipt_long_outlined,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -552,6 +661,108 @@ class _FichajeScreenState extends State<FichajeScreen> {
     }
   }
 
+  Future<void> _editAdjustmentRequest(TimeAdjustmentRequest request) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final result = await showDialog<_TimeAdjustmentRequestInput>(
+      context: context,
+      builder: (_) => _TimeAdjustmentRequestDialog(
+        entries: _entries,
+        title: 'Editar ajuste de fichaje',
+        submitLabel: 'Guardar cambios',
+        initialRequest: request,
+      ),
+    );
+
+    if (!mounted || result == null) {
+      return;
+    }
+
+    setState(() => _adjustmentBusy = true);
+    try {
+      await context.read<TimeTrackingService>().updateAdjustmentRequest(
+        token,
+        requestId: request.id,
+        timeEntryId: result.timeEntryId,
+        workDate: result.workDate,
+        requestedClockIn: result.requestedClockIn,
+        requestedClockOut: result.requestedClockOut,
+        workSite: result.workSite,
+        reason: result.reason,
+      );
+      await _loadEntries();
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(context, 'Ajuste actualizado.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo actualizar el ajuste: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _adjustmentBusy = false);
+      }
+    }
+  }
+
+  Future<void> _deleteAdjustmentRequest(TimeAdjustmentRequest request) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Eliminar ajuste'),
+        content: const Text(
+          'Esta solicitud de ajuste se eliminará por completo. ¿Quieres continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted || confirmed != true) {
+      return;
+    }
+
+    setState(() => _adjustmentBusy = true);
+    try {
+      await context.read<TimeTrackingService>().deleteAdjustmentRequest(
+        token,
+        requestId: request.id,
+      );
+      await _loadEntries();
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(context, 'Ajuste eliminado.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo eliminar el ajuste: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _adjustmentBusy = false);
+      }
+    }
+  }
+
   Future<void> _reviewAdjustmentRequest(
     TimeAdjustmentRequest request, {
     required bool approve,
@@ -650,9 +861,17 @@ class _TimeAdjustmentRequestInput {
 }
 
 class _TimeAdjustmentRequestDialog extends StatefulWidget {
-  const _TimeAdjustmentRequestDialog({required this.entries});
+  const _TimeAdjustmentRequestDialog({
+    required this.entries,
+    this.title = 'Solicitar ajuste de fichaje',
+    this.submitLabel = 'Enviar solicitud',
+    this.initialRequest,
+  });
 
   final List<TimeEntry> entries;
+  final String title;
+  final String submitLabel;
+  final TimeAdjustmentRequest? initialRequest;
 
   @override
   State<_TimeAdjustmentRequestDialog> createState() =>
@@ -673,7 +892,27 @@ class _TimeAdjustmentRequestDialogState
   @override
   void initState() {
     super.initState();
-    _workDate = DateTime.now();
+    final initialRequest = widget.initialRequest;
+    if (initialRequest != null) {
+      _selectedEntryId = initialRequest.timeEntryId;
+      _workDate = DateTime(
+        initialRequest.workDate.year,
+        initialRequest.workDate.month,
+        initialRequest.workDate.day,
+      );
+      _clockInTime = initialRequest.requestedClockIn == null
+          ? null
+          : TimeOfDay.fromDateTime(initialRequest.requestedClockIn!.toLocal());
+      _clockOutTime = initialRequest.requestedClockOut == null
+          ? null
+          : TimeOfDay.fromDateTime(
+              initialRequest.requestedClockOut!.toLocal(),
+            );
+      _workSite = initialRequest.workSite;
+      _reasonController.text = initialRequest.reason;
+    } else {
+      _workDate = DateTime.now();
+    }
   }
 
   @override
@@ -685,7 +924,7 @@ class _TimeAdjustmentRequestDialogState
   @override
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
-      title: 'Solicitar ajuste de fichaje',
+      title: widget.title,
       subtitle:
           'Replica el patrón de Partes para documentar la jornada corregida y dejar trazabilidad clara.',
       actions: [
@@ -694,7 +933,7 @@ class _TimeAdjustmentRequestDialogState
           onPressed: () => Navigator.pop(context),
         ),
         NavalgoGradientButton(
-          label: 'Enviar solicitud',
+          label: widget.submitLabel,
           icon: Icons.send_outlined,
           onPressed: _submit,
         ),
@@ -947,8 +1186,12 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
     required this.workSiteLabel,
     required this.busy,
     required this.canReview,
+    this.canEdit = false,
+    this.canDelete = false,
     this.onApprove,
     this.onReject,
+    this.onEdit,
+    this.onDelete,
   });
 
   final TimeAdjustmentRequest request;
@@ -957,8 +1200,12 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
   final String workSiteLabel;
   final bool busy;
   final bool canReview;
+  final bool canEdit;
+  final bool canDelete;
   final VoidCallback? onApprove;
   final VoidCallback? onReject;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1026,6 +1273,26 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
                 ),
               ],
             ),
+          ] else if (canEdit || canDelete) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                if (canEdit)
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Editar'),
+                  ),
+                if (canDelete)
+                  OutlinedButton.icon(
+                    onPressed: busy ? null : onDelete,
+                    icon: const Icon(Icons.delete_outline_rounded),
+                    label: const Text('Eliminar'),
+                  ),
+              ],
+            ),
           ],
         ],
       ),
@@ -1047,6 +1314,59 @@ class _ClockWorkSiteOption {
   final String subtitle;
   final IconData icon;
   final Color accent;
+}
+
+class _ClockInfoPill extends StatelessWidget {
+  const _ClockInfoPill({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 180),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: NavalgoColors.mist,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: NavalgoColors.tide, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.labelMedium),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 Color _timeAdjustmentStatusColor(String status) {
@@ -1086,6 +1406,41 @@ String _formatDialogHour(DateTime d) {
   final hh = local.hour.toString().padLeft(2, '0');
   final mm = local.minute.toString().padLeft(2, '0');
   return '$hh:$mm';
+}
+
+String _fmtHourWithSeconds(DateTime d) {
+  final local = d.toLocal();
+  final hh = local.hour.toString().padLeft(2, '0');
+  final mm = local.minute.toString().padLeft(2, '0');
+  final ss = local.second.toString().padLeft(2, '0');
+  return '$hh:$mm:$ss';
+}
+
+String _fmtLongDate(DateTime d) {
+  const weekdays = [
+    'Lunes',
+    'Martes',
+    'Miércoles',
+    'Jueves',
+    'Viernes',
+    'Sábado',
+    'Domingo',
+  ];
+  const months = [
+    'enero',
+    'febrero',
+    'marzo',
+    'abril',
+    'mayo',
+    'junio',
+    'julio',
+    'agosto',
+    'septiembre',
+    'octubre',
+    'noviembre',
+    'diciembre',
+  ];
+  return '${weekdays[d.weekday - 1]}, ${d.day} de ${months[d.month - 1]}';
 }
 
 String _workSiteLabelForDialog(String workSite) {
