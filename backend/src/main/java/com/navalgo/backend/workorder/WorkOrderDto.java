@@ -26,7 +26,9 @@ public record WorkOrderDto(
         LocalDate closeDueDate,
         Instant createdAt,
         String signatureUrl,
+        String clientSignatureUrl,
         Instant signedAt,
+        Instant clientSignedAt,
         Long signedByWorkerId,
         String signedByWorkerName
 ) {

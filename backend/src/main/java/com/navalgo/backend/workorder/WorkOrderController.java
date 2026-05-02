@@ -222,4 +222,31 @@ public class WorkOrderController {
 
         return ResponseEntity.ok(service.signWorkOrder(id, signatureWithoutWatermark, proofDtos, email));
     }
+
+    @PostMapping(value = "/{id}/client-signature", consumes = "multipart/form-data")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<WorkOrderDto> uploadClientSignature(
+            @PathVariable Long id,
+            @RequestParam("signatureFile") MultipartFile signatureFile,
+            @RequestParam(required = false) Double latitude,
+            @RequestParam(required = false) Double longitude,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+        Instant now = Instant.now();
+        WorkOrderService.WorkOrderMediaContext context = service.getWorkOrderMediaContext(id, email);
+
+        UploadedAttachmentDto clientSignature = mediaService.uploadClientSignature(
+                signatureFile,
+                latitude,
+                longitude,
+                now,
+                email,
+                context.ownerName(),
+                context.vesselName(),
+                context.workOrderDate()
+        );
+
+        return ResponseEntity.ok(service.saveClientSignature(id, clientSignature, email));
+    }
 }

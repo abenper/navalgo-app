@@ -427,7 +427,9 @@ class WorkOrder {
     this.closeDueDate,
     required this.createdAt,
     this.signatureUrl,
+    this.clientSignatureUrl,
     this.signedAt,
+    this.clientSignedAt,
     this.signedByWorkerId,
     this.signedByWorkerName,
   });
@@ -452,7 +454,9 @@ class WorkOrder {
   final DateTime? closeDueDate;
   final DateTime createdAt;
   final String? signatureUrl;
+  final String? clientSignatureUrl;
   final DateTime? signedAt;
+  final DateTime? clientSignedAt;
   final int? signedByWorkerId;
   final String? signedByWorkerName;
 
@@ -477,6 +481,16 @@ class WorkOrder {
         ? DateTime.parse(rawSignedAt)
         : rawSignedAt is num
         ? DateTime.fromMillisecondsSinceEpoch(rawSignedAt.toInt(), isUtc: true)
+        : null;
+
+    final rawClientSignedAt = json['clientSignedAt'];
+    final DateTime? clientSignedAt = rawClientSignedAt is String
+        ? DateTime.parse(rawClientSignedAt)
+        : rawClientSignedAt is num
+        ? DateTime.fromMillisecondsSinceEpoch(
+            rawClientSignedAt.toInt(),
+            isUtc: true,
+          )
         : null;
 
     final rawCloseDueDate = json['closeDueDate'];
@@ -574,7 +588,9 @@ class WorkOrder {
       closeDueDate: closeDueDate,
       createdAt: createdAt,
       signatureUrl: asNullableString(json['signatureUrl']),
+      clientSignatureUrl: asNullableString(json['clientSignatureUrl']),
       signedAt: signedAt,
+      clientSignedAt: clientSignedAt,
       signedByWorkerId: rawSignedByWorkerId is num
           ? rawSignedByWorkerId.toInt()
           : null,

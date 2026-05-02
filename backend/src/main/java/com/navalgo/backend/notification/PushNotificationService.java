@@ -3,17 +3,25 @@ package com.navalgo.backend.notification;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 @Service
 @Transactional(readOnly = true)
 public class PushNotificationService {
+
+    private static final Logger log = LoggerFactory.getLogger(PushNotificationService.class);
 
     private final FirebasePushGateway firebasePushGateway;
     private final WorkerPushTokenRepository workerPushTokenRepository;
@@ -46,6 +54,12 @@ public class PushNotificationService {
         entity.setActive(true);
         entity.setLastSeenAt(now);
         workerPushTokenRepository.save(entity);
+        log.info(
+                "Push token registrado. workerId={}, platform={}, token={}",
+                worker.getId(),
+                entity.getPlatform(),
+                maskToken(normalizedToken)
+        );
     }
 
     @Transactional
@@ -57,6 +71,12 @@ public class PushNotificationService {
                     token.setActive(false);
                     token.setLastSeenAt(Instant.now());
                     workerPushTokenRepository.save(token);
+                    log.info(
+                            "Push token desactivado. workerId={}, platform={}, token={}",
+                            worker.getId(),
+                            token.getPlatform(),
+                            maskToken(token.getToken())
+                    );
                 });
     }
 
@@ -69,6 +89,7 @@ public class PushNotificationService {
                              Long notificationId) {
         List<WorkerPushToken> activeTokens = workerPushTokenRepository.findByWorkerIdAndActiveTrue(workerId);
         if (activeTokens.isEmpty()) {
+            log.info("No hay push tokens activos para workerId={}", workerId);
             return;
         }
 
@@ -89,6 +110,58 @@ public class PushNotificationService {
             invalidEntity.setLastSeenAt(now);
         }
         workerPushTokenRepository.saveAll(invalidEntities);
+        log.warn("Firebase marco {} token(s) invalidos para workerId={}", invalidEntities.size(), workerId);
+    }
+
+    public PushDebugStatusDto getDebugStatus() {
+        FirebasePushGateway.FirebasePushDebugDto firebase = firebasePushGateway.debugStatus();
+        List<WorkerPushToken> activeTokens = workerPushTokenRepository.findByActiveTrueOrderByLastSeenAtDesc();
+        Map<String, Integer> countsByPlatform = new TreeMap<>();
+        for (WorkerPushToken token : activeTokens) {
+            countsByPlatform.merge(normalizePlatform(token.getPlatform()), 1, Integer::sum);
+        }
+
+        List<PushDebugPlatformCountDto> platformCounts = countsByPlatform.entrySet().stream()
+                .map(entry -> new PushDebugPlatformCountDto(entry.getKey(), entry.getValue()))
+                .toList();
+
+        return new PushDebugStatusDto(
+                firebase.enabled(),
+                firebase.credentialSource(),
+                firebase.credentialsReadable(),
+                firebase.initializationAttempted(),
+                firebase.initialized(),
+                firebase.lastInitializationAttemptAt(),
+                firebase.lastInitializationSuccessAt(),
+                firebase.lastInitializationError(),
+                firebase.lastSendAttemptAt(),
+                firebase.lastSendSuccessAt(),
+                firebase.lastSendError(),
+                firebase.lastRequestedTokenCount(),
+                firebase.lastInvalidTokenCount(),
+                activeTokens.size(),
+                platformCounts
+        );
+    }
+
+    public List<PushDebugTokenDto> listDebugTokens() {
+        List<WorkerPushToken> tokens = workerPushTokenRepository.findByActiveTrueOrderByLastSeenAtDesc();
+        List<PushDebugTokenDto> result = new ArrayList<>();
+        for (WorkerPushToken token : tokens) {
+            Worker worker = token.getWorker();
+            result.add(new PushDebugTokenDto(
+                    worker.getId(),
+                    worker.getFullName(),
+                    worker.getEmail(),
+                    normalizePlatform(token.getPlatform()),
+                    token.isActive(),
+                    maskToken(token.getToken()),
+                    token.getCreatedAt(),
+                    token.getLastSeenAt()
+            ));
+        }
+        result.sort(Comparator.comparing(PushDebugTokenDto::lastSeenAt, Comparator.nullsLast(Comparator.reverseOrder())));
+        return result;
     }
 
     private Worker requireWorker(String email) {
@@ -101,5 +174,15 @@ public class PushNotificationService {
             return "UNKNOWN";
         }
         return platform.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String maskToken(String token) {
+        if (token == null || token.isBlank()) {
+            return "";
+        }
+        if (token.length() <= 12) {
+            return token;
+        }
+        return token.substring(0, 6) + "..." + token.substring(token.length() - 6);
     }
 }

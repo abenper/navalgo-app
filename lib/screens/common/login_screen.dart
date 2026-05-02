@@ -8,6 +8,7 @@ import 'package:navalgo/theme/navalgo_theme.dart';
 import 'package:navalgo/utils/app_toast.dart';
 import 'package:navalgo/viewmodels/login_view_model.dart';
 import 'package:navalgo/viewmodels/session_view_model.dart';
+import 'package:navalgo/widgets/navalgo_logo.dart';
 
 import '../admin/admin_shell_screen.dart';
 import '../worker/worker_shell_screen.dart';
@@ -416,20 +417,21 @@ class _BrandMark extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 72,
-        height: 72,
         decoration: BoxDecoration(
-          gradient: NavalgoColors.heroGradient,
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: NavalgoColors.deepSea.withValues(alpha: 0.18),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
+              color: NavalgoColors.deepSea.withValues(alpha: 0.14),
+              blurRadius: 28,
+              offset: const Offset(0, 14),
             ),
           ],
         ),
-        child: const Icon(Icons.navigation, color: Colors.white, size: 32),
+        child: const NavalgoLogo(
+          variant: NavalgoLogoVariant.colorBadge,
+          width: 96,
+          height: 96,
+        ),
       ),
     );
   }

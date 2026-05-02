@@ -133,6 +133,59 @@ class WorkOrderMediaService {
 
   /// Sign a work order: sends the drawn signature + optional proof attachments.
   /// Works from both web and mobile (no platform restriction).
+  Future<WorkOrder> uploadClientSignature(
+    String token, {
+    required int workOrderId,
+    required String signatureFileName,
+    required List<int> signatureBytes,
+    required String signatureMimeType,
+    double? latitude,
+    double? longitude,
+  }) async {
+    await _ensureSessionIsValid(token);
+
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/work-orders/$workOrderId/client-signature',
+    );
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token';
+
+    if (latitude != null) request.fields['latitude'] = latitude.toString();
+    if (longitude != null) request.fields['longitude'] = longitude.toString();
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'signatureFile',
+        signatureBytes,
+        filename: signatureFileName,
+        contentType: _parseMediaType(signatureMimeType),
+      ),
+    );
+
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final sessionError = await ApiClient.maybeHandleSessionExpired(
+        token: token,
+        statusCode: response.statusCode,
+      );
+      if (sessionError != null) {
+        throw sessionError;
+      }
+
+      throw Exception(
+        'Error guardando firma de cliente (${response.statusCode}): ${response.body}',
+      );
+    }
+
+    return WorkOrder.fromJson(
+      jsonDecode(response.body) as Map<String, dynamic>,
+    );
+  }
+
+  /// Sign a work order: sends the drawn signature + optional proof attachments.
+  /// Works from both web and mobile (no platform restriction).
   Future<WorkOrder> signWorkOrder(
     String token, {
     required int workOrderId,

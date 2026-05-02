@@ -18,6 +18,7 @@ public record UpdateWorkOrderRequest(
         WorkOrderStatus status,
         LocalDate closeDueDate,
         Boolean clearSignature,
+        Boolean clearClientSignature,
         @DecimalMin(value = "0.0", inclusive = true) BigDecimal laborHours,
         Long materialTemplateId,
         Boolean clearMaterialChecklist,

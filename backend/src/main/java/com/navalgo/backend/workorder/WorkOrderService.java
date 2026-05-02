@@ -252,6 +252,17 @@ public class WorkOrderService {
             workOrder.setSignedByWorker(null);
         }
 
+        if (Boolean.TRUE.equals(request.clearClientSignature())) {
+            if (!canAdvancedEdit) {
+                throw new AccessDeniedException("No tienes permiso para borrar la firma de cliente de este parte");
+            }
+            if (workOrder.getClientSignatureUrl() != null && !workOrder.getClientSignatureUrl().isBlank()) {
+                workOrderMediaService.deleteByPublicUrl(workOrder.getClientSignatureUrl());
+            }
+            workOrder.setClientSignatureUrl(null);
+            workOrder.setClientSignedAt(null);
+        }
+
         if (request.materialTemplateId() != null) {
             if (!admin) {
                 throw new AccessDeniedException("Solo un administrador puede asignar plantillas de material");
@@ -504,6 +515,9 @@ public class WorkOrderService {
         if (workOrder.getSignatureUrl() != null && !workOrder.getSignatureUrl().isBlank()) {
             mediaUrls.add(workOrder.getSignatureUrl());
         }
+        if (workOrder.getClientSignatureUrl() != null && !workOrder.getClientSignatureUrl().isBlank()) {
+            mediaUrls.add(workOrder.getClientSignatureUrl());
+        }
         for (WorkOrderAttachment att : workOrder.getAttachments()) {
             mediaUrls.add(att.getFileUrl());
         }
@@ -542,6 +556,7 @@ public class WorkOrderService {
                 || request.vesselId() != null
                 || request.workerIds() != null
                 || Boolean.TRUE.equals(request.clearSignature())
+                || Boolean.TRUE.equals(request.clearClientSignature())
                 || request.materialTemplateId() != null
                 || Boolean.TRUE.equals(request.clearMaterialChecklist());
     }
@@ -639,7 +654,9 @@ public class WorkOrderService {
                 w.getCloseDueDate(),
                 w.getCreatedAt(),
                 w.getSignatureUrl(),
+                w.getClientSignatureUrl(),
                 w.getSignedAt(),
+                w.getClientSignedAt(),
                 w.getSignedByWorker() != null ? w.getSignedByWorker().getId() : null,
                 w.getSignedByWorker() != null ? w.getSignedByWorker().getFullName() : null
         );
@@ -693,6 +710,32 @@ public class WorkOrderService {
         }
 
         return toDto(workOrderRepository.save(workOrder));
+    }
+
+    @Transactional
+    public WorkOrderDto saveClientSignature(Long id,
+                                            UploadedAttachmentDto clientSignature,
+                                            String signerEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+
+        Worker signer = requireWorkerByEmail(signerEmail);
+        if (!isAdmin(signer) && !isAssignedToWorkOrder(signer, workOrder)) {
+            throw new AccessDeniedException("Solo puedes registrar la firma de cliente en partes que tienes asignados");
+        }
+
+        String previousClientSignatureUrl = workOrder.getClientSignatureUrl();
+        workOrder.setClientSignatureUrl(clientSignature.fileUrl());
+        workOrder.setClientSignedAt(Instant.now());
+
+        WorkOrder saved = workOrderRepository.save(workOrder);
+        if (previousClientSignatureUrl != null
+                && !previousClientSignatureUrl.isBlank()
+                && !previousClientSignatureUrl.equals(clientSignature.fileUrl())) {
+            workOrderMediaService.deleteByPublicUrl(previousClientSignatureUrl);
+        }
+
+        return toDto(saved);
     }
 
     private WorkOrderChecklist requireMaterialChecklist(WorkOrder workOrder) {

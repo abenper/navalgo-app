@@ -67,9 +67,13 @@ class PushNotificationService {
     _notificationApi = notificationApi;
     _refreshNotifications = refreshNotifications;
     _authToken = currentAuthToken;
+    debugPrint(
+      'Push syncSession authChanged: previous=${_maskToken(previousAuthToken)} current=${_maskToken(currentAuthToken)}',
+    );
 
     await _ensureInitialized();
     if (!_firebaseAvailable) {
+      debugPrint('Push unavailable: Firebase no inicializado en cliente.');
       return;
     }
 
@@ -110,10 +114,10 @@ class PushNotificationService {
         );
       }
 
-      await _messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
+      await _messaging.requestPermission(alert: true, badge: true, sound: true);
+      final settings = await _messaging.getNotificationSettings();
+      debugPrint(
+        'Push permission status: ${settings.authorizationStatus.name}',
       );
 
       if (!kIsWeb) {
@@ -127,27 +131,38 @@ class PushNotificationService {
       _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
         unawaited(_handleForegroundMessage(message));
       });
-      _messageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((_) {
+      _messageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
+        message,
+      ) {
+        debugPrint(
+          'Push messageOpenedApp notificationId=${message.messageId} data=${message.data}',
+        );
         final refreshNotifications = _refreshNotifications;
         if (refreshNotifications != null) {
           unawaited(refreshNotifications());
         }
       });
       _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((token) {
-        unawaited(
-          _registerCurrentToken(explicitToken: token, force: true),
-        );
+        debugPrint('Push token refreshed: ${_maskToken(token)}');
+        unawaited(_registerCurrentToken(explicitToken: token, force: true));
       });
 
       _firebaseAvailable = true;
+      debugPrint('Push Firebase inicializado correctamente en cliente.');
     } on UnsupportedError {
       _firebaseAvailable = false;
-    } catch (_) {
+      debugPrint('Push Firebase no soportado en esta plataforma.');
+    } catch (error, stackTrace) {
       _firebaseAvailable = false;
+      debugPrint('Push Firebase init failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    debugPrint(
+      'Push foreground message id=${message.messageId} title=${message.notification?.title} data=${message.data}',
+    );
     final refreshNotifications = _refreshNotifications;
     if (refreshNotifications != null) {
       await refreshNotifications();
@@ -201,14 +216,20 @@ class PushNotificationService {
       return;
     }
 
-    final pushToken = explicitToken ??
+    final pushToken =
+        explicitToken ??
         await _messaging.getToken(
           vapidKey: kIsWeb ? _firebaseWebVapidKey : null,
         );
     if (pushToken == null || pushToken.isEmpty) {
+      debugPrint('Push getToken devolvio null o vacio.');
       return;
     }
+    debugPrint(
+      'Push token obtenido para ${_platformLabel()}: ${_maskToken(pushToken)}',
+    );
     if (!force && pushToken == _registeredPushToken) {
+      debugPrint('Push token ya estaba registrado, se reutiliza.');
       return;
     }
 
@@ -219,7 +240,11 @@ class PushNotificationService {
         platform: _platformLabel(),
       );
       _registeredPushToken = pushToken;
-    } catch (_) {}
+      debugPrint('Push token registrado en backend correctamente.');
+    } catch (error, stackTrace) {
+      debugPrint('Push token register failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _unregisterPushToken(String? authToken) async {
@@ -240,7 +265,11 @@ class PushNotificationService {
         authToken,
         pushToken: registeredPushToken,
       );
-    } catch (_) {}
+      debugPrint('Push token desregistrado del backend.');
+    } catch (error, stackTrace) {
+      debugPrint('Push token unregister failed: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   String _platformLabel() {
@@ -261,5 +290,15 @@ class PushNotificationService {
       case TargetPlatform.fuchsia:
         return 'FUCHSIA';
     }
+  }
+
+  String _maskToken(String? value) {
+    if (value == null || value.isEmpty) {
+      return '';
+    }
+    if (value.length <= 12) {
+      return value;
+    }
+    return '${value.substring(0, 6)}...${value.substring(value.length - 6)}';
   }
 }

@@ -21,3 +21,9 @@ ALTER TABLE vessels
 
 ALTER TABLE vessels
     ADD COLUMN IF NOT EXISTS gearbox_serial_numbers VARCHAR(1000);
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS client_signature_url VARCHAR(2000);
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS client_signed_at TIMESTAMP WITH TIME ZONE;

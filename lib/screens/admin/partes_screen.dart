@@ -24,6 +24,7 @@ import '../../viewmodels/fleet_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/work_orders_view_model.dart';
 import '../../viewmodels/workers_view_model.dart';
+import '../../widgets/work_order_attachment_preview_dialog.dart';
 import '../../widgets/navalgo_ui.dart';
 import 'material_templates_screen.dart';
 
@@ -798,7 +799,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   bool _signing = false;
   bool _hasMaterialDraft = false;
   late final SignatureController _sigController;
+  late final SignatureController _clientSigController;
   final GlobalKey _signaturePadKey = GlobalKey();
+  final GlobalKey _clientSignaturePadKey = GlobalKey();
   final WorkOrderMaterialDraftStore _materialDraftStore =
       WorkOrderMaterialDraftStore();
   late final TextEditingController _observationsCtrl;
@@ -819,6 +822,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       penColor: Colors.black,
       exportBackgroundColor: Colors.white,
     );
+    _clientSigController = SignatureController(
+      penStrokeWidth: 3,
+      penColor: Colors.black,
+      exportBackgroundColor: Colors.white,
+    );
     _observationsCtrl = TextEditingController();
     _laborHoursCtrl = TextEditingController();
     _syncWorkInputsFromWorkOrder();
@@ -831,6 +839,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   void dispose() {
     _workOrderRefreshTimer?.cancel();
     _sigController.dispose();
+    _clientSigController.dispose();
     _observationsCtrl.dispose();
     _laborHoursCtrl.dispose();
     for (final controller in _engineHoursControllers.values) {
@@ -848,7 +857,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   bool get _canReviewMaterial => _isAdmin || _isWorker;
   bool get _isSigned =>
       _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
+  bool get _hasClientSignature =>
+      _workOrder.clientSignatureUrl != null &&
+      _workOrder.clientSignatureUrl!.isNotEmpty;
   bool get _canSign => (_isWorker || _isAdmin) && !_isSigned;
+  bool get _canManageClientSignature => _isWorker || _isAdmin;
 
   bool get _canDeleteMedia {
     if (_isAdmin || _canEditPart) {
@@ -965,6 +978,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
           _buildWorkLogSection(),
           const SizedBox(height: 16),
           _buildMaterialSection(),
+          const SizedBox(height: 16),
+          _buildClientSignatureSection(),
           const SizedBox(height: 16),
           _buildSignatureSection(),
         ],
@@ -1376,7 +1391,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   Widget _buildSignatureSection() {
     if (_isSigned) {
       return _buildSectionCard(
-        title: 'Firma',
+        title: 'Firma trabajador',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1439,7 +1454,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
 
     if (!_canSign) {
       return _buildSectionCard(
-        title: 'Firma del parte',
+        title: 'Firma trabajador',
         subtitle: 'Este parte todavía no tiene firma registrada.',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1454,7 +1469,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     }
 
     return _buildSectionCard(
-      title: 'Firma y cierre',
+      title: 'Firma trabajador',
       subtitle:
           'Dibuja la firma para cerrar el parte cuando el avance del trabajo ya esté actualizado.',
       child: Column(
@@ -1524,7 +1539,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Las fotos de avance se capturan desde la cámara del móvil y se guardan con ubicación y marca de agua.',
+                      'Los adjuntos de avance se capturan desde la app y se guardan con ubicación y marca de agua.',
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
@@ -1537,7 +1552,15 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                       ? null
                       : _captureWorkProgressPhoto,
                   icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                  label: const Text('Hacer foto'),
+                  label: const Text('Foto'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _busy || _signing
+                      ? null
+                      : _captureWorkProgressVideo,
+                  icon: const Icon(Icons.videocam_outlined, size: 18),
+                  label: const Text('Vídeo'),
                 ),
               ],
             ],
@@ -1547,7 +1570,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                'Las fotos de avance solo pueden capturarse desde la app móvil para evitar adjuntos externos.',
+                'Los adjuntos de avance solo pueden capturarse desde la app móvil para evitar archivos externos.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.storm),
@@ -1565,6 +1588,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     (item) => Card(
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
+                        onTap: () => _previewAttachment(item),
                         leading: Container(
                           width: 42,
                           height: 42,
@@ -1585,8 +1609,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                           spacing: 4,
                           children: [
                             IconButton(
-                              onPressed: () => _openExternal(item.fileUrl),
-                              icon: const Icon(Icons.open_in_new),
+                              onPressed: () => _previewAttachment(item),
+                              icon: const Icon(Icons.visibility_outlined),
                             ),
                             if (_canDeleteMedia)
                               IconButton(
@@ -1607,11 +1631,121 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     );
   }
 
+  Widget _buildClientSignatureSection() {
+    if (_hasClientSignature) {
+      return _buildSectionCard(
+        title: 'Firma de cliente',
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (_workOrder.clientSignedAt != null)
+              _InfoTile(
+                icon: Icons.event_available_outlined,
+                label: 'Fecha',
+                value: _formatHumanDate(_workOrder.clientSignedAt!),
+              ),
+            if (_workOrder.clientSignedAt != null) const SizedBox(height: 10),
+            AspectRatio(
+              aspectRatio: 3.4,
+              child: Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.grey.shade300),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.network(
+                  resolveMediaUrl(_workOrder.clientSignatureUrl),
+                  headers: buildMediaHeaders(
+                    context.read<SessionViewModel>().token,
+                  ),
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, _, _) =>
+                      const Center(child: Text('No se pudo cargar la firma')),
+                ),
+              ),
+            ),
+            if (_canEditPart) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _busy || _signing ? null : _clearClientSignature,
+                icon: const Icon(Icons.delete_outline),
+                label: const Text('Borrar firma'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: NavalgoColors.coral,
+                ),
+              ),
+            ],
+          ],
+        ),
+      );
+    }
+
+    if (!_canManageClientSignature) {
+      return _buildSectionCard(
+        title: 'Firma de cliente',
+        child: Text('Pendiente', style: Theme.of(context).textTheme.bodyMedium),
+      );
+    }
+
+    return _buildSectionCard(
+      title: 'Firma de cliente',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            key: _clientSignaturePadKey,
+            height: 180,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(14),
+              color: Colors.white,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Signature(
+                controller: _clientSigController,
+                backgroundColor: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _busy || _signing ? null : _clientSigController.clear,
+              icon: const Icon(Icons.clear, size: 18),
+              label: const Text('Borrar trazo'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          NavalgoGradientButton(
+            label: _busy ? 'Guardando...' : 'Guardar firma de cliente',
+            icon: _busy ? null : Icons.draw_outlined,
+            onPressed: _busy || _signing ? null : _submitClientSignature,
+            expand: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _previewAttachment(WorkOrderAttachmentItem item) async {
+    await showWorkOrderAttachmentPreviewDialog(
+      context: context,
+      attachment: item,
+      authToken: context.read<SessionViewModel>().token,
+    );
+  }
+
   Future<void> _openExternal(String url) async {
-    final resolvedUrl = resolveMediaUrl(url);
+    final rawUrl = url.trim();
+    final resolvedUrl = resolveMediaUrl(rawUrl);
+    final targetUrl = rawUrl.isNotEmpty ? rawUrl : resolvedUrl;
     final opened = await launchUrl(
-      Uri.parse(resolvedUrl.isEmpty ? url : resolvedUrl),
-      mode: LaunchMode.externalApplication,
+      Uri.parse(targetUrl),
+      mode: kIsWeb
+          ? LaunchMode.platformDefault
+          : LaunchMode.externalApplication,
     );
     if (!opened && mounted) {
       AppToast.error(context, 'No se pudo abrir el archivo.');
@@ -2059,7 +2193,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     if (kIsWeb && !_isMobileWebDevice(context)) {
       AppToast.warning(
         context,
-        'Las fotos de avance solo se pueden capturar desde la app móvil o desde la web abierta en un móvil.',
+        'Los adjuntos de avance solo se pueden capturar desde la app móvil o desde la web abierta en un móvil.',
       );
       return;
     }
@@ -2132,6 +2266,83 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     }
   }
 
+  Future<void> _captureWorkProgressVideo() async {
+    if (kIsWeb && !_isMobileWebDevice(context)) {
+      AppToast.warning(
+        context,
+        'Los vídeos de avance solo se pueden capturar desde la app móvil o desde la web abierta en un móvil.',
+      );
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    final mediaService = context.read<WorkOrderMediaService>();
+    if (token == null) {
+      return;
+    }
+
+    final position = await _getRequiredAttachmentPosition();
+    if (position == null) {
+      return;
+    }
+
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickVideo(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.rear,
+        maxDuration: const Duration(minutes: 3),
+      );
+      if (picked == null) {
+        return;
+      }
+
+      final bytes = await picked.readAsBytes();
+      final mime = picked.mimeType ?? _guessMimeType(picked.name);
+      final capturedAt = DateTime.now().toUtc();
+
+      setState(() => _busy = true);
+      final updated = await mediaService.attachToWorkOrder(
+        token,
+        workOrderId: _workOrder.id,
+        fileName: picked.name.isEmpty
+            ? 'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.mp4'
+            : picked.name,
+        bytes: bytes,
+        mimeType: mime,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        capturedAt: capturedAt,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _updateWorkOrder(updated, syncInputs: false);
+      });
+      AppToast.success(context, 'Vídeo de avance guardado.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      final error = '$e';
+      if (error.contains('camera_access_denied') ||
+          error.contains('permission') ||
+          error.contains('photo_access_denied')) {
+        AppToast.error(
+          context,
+          'No se pudo abrir la cámara. Revisa los permisos de cámara y ubicación del dispositivo.',
+        );
+        return;
+      }
+      AppToast.error(context, 'No se pudo subir el vídeo de avance: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   Future<Position?> _getRequiredAttachmentPosition() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -2139,7 +2350,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         if (mounted) {
           AppToast.warning(
             context,
-            'Activa la ubicación del dispositivo para adjuntar fotos de avance.',
+            'Activa la ubicación del dispositivo para adjuntar multimedia de avance.',
           );
         }
         return null;
@@ -2156,7 +2367,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         if (mounted) {
           AppToast.warning(
             context,
-            'La ubicación es obligatoria para guardar fotos de avance con metadatos y marca de agua.',
+            'La ubicación es obligatoria para guardar multimedia de avance con metadatos y marca de agua.',
           );
         }
         return null;
@@ -2174,9 +2385,107 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     }
   }
 
+  Future<Position?> _getOptionalSignaturePosition() async {
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        return null;
+      }
+      return await Geolocator.getCurrentPosition();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<List<int>> _exportSignatureBytes({
+    required SignatureController controller,
+    required GlobalKey signaturePadKey,
+  }) async {
+    final renderObject = signaturePadKey.currentContext?.findRenderObject();
+    final signatureSize = renderObject is RenderBox ? renderObject.size : null;
+    final exportScale = MediaQuery.of(context).devicePixelRatio.clamp(2.5, 4.0);
+    final exportWidth = signatureSize == null
+        ? 1600
+        : (signatureSize.width * exportScale).round();
+    final exportHeight = signatureSize == null
+        ? 720
+        : (signatureSize.height * exportScale).round();
+    final signatureBytes = await controller.toPngBytes(
+      width: exportWidth,
+      height: exportHeight,
+    );
+    if (signatureBytes == null) {
+      throw Exception('No se pudo exportar la firma');
+    }
+    return signatureBytes;
+  }
+
+  Future<void> _submitClientSignature() async {
+    if (!_clientSigController.isNotEmpty) {
+      AppToast.warning(context, 'Dibuja la firma de cliente antes de guardar.');
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() => _busy = true);
+
+    final mediaService = context.read<WorkOrderMediaService>();
+    try {
+      final signatureBytes = await _exportSignatureBytes(
+        controller: _clientSigController,
+        signaturePadKey: _clientSignaturePadKey,
+      );
+      final position = await _getOptionalSignaturePosition();
+
+      final updated = await mediaService.uploadClientSignature(
+        token,
+        workOrderId: _workOrder.id,
+        signatureFileName: 'firma_cliente_parte_${_workOrder.id}.png',
+        signatureBytes: signatureBytes,
+        signatureMimeType: 'image/png',
+        latitude: position?.latitude,
+        longitude: position?.longitude,
+      );
+
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _clientSigController.clear();
+        _updateWorkOrder(updated, syncInputs: false);
+      });
+      AppToast.success(context, 'Firma de cliente guardada.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo guardar la firma de cliente: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
   Future<void> _submitInlineSignature() async {
     if (!_sigController.isNotEmpty) {
       AppToast.warning(context, 'Dibuja tu firma antes de enviar.');
+      return;
+    }
+
+    final confirmClose = await showDialog<bool>(
+      context: context,
+      builder: (_) => const NavalgoConfirmDialog(
+        title: 'Cerrar parte',
+        message: 'Si firmas el parte, el parte se cerrará. ¿Quieres continuar?',
+        confirmLabel: 'Firmar y cerrar',
+        icon: Icons.warning_amber_rounded,
+      ),
+    );
+    if (!mounted || confirmClose != true) {
       return;
     }
 
@@ -2230,6 +2539,22 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       }
     }
 
+    if (!_hasClientSignature) {
+      final continueWithoutClientSignature = await showDialog<bool>(
+        context: context,
+        builder: (_) => const NavalgoConfirmDialog(
+          title: 'Falta firma de cliente',
+          message:
+              'Este parte no tiene firma de cliente. ¿Quieres cerrarlo igualmente?',
+          confirmLabel: 'Cerrar igualmente',
+          icon: Icons.border_color_outlined,
+        ),
+      );
+      if (!mounted || continueWithoutClientSignature != true) {
+        return;
+      }
+    }
+
     final token = context.read<SessionViewModel>().token;
     if (token == null) {
       return;
@@ -2239,33 +2564,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
 
     final mediaService = context.read<WorkOrderMediaService>();
     try {
-      final renderObject = _signaturePadKey.currentContext?.findRenderObject();
-      final signatureSize = renderObject is RenderBox
-          ? renderObject.size
-          : null;
-      final exportScale = MediaQuery.of(
-        context,
-      ).devicePixelRatio.clamp(2.5, 4.0);
-      final exportWidth = signatureSize == null
-          ? 1600
-          : (signatureSize.width * exportScale).round();
-      final exportHeight = signatureSize == null
-          ? 720
-          : (signatureSize.height * exportScale).round();
-      final signatureBytes = await _sigController.toPngBytes(
-        width: exportWidth,
-        height: exportHeight,
+      final signatureBytes = await _exportSignatureBytes(
+        controller: _sigController,
+        signaturePadKey: _signaturePadKey,
       );
-      if (signatureBytes == null) {
-        throw Exception('No se pudo exportar la firma');
-      }
-
-      Position? position;
-      try {
-        if (await Geolocator.isLocationServiceEnabled()) {
-          position = await Geolocator.getCurrentPosition();
-        }
-      } catch (_) {}
+      final position = await _getOptionalSignaturePosition();
 
       await mediaService.signWorkOrder(
         token,
@@ -2394,6 +2697,38 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         return;
       }
       AppToast.error(context, 'No se pudo eliminar el parte: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
+
+  Future<void> _clearClientSignature() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      final updated = await context.read<WorkOrderService>().updateWorkOrder(
+        token,
+        workOrderId: _workOrder.id,
+        clearClientSignature: true,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _updateWorkOrder(updated, syncInputs: false);
+      });
+      AppToast.success(context, 'Firma de cliente eliminada.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo borrar la firma de cliente: $e');
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -2591,6 +2926,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         return 'image/png';
       case 'mov':
         return 'video/quicktime';
+      case 'avi':
+        return 'video/x-msvideo';
+      case 'webm':
+        return 'video/webm';
+      case 'm4v':
       case 'mp4':
       default:
         return 'video/mp4';

@@ -75,7 +75,13 @@ public class WorkOrder {
     @Column(length = 2000)
     private String signatureUrl;
 
+    @Column(name = "client_signature_url", length = 2000)
+    private String clientSignatureUrl;
+
     private Instant signedAt;
+
+    @Column(name = "client_signed_at")
+    private Instant clientSignedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "signed_by_worker_id")
@@ -139,8 +145,14 @@ public class WorkOrder {
     public String getSignatureUrl() { return signatureUrl; }
     public void setSignatureUrl(String signatureUrl) { this.signatureUrl = signatureUrl; }
 
+    public String getClientSignatureUrl() { return clientSignatureUrl; }
+    public void setClientSignatureUrl(String clientSignatureUrl) { this.clientSignatureUrl = clientSignatureUrl; }
+
     public Instant getSignedAt() { return signedAt; }
     public void setSignedAt(Instant signedAt) { this.signedAt = signedAt; }
+
+    public Instant getClientSignedAt() { return clientSignedAt; }
+    public void setClientSignedAt(Instant clientSignedAt) { this.clientSignedAt = clientSignedAt; }
 
     public Worker getSignedByWorker() { return signedByWorker; }
     public void setSignedByWorker(Worker signedByWorker) { this.signedByWorker = signedByWorker; }

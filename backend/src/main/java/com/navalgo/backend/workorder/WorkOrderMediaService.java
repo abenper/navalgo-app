@@ -94,6 +94,19 @@ public class WorkOrderMediaService {
             false, true, basePath + "/firma", false);
     }
 
+    public UploadedAttachmentDto uploadClientSignature(MultipartFile file,
+                                                       Double latitude,
+                                                       Double longitude,
+                                                       Instant capturedAt,
+                                                       String uploaderEmail,
+                                                       String ownerName,
+                                                       String vesselName,
+                                                       LocalDate workOrderDate) {
+        String basePath = buildWorkOrderBasePath(ownerName, vesselName, workOrderDate);
+        return uploadMedia(file, latitude, longitude, capturedAt, uploaderEmail,
+                false, true, basePath + "/firma-cliente", false);
+    }
+
     public UploadedAttachmentDto uploadProfilePhoto(MultipartFile file,
                                                     String uploaderEmail) {
         uploadValidationService.validateProfilePhoto(file);

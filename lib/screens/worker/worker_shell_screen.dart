@@ -8,6 +8,7 @@ import '../../utils/app_toast.dart';
 import '../../utils/media_url.dart';
 import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
+import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../admin/partes_screen.dart';
 import '../common/login_screen.dart';
@@ -606,13 +607,23 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                           child: Container(
                             width: 52,
                             height: 52,
+                            padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
-                              gradient: NavalgoColors.heroGradient,
-                              borderRadius: BorderRadius.circular(18),
-                            ),
-                            child: const Icon(
-                              Icons.navigation,
                               color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: NavalgoColors.border),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: NavalgoColors.deepSea.withValues(
+                                    alpha: 0.08,
+                                  ),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: const NavalgoLogo(
+                              variant: NavalgoLogoVariant.colorBadge,
                             ),
                           ),
                         ),
