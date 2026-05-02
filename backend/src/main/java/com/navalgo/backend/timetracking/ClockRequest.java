@@ -7,6 +7,8 @@ import java.time.Instant;
 public record ClockRequest(
         @NotNull Long workerId,
         TimeEntryWorkSite workSite,
-        Instant plannedClockOut
+        Instant plannedClockOut,
+        Double latitude,
+        Double longitude
 ) {
 }

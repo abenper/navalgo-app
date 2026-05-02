@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/time_adjustment_request.dart';
@@ -153,11 +154,17 @@ class _FichajeScreenState extends State<FichajeScreen> {
         if (!mounted || clockInInput == null) {
           return;
         }
+        final position = await _requireClockInPosition();
+        if (!mounted || position == null) {
+          return;
+        }
         await timeTrackingService.clockIn(
           token,
           workerId: workerId,
           workSite: clockInInput.workSite,
           plannedClockOut: clockInInput.plannedClockOut,
+          latitude: position.latitude,
+          longitude: position.longitude,
         );
       }
       await _loadEntries();
@@ -478,6 +485,57 @@ class _FichajeScreenState extends State<FichajeScreen> {
   Duration _durationForEntry(TimeEntry entry) {
     final out = entry.clockOut?.toLocal() ?? DateTime.now();
     return out.difference(entry.clockIn.toLocal());
+  }
+
+  Future<Position?> _requireClockInPosition() async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Activa la ubicación del dispositivo para fichar.'),
+          ),
+        );
+      }
+      return null;
+    }
+
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Debes permitir la ubicación para fichar.'),
+          ),
+        );
+      }
+      return null;
+    }
+
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 12),
+        ),
+      );
+    } catch (_) {
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo obtener la ubicación del fichaje.'),
+          ),
+        );
+      }
+      return null;
+    }
   }
 
   Future<_ClockInInput?> _selectClockInInput() async {

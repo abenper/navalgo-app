@@ -40,5 +40,11 @@ ALTER TABLE time_entries
 ALTER TABLE time_entries
     ADD COLUMN IF NOT EXISTS auto_close_reason VARCHAR(40);
 
+ALTER TABLE time_entries
+    ADD COLUMN IF NOT EXISTS clock_in_latitude DOUBLE PRECISION;
+
+ALTER TABLE time_entries
+    ADD COLUMN IF NOT EXISTS clock_in_longitude DOUBLE PRECISION;
+
 ALTER TABLE workers
     ADD COLUMN IF NOT EXISTS last_missing_clock_in_reminder_date DATE;

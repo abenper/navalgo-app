@@ -35,6 +35,10 @@ public class TimeEntry {
     @Column(length = 40)
     private TimeEntryAutoCloseReason autoCloseReason;
 
+    private Double clockInLatitude;
+
+    private Double clockInLongitude;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -63,4 +67,10 @@ public class TimeEntry {
     public void setAutoCloseReason(TimeEntryAutoCloseReason autoCloseReason) {
         this.autoCloseReason = autoCloseReason;
     }
+
+    public Double getClockInLatitude() { return clockInLatitude; }
+    public void setClockInLatitude(Double clockInLatitude) { this.clockInLatitude = clockInLatitude; }
+
+    public Double getClockInLongitude() { return clockInLongitude; }
+    public void setClockInLongitude(Double clockInLongitude) { this.clockInLongitude = clockInLongitude; }
 }

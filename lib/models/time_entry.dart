@@ -9,6 +9,8 @@ class TimeEntry {
     this.plannedClockOut,
     this.autoClosedAt,
     this.autoCloseReason,
+    this.clockInLatitude,
+    this.clockInLongitude,
   });
 
   final int id;
@@ -20,8 +22,20 @@ class TimeEntry {
   final DateTime? plannedClockOut;
   final DateTime? autoClosedAt;
   final String? autoCloseReason;
+  final double? clockInLatitude;
+  final double? clockInLongitude;
 
   factory TimeEntry.fromJson(Map<String, dynamic> json) {
+    double? parseDouble(dynamic value) {
+      if (value == null) {
+        return null;
+      }
+      if (value is num) {
+        return value.toDouble();
+      }
+      return double.tryParse('$value');
+    }
+
     return TimeEntry(
       id: json['id'] as int,
       workerId: json['workerId'] as int,
@@ -38,6 +52,8 @@ class TimeEntry {
           ? null
           : DateTime.parse(json['autoClosedAt'] as String),
       autoCloseReason: json['autoCloseReason'] as String?,
+      clockInLatitude: parseDouble(json['clockInLatitude']),
+      clockInLongitude: parseDouble(json['clockInLongitude']),
     );
   }
 }

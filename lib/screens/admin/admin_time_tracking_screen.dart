@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/time_entry.dart';
 import '../../models/worker_profile.dart';
@@ -166,39 +167,56 @@ class _WorkerJornadaAdjustmentScreenState
     final token = context.read<SessionViewModel>().token;
     final photoUrl = resolveMediaUrl(widget.worker.photoUrl);
 
-    return NavalgoPageIntro(
-      eyebrow: 'JORNADA Y RENDIMIENTO',
-      title: widget.worker.fullName,
-      subtitle:
-          'Vista operativa para entender productividad, control de cierres y ajustar jornadas cuando haga falta.',
-      trailing: compact
-          ? null
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _QualityGauge(score: insight.qualityScore, color: scoreColor),
-                const SizedBox(width: 18),
-                _WorkerPhotoCard(photoUrl: photoUrl, token: token),
-              ],
-            ),
-      footer: compact
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+    return NavalgoPanel(
+      padding: const EdgeInsets.all(22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          compact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _QualityGauge(score: insight.qualityScore, color: scoreColor),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: _WorkerPhotoCard(photoUrl: photoUrl, token: token),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _WorkerPhotoCard(photoUrl: photoUrl, token: token),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _WorkerIdentityBlock(worker: widget.worker),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _QualityGauge(
+                      score: insight.qualityScore,
+                      color: scoreColor,
+                      compact: true,
+                    ),
+                  ],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _WorkerPhotoCard(photoUrl: photoUrl, token: token),
+                        const SizedBox(width: 18),
+                        _WorkerIdentityBlock(worker: widget.worker),
+                      ],
+                    ),
+                    const Spacer(),
+                    _QualityGauge(
+                      score: insight.qualityScore,
+                      color: scoreColor,
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                _buildHeroPills(insight),
-              ],
-            )
-          : _buildHeroPills(insight),
+          const SizedBox(height: 18),
+          _buildHeroPills(insight),
+        ],
+      ),
     );
   }
 
@@ -219,12 +237,6 @@ class _WorkerJornadaAdjustmentScreenState
               ? NavalgoColors.coral
               : NavalgoColors.kelp,
         ),
-        NavalgoStatusChip(
-          label: widget.worker.speciality?.trim().isNotEmpty == true
-              ? widget.worker.speciality!
-              : 'Sin especialidad',
-          color: NavalgoColors.harbor,
-        ),
       ],
     );
   }
@@ -233,11 +245,7 @@ class _WorkerJornadaAdjustmentScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const NavalgoSectionHeader(
-          title: 'Calidad del trabajador',
-          subtitle:
-              'La media combina ausencias no vacacionales, partes resueltos por hora, disciplina de cierre y firmas completas.',
-        ),
+        const NavalgoSectionHeader(title: 'Calidad'),
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -248,28 +256,24 @@ class _WorkerJornadaAdjustmentScreenState
               value: _formatMinutes(insight.workedMinutesToday),
               icon: const Icon(Icons.today_outlined),
               accent: NavalgoColors.tide,
-              note: 'Sesión actual del día',
             ),
             NavalgoMetricCard(
               label: 'Horas este mes',
               value: _formatMinutes(insight.workedMinutesThisMonth),
               icon: const Icon(Icons.calendar_view_month_rounded),
               accent: NavalgoColors.harbor,
-              note: 'Carga acumulada del mes',
             ),
             NavalgoMetricCard(
               label: 'Horas este año',
               value: _formatMinutes(insight.workedMinutesThisYear),
               icon: const Icon(Icons.calendar_month_rounded),
               accent: NavalgoColors.kelp,
-              note: 'Ritmo global anual',
             ),
             NavalgoMetricCard(
               label: 'Ausencias no vacacionales',
               value: '${insight.approvedNonVacationAbsenceDaysThisYear}',
               icon: const Icon(Icons.event_busy_outlined),
               accent: NavalgoColors.coral,
-              note: 'No cuenta vacaciones',
             ),
           ],
         ),
@@ -326,11 +330,7 @@ class _WorkerJornadaAdjustmentScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const NavalgoSectionHeader(
-          title: 'Partes y horas',
-          subtitle:
-              'Aquí ves cuántos partes resuelve y cuánto tiempo le cuesta resolverlos según las jornadas registradas.',
-        ),
+        const NavalgoSectionHeader(title: 'Partes y horas'),
         const SizedBox(height: 12),
         NavalgoPanel(
           child: SingleChildScrollView(
@@ -417,13 +417,13 @@ class _WorkerPhotoCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasPhoto = photoUrl.isNotEmpty;
     return Container(
-      width: 132,
-      height: 132,
+      width: 128,
+      height: 128,
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: NavalgoColors.foam,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+        border: Border.all(color: NavalgoColors.border),
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
@@ -441,33 +441,43 @@ class _WorkerPhotoCard extends StatelessWidget {
 
   Widget _fallback() {
     return Container(
-      color: Colors.white.withValues(alpha: 0.12),
-      child: const Icon(Icons.person_outline_rounded, size: 56, color: Colors.white),
+      color: NavalgoColors.mist,
+      child: const Icon(
+        Icons.person_outline_rounded,
+        size: 56,
+        color: NavalgoColors.tide,
+      ),
     );
   }
 }
 
 class _QualityGauge extends StatelessWidget {
-  const _QualityGauge({required this.score, required this.color});
+  const _QualityGauge({
+    required this.score,
+    required this.color,
+    this.compact = false,
+  });
 
   final double score;
   final Color color;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
+    final size = compact ? 118.0 : 132.0;
     return SizedBox(
-      width: 132,
-      height: 132,
+      width: size,
+      height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
           SizedBox(
-            width: 132,
-            height: 132,
+            width: size,
+            height: size,
             child: CircularProgressIndicator(
               value: (score.clamp(0, 100)) / 100,
               strokeWidth: 12,
-              backgroundColor: Colors.white.withValues(alpha: 0.14),
+              backgroundColor: NavalgoColors.border,
               valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
@@ -476,8 +486,8 @@ class _QualityGauge extends StatelessWidget {
             children: [
               Text(
                 score.toStringAsFixed(0),
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: NavalgoColors.deepSea,
                   fontWeight: FontWeight.w900,
                 ),
               ),
@@ -485,13 +495,46 @@ class _QualityGauge extends StatelessWidget {
               Text(
                 'Calidad',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: Colors.white.withValues(alpha: 0.78),
+                  color: NavalgoColors.storm,
                 ),
               ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+class _WorkerIdentityBlock extends StatelessWidget {
+  const _WorkerIdentityBlock({required this.worker});
+
+  final WorkerProfile worker;
+
+  @override
+  Widget build(BuildContext context) {
+    final speciality = worker.speciality?.trim();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          worker.fullName,
+          style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+            color: NavalgoColors.deepSea,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          (speciality == null || speciality.isEmpty)
+              ? 'Sin especialidad'
+              : speciality,
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: NavalgoColors.storm,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -507,6 +550,8 @@ class _TimeEntryAdminCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasLocation =
+        entry.clockInLatitude != null && entry.clockInLongitude != null;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -542,14 +587,36 @@ class _TimeEntryAdminCard extends StatelessWidget {
                         'Cierre previsto: ${_formatHour(entry.plannedClockOut!)}',
                       ),
                     ],
+                    if (hasLocation) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'GPS: ${entry.clockInLatitude!.toStringAsFixed(5)}, ${entry.clockInLongitude!.toStringAsFixed(5)}',
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Ajustar'),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: onEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Ajustar'),
+                  ),
+                  if (hasLocation) ...[
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => _openClockInLocation(
+                        entry.clockInLatitude!,
+                        entry.clockInLongitude!,
+                      ),
+                      icon: const Icon(Icons.location_on_outlined),
+                      label: const Text('Abrir ubicación'),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -877,4 +944,11 @@ String _absenceComparisonLabel(double percent) {
     return '${percent.toStringAsFixed(0)}% más ausencias que la media';
   }
   return '${percent.abs().toStringAsFixed(0)}% menos ausencias que la media';
+}
+
+Future<void> _openClockInLocation(double latitude, double longitude) async {
+  final uri = Uri.parse(
+    'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude',
+  );
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
 }

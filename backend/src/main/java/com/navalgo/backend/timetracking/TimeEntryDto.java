@@ -11,7 +11,9 @@ public record TimeEntryDto(
         TimeEntryWorkSite workSite,
         Instant plannedClockOut,
         Instant autoClosedAt,
-        TimeEntryAutoCloseReason autoCloseReason
+        TimeEntryAutoCloseReason autoCloseReason,
+        Double clockInLatitude,
+        Double clockInLongitude
 ) {
     public static TimeEntryDto from(TimeEntry entry) {
         return new TimeEntryDto(
@@ -23,7 +25,9 @@ public record TimeEntryDto(
                 entry.getWorkSite(),
                 entry.getPlannedClockOut(),
                 entry.getAutoClosedAt(),
-                entry.getAutoCloseReason()
+                entry.getAutoCloseReason(),
+                entry.getClockInLatitude(),
+                entry.getClockInLongitude()
         );
     }
 }

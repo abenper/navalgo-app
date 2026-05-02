@@ -28,7 +28,13 @@ public class TimeTrackingController {
     public ResponseEntity<TimeEntryDto> clockIn(@RequestBody @Valid ClockRequest request,
                                                 Authentication authentication) {
         validateWorkerScope(request.workerId(), authentication);
-        return ResponseEntity.ok(service.clockIn(request.workerId(), request.workSite(), request.plannedClockOut()));
+        return ResponseEntity.ok(service.clockIn(
+                request.workerId(),
+                request.workSite(),
+                request.plannedClockOut(),
+                request.latitude(),
+                request.longitude()
+        ));
     }
 
     @PostMapping("/clock-out")

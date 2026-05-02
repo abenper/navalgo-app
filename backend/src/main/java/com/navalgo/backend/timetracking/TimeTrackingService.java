@@ -49,7 +49,11 @@ public class TimeTrackingService {
     }
 
     @Transactional
-    public TimeEntryDto clockIn(Long workerId, TimeEntryWorkSite workSite, Instant plannedClockOut) {
+    public TimeEntryDto clockIn(Long workerId,
+                                TimeEntryWorkSite workSite,
+                                Instant plannedClockOut,
+                                Double latitude,
+                                Double longitude) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
 
@@ -64,12 +68,15 @@ public class TimeTrackingService {
 
         Instant now = Instant.now();
         validatePlannedClockOut(now, plannedClockOut);
+        validateClockInLocation(latitude, longitude);
 
         TimeEntry entry = new TimeEntry();
         entry.setWorker(worker);
         entry.setClockIn(now);
         entry.setWorkSite(workSite);
         entry.setPlannedClockOut(plannedClockOut);
+        entry.setClockInLatitude(latitude);
+        entry.setClockInLongitude(longitude);
 
         return TimeEntryDto.from(timeEntryRepository.save(entry));
     }
@@ -468,6 +475,18 @@ public class TimeTrackingService {
         }
         if (plannedClockOut != null && plannedClockOut.isBefore(clockIn)) {
             throw new IllegalArgumentException("La hora prevista de cierre no puede ser anterior a la entrada");
+        }
+    }
+
+    private void validateClockInLocation(Double latitude, Double longitude) {
+        if (latitude == null || longitude == null) {
+            throw new IllegalArgumentException("Debes permitir la ubicacion para fichar");
+        }
+        if (latitude < -90.0 || latitude > 90.0) {
+            throw new IllegalArgumentException("La latitud del fichaje no es valida");
+        }
+        if (longitude < -180.0 || longitude > 180.0) {
+            throw new IllegalArgumentException("La longitud del fichaje no es valida");
         }
     }
 

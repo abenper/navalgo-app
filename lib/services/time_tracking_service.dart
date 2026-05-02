@@ -21,6 +21,8 @@ class TimeTrackingService {
     required int workerId,
     required String workSite,
     DateTime? plannedClockOut,
+    required double latitude,
+    required double longitude,
   }) async {
     final data = await _apiClient.post(
       '/time-entries/clock-in',
@@ -29,6 +31,8 @@ class TimeTrackingService {
         'workerId': workerId,
         'workSite': workSite,
         'plannedClockOut': plannedClockOut?.toUtc().toIso8601String(),
+        'latitude': latitude,
+        'longitude': longitude,
       },
     );
     return TimeEntry.fromJson(data as Map<String, dynamic>);
