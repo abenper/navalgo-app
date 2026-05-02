@@ -33,6 +33,8 @@ public class FirebasePushGateway {
 
     private static final Logger log = LoggerFactory.getLogger(FirebasePushGateway.class);
     private static final String APP_NAME = "navalgo-backend";
+    private static final String GOOGLE_APPLICATION_CREDENTIALS_ENV = "GOOGLE_APPLICATION_CREDENTIALS";
+    private static final Path DEFAULT_DOCKER_SECRET_PATH = Path.of("/run/secrets/firebase-admin.json");
 
     private final FirebasePushProperties properties;
 
@@ -107,7 +109,7 @@ public class FirebasePushGateway {
     }
 
     private FirebaseApp resolveApp() {
-        if (!properties.isConfigured()) {
+        if (!properties.isEnabled()) {
             return null;
         }
 
@@ -154,6 +156,13 @@ public class FirebasePushGateway {
         }
         if (properties.getServiceAccountPath() != null && !properties.getServiceAccountPath().isBlank()) {
             return Files.newInputStream(Path.of(properties.getServiceAccountPath().trim()));
+        }
+        String googleApplicationCredentials = System.getenv(GOOGLE_APPLICATION_CREDENTIALS_ENV);
+        if (googleApplicationCredentials != null && !googleApplicationCredentials.isBlank()) {
+            return Files.newInputStream(Path.of(googleApplicationCredentials.trim()));
+        }
+        if (Files.exists(DEFAULT_DOCKER_SECRET_PATH)) {
+            return Files.newInputStream(DEFAULT_DOCKER_SECRET_PATH);
         }
         return null;
     }

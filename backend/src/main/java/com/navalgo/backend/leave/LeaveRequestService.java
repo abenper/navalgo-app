@@ -144,7 +144,7 @@ public class LeaveRequestService {
         long accrued = calculateAccruedDays(worker);
         long bonus = calculateTravelBonusDays(worker.getId());
         long consumed = calculateConsumedDays(worker.getId(), null);
-        long available = Math.max(0L, accrued + bonus - consumed);
+        long available = accrued + bonus - consumed;
 
         return new LeaveBalanceDto(
                 worker.getId(),
@@ -251,16 +251,6 @@ public class LeaveRequestService {
 
         if (!isVacationReason(reason)) {
             return;
-        }
-
-        long requested = ChronoUnit.DAYS.between(startDate, endDate) + 1;
-        long accrued = calculateAccruedDays(worker);
-        long bonus = calculateTravelBonusDays(worker.getId());
-        long consumed = calculateConsumedDays(worker.getId(), excludeRequestId);
-        long available = accrued + bonus - consumed;
-
-        if (requested > available) {
-            throw new IllegalArgumentException("No tienes días disponibles suficientes para esta solicitud de vacaciones");
         }
     }
 

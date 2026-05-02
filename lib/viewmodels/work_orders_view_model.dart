@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../models/work_order.dart';
 import '../services/work_order_service.dart';
@@ -15,6 +16,8 @@ class WorkOrdersViewModel extends ChangeNotifier {
   final SessionViewModel _session;
 
   bool _isLoading = false;
+  bool _isDisposed = false;
+  bool _notificationScheduled = false;
   String? _error;
   List<WorkOrder> _workOrders = <WorkOrder>[];
 
@@ -22,17 +25,49 @@ class WorkOrdersViewModel extends ChangeNotifier {
   String? get error => _error;
   List<WorkOrder> get workOrders => _workOrders;
 
+  void _notifyListenersSafely() {
+    if (_isDisposed) {
+      return;
+    }
+
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.idle ||
+        phase == SchedulerPhase.postFrameCallbacks) {
+      notifyListeners();
+      return;
+    }
+
+    if (_notificationScheduled) {
+      return;
+    }
+
+    _notificationScheduled = true;
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      _notificationScheduled = false;
+      if (_isDisposed) {
+        return;
+      }
+      notifyListeners();
+    });
+  }
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
   Future<void> loadWorkOrders({int? workerId}) async {
     final token = _session.token;
     if (token == null || token.isEmpty) {
       _error = 'No hay sesion activa.';
-      notifyListeners();
+      _notifyListenersSafely();
       return;
     }
 
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    _notifyListenersSafely();
 
     try {
       _workOrders = await _workOrderService.getWorkOrders(
@@ -44,7 +79,7 @@ class WorkOrdersViewModel extends ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
-      notifyListeners();
+      _notifyListenersSafely();
     }
   }
 
@@ -55,7 +90,7 @@ class WorkOrdersViewModel extends ChangeNotifier {
     final token = _session.token;
     if (token == null || token.isEmpty) {
       _error = 'No hay sesion activa.';
-      notifyListeners();
+      _notifyListenersSafely();
       return;
     }
 
@@ -68,10 +103,10 @@ class WorkOrdersViewModel extends ChangeNotifier {
       _workOrders = _workOrders
           .map((item) => item.id == workOrderId ? updated : item)
           .toList();
-      notifyListeners();
+      _notifyListenersSafely();
     } catch (e) {
       _error = e.toString();
-      notifyListeners();
+      _notifyListenersSafely();
     }
   }
 }
