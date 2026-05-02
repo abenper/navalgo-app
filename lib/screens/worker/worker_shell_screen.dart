@@ -624,6 +624,8 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                             ),
                             child: const NavalgoLogo(
                               variant: NavalgoLogoVariant.colorBadge,
+                              width: 40,
+                              height: 40,
                             ),
                           ),
                         ),

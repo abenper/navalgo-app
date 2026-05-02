@@ -18,11 +18,22 @@ class NavalgoLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final cacheWidth = width == null
+        ? null
+        : (width! * devicePixelRatio).round();
+    final cacheHeight = height == null
+        ? null
+        : (height! * devicePixelRatio).round();
+
     return Image.asset(
       _assetForVariant(variant),
       width: width,
       height: height,
       fit: fit,
+      cacheWidth: cacheWidth,
+      cacheHeight: cacheHeight,
+      isAntiAlias: true,
       filterQuality: FilterQuality.high,
       semanticLabel: 'NavalGO',
     );

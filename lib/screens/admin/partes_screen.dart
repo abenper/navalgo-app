@@ -1405,22 +1405,27 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                 value: _formatHumanDate(_workOrder.signedAt!),
               ),
             const SizedBox(height: 10),
-            AspectRatio(
-              aspectRatio: 3.4,
+            SizedBox(
+              height: 180,
+              width: double.infinity,
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: Image.network(
-                  resolveMediaUrl(_workOrder.signatureUrl),
-                  headers: buildMediaHeaders(
-                    context.read<SessionViewModel>().token,
+                child: Center(
+                  child: Image.network(
+                    resolveMediaUrl(_workOrder.signatureUrl),
+                    headers: buildMediaHeaders(
+                      context.read<SessionViewModel>().token,
+                    ),
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, _, _) => const Center(
+                      child: Text('No se pudo cargar la firma'),
+                    ),
                   ),
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) =>
-                      const Center(child: Text('No se pudo cargar la firma')),
                 ),
               ),
             ),
@@ -1643,22 +1648,27 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                 value: _formatHumanDate(_workOrder.clientSignedAt!),
               ),
             if (_workOrder.clientSignedAt != null) const SizedBox(height: 10),
-            AspectRatio(
-              aspectRatio: 3.4,
+            SizedBox(
+              height: 180,
+              width: double.infinity,
               child: Container(
                 decoration: BoxDecoration(
                   border: Border.all(color: Colors.grey.shade300),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 clipBehavior: Clip.antiAlias,
-                child: Image.network(
-                  resolveMediaUrl(_workOrder.clientSignatureUrl),
-                  headers: buildMediaHeaders(
-                    context.read<SessionViewModel>().token,
+                child: Center(
+                  child: Image.network(
+                    resolveMediaUrl(_workOrder.clientSignatureUrl),
+                    headers: buildMediaHeaders(
+                      context.read<SessionViewModel>().token,
+                    ),
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (_, _, _) => const Center(
+                      child: Text('No se pudo cargar la firma'),
+                    ),
                   ),
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) =>
-                      const Center(child: Text('No se pudo cargar la firma')),
                 ),
               ),
             ),
@@ -2400,9 +2410,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }) async {
     final renderObject = signaturePadKey.currentContext?.findRenderObject();
     final signatureSize = renderObject is RenderBox ? renderObject.size : null;
-    final exportScale = MediaQuery.of(context).devicePixelRatio.clamp(2.5, 4.0);
+    final exportScale = MediaQuery.of(context).devicePixelRatio.clamp(3.0, 5.0);
     final exportWidth = signatureSize == null
-        ? 1600
+        ? 1800
         : (signatureSize.width * exportScale).round();
     final exportHeight = signatureSize == null
         ? 720

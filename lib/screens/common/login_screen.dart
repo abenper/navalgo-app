@@ -429,8 +429,8 @@ class _BrandMark extends StatelessWidget {
         ),
         child: const NavalgoLogo(
           variant: NavalgoLogoVariant.colorBadge,
-          width: 96,
-          height: 96,
+          width: 104,
+          height: 104,
         ),
       ),
     );

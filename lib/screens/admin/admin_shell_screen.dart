@@ -646,6 +646,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                             ),
                             child: const NavalgoLogo(
                               variant: NavalgoLogoVariant.colorBadge,
+                              width: 40,
+                              height: 40,
                             ),
                           ),
                         ),
