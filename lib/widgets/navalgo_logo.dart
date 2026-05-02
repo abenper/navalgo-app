@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/navalgo_theme.dart';
+
 enum NavalgoLogoVariant { icon, horizontal, stacked, colorBadge }
 
 class NavalgoLogo extends StatelessWidget {
@@ -25,6 +27,46 @@ class NavalgoLogo extends StatelessWidget {
     final cacheHeight = height == null
         ? null
         : (height! * devicePixelRatio).round();
+    if (variant == NavalgoLogoVariant.colorBadge) {
+      final resolvedWidth = width ?? height ?? 64;
+      final resolvedHeight = height ?? width ?? resolvedWidth;
+      final iconPadding = (resolvedWidth * 0.16).clamp(6.0, 20.0);
+      return SizedBox(
+        width: resolvedWidth,
+        height: resolvedHeight,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: NavalgoColors.heroGradient,
+            borderRadius: BorderRadius.circular(resolvedWidth * 0.28),
+            boxShadow: [
+              BoxShadow(
+                color: NavalgoColors.deepSea.withValues(alpha: 0.10),
+                blurRadius: resolvedWidth * 0.18,
+                offset: Offset(0, resolvedWidth * 0.08),
+              ),
+            ],
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(iconPadding),
+            child: ColorFiltered(
+              colorFilter: const ColorFilter.mode(
+                Colors.white,
+                BlendMode.srcIn,
+              ),
+              child: Image.asset(
+                _assetForVariant(NavalgoLogoVariant.icon),
+                fit: BoxFit.contain,
+                cacheWidth: cacheWidth,
+                cacheHeight: cacheHeight,
+                isAntiAlias: true,
+                filterQuality: FilterQuality.high,
+                semanticLabel: 'NavalGO',
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Image.asset(
       _assetForVariant(variant),

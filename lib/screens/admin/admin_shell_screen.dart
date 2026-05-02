@@ -10,9 +10,9 @@ import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
+import 'admin_time_tracking_screen.dart';
 import 'push_debug_screen.dart';
 import '../common/login_screen.dart';
-import '../worker/fichaje_screen.dart';
 import '../worker/vacaciones_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'equipo_screen.dart';
@@ -38,7 +38,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     const MaterialTemplatesScreen(),
     const FlotaScreen(),
     const EquipoScreen(),
-    const FichajeScreen(),
+    const AdminTimeTrackingScreen(),
     const AusenciasScreen(),
     const PushDebugScreen(),
   ];

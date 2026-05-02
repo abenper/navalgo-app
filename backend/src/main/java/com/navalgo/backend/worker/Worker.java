@@ -43,6 +43,8 @@ public class Worker {
     @Column(length = 1000)
     private String photoUrl;
 
+    private LocalDate lastMissingClockInReminderDate;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -75,4 +77,9 @@ public class Worker {
 
     public String getPhotoUrl() { return photoUrl; }
     public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+
+    public LocalDate getLastMissingClockInReminderDate() { return lastMissingClockInReminderDate; }
+    public void setLastMissingClockInReminderDate(LocalDate lastMissingClockInReminderDate) {
+        this.lastMissingClockInReminderDate = lastMissingClockInReminderDate;
+    }
 }

@@ -28,7 +28,7 @@ public class TimeTrackingController {
     public ResponseEntity<TimeEntryDto> clockIn(@RequestBody @Valid ClockRequest request,
                                                 Authentication authentication) {
         validateWorkerScope(request.workerId(), authentication);
-        return ResponseEntity.ok(service.clockIn(request.workerId(), request.workSite()));
+        return ResponseEntity.ok(service.clockIn(request.workerId(), request.workSite(), request.plannedClockOut()));
     }
 
     @PostMapping("/clock-out")
@@ -51,6 +51,19 @@ public class TimeTrackingController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TodayClockedWorkersSummaryDto> todaySummary() {
         return ResponseEntity.ok(service.getTodaySummary());
+    }
+
+    @GetMapping("/admin/worker-stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<WorkerTimeTrackingStatsDto>> workerStats() {
+        return ResponseEntity.ok(service.getWorkerStats());
+    }
+
+    @PatchMapping("/{entryId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<TimeEntryDto> updateEntry(@PathVariable Long entryId,
+                                                    @RequestBody @Valid UpdateTimeEntryRequest request) {
+        return ResponseEntity.ok(service.updateEntry(entryId, request));
     }
 
     private void validateWorkerScope(Long targetWorkerId, Authentication authentication) {

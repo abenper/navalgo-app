@@ -20,11 +20,16 @@ class TimeTrackingService {
     String token, {
     required int workerId,
     required String workSite,
+    DateTime? plannedClockOut,
   }) async {
     final data = await _apiClient.post(
       '/time-entries/clock-in',
       headers: {'Authorization': 'Bearer $token'},
-      body: {'workerId': workerId, 'workSite': workSite},
+      body: {
+        'workerId': workerId,
+        'workSite': workSite,
+        'plannedClockOut': plannedClockOut?.toUtc().toIso8601String(),
+      },
     );
     return TimeEntry.fromJson(data as Map<String, dynamic>);
   }
@@ -60,6 +65,41 @@ class TimeTrackingService {
       headers: {'Authorization': 'Bearer $token'},
     );
     return TodayClockedWorkersSummary.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<List<WorkerTimeTrackingStats>> getWorkerStats(String token) async {
+    final data = await _apiClient.get(
+      '/time-entries/admin/worker-stats',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    if (data is! List) {
+      return <WorkerTimeTrackingStats>[];
+    }
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(WorkerTimeTrackingStats.fromJson)
+        .toList();
+  }
+
+  Future<TimeEntry> updateTimeEntry(
+    String token, {
+    required int entryId,
+    required DateTime clockIn,
+    DateTime? clockOut,
+    DateTime? plannedClockOut,
+    required String workSite,
+  }) async {
+    final data = await _apiClient.patch(
+      '/time-entries/$entryId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'clockIn': clockIn.toUtc().toIso8601String(),
+        'clockOut': clockOut?.toUtc().toIso8601String(),
+        'plannedClockOut': plannedClockOut?.toUtc().toIso8601String(),
+        'workSite': workSite,
+      },
+    );
+    return TimeEntry.fromJson(data as Map<String, dynamic>);
   }
 
   Future<List<TimeAdjustmentRequest>> getAdjustmentRequests(

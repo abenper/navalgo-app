@@ -9,4 +9,5 @@ import java.util.Optional;
 public interface WorkerRepository extends JpaRepository<Worker, Long> {
     Optional<Worker> findByEmailIgnoreCase(String email);
     List<Worker> findByRoleAndActiveTrue(Role role);
+    List<Worker> findByRoleAndActiveTrueOrderByFullNameAsc(Role role);
 }

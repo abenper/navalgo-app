@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:signature/signature.dart';
@@ -1479,7 +1481,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            key: _signaturePadKey,
             height: 180,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey.shade300),
@@ -1488,9 +1489,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: Signature(
-                controller: _sigController,
-                backgroundColor: Colors.white,
+              child: RepaintBoundary(
+                key: _signaturePadKey,
+                child: Signature(
+                  controller: _sigController,
+                  backgroundColor: Colors.white,
+                ),
               ),
             ),
           ),
@@ -1701,7 +1705,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            key: _clientSignaturePadKey,
             height: 180,
             decoration: BoxDecoration(
               border: Border.all(color: Colors.grey.shade300),
@@ -1710,9 +1713,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(14),
-              child: Signature(
-                controller: _clientSigController,
-                backgroundColor: Colors.white,
+              child: RepaintBoundary(
+                key: _clientSignaturePadKey,
+                child: Signature(
+                  controller: _clientSigController,
+                  backgroundColor: Colors.white,
+                ),
               ),
             ),
           ),
@@ -2408,19 +2414,19 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     required SignatureController controller,
     required GlobalKey signaturePadKey,
   }) async {
-    final renderObject = signaturePadKey.currentContext?.findRenderObject();
-    final signatureSize = renderObject is RenderBox ? renderObject.size : null;
-    final exportScale = MediaQuery.of(context).devicePixelRatio.clamp(3.0, 5.0);
-    final exportWidth = signatureSize == null
-        ? 1800
-        : (signatureSize.width * exportScale).round();
-    final exportHeight = signatureSize == null
-        ? 720
-        : (signatureSize.height * exportScale).round();
-    final signatureBytes = await controller.toPngBytes(
-      width: exportWidth,
-      height: exportHeight,
-    );
+    final boundary =
+        signaturePadKey.currentContext?.findRenderObject()
+            as RenderRepaintBoundary?;
+    if (boundary == null) {
+      throw Exception('No se pudo localizar el lienzo de firma');
+    }
+
+    final exportScale = kIsWeb
+        ? 1.5
+        : MediaQuery.of(context).devicePixelRatio.clamp(2.0, 3.0);
+    final image = await boundary.toImage(pixelRatio: exportScale);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final signatureBytes = bytes?.buffer.asUint8List();
     if (signatureBytes == null) {
       throw Exception('No se pudo exportar la firma');
     }

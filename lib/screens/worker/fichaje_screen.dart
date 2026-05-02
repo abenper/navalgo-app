@@ -149,14 +149,15 @@ class _FichajeScreenState extends State<FichajeScreen> {
       if (_isPunchedIn) {
         await timeTrackingService.clockOut(token, workerId: workerId);
       } else {
-        final workSite = await _selectWorkSite();
-        if (!mounted || workSite == null) {
+        final clockInInput = await _selectClockInInput();
+        if (!mounted || clockInInput == null) {
           return;
         }
         await timeTrackingService.clockIn(
           token,
           workerId: workerId,
-          workSite: workSite,
+          workSite: clockInInput.workSite,
+          plannedClockOut: clockInInput.plannedClockOut,
         );
       }
       await _loadEntries();
@@ -447,6 +448,12 @@ class _FichajeScreenState extends State<FichajeScreen> {
                     value: _workSiteLabel(activeEntry.workSite),
                     icon: Icons.place_outlined,
                   ),
+                if (activeEntry?.plannedClockOut != null)
+                  _ClockInfoPill(
+                    label: 'Cierre previsto',
+                    value: _fmtHour(activeEntry!.plannedClockOut!),
+                    icon: Icons.alarm_on_outlined,
+                  ),
                 _ClockInfoPill(
                   label: 'Registros recientes',
                   value: '${_entries.length}',
@@ -473,116 +480,12 @@ class _FichajeScreenState extends State<FichajeScreen> {
     return out.difference(entry.clockIn.toLocal());
   }
 
-  Future<String?> _selectWorkSite() async {
-    return showModalBottomSheet<String>(
+  Future<_ClockInInput?> _selectClockInInput() async {
+    return showModalBottomSheet<_ClockInInput>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (sheetContext) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: NavalgoColors.heroGradient,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '¿Dónde comienza la jornada?',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Selecciona si el fichaje de hoy corresponde a taller o a viaje.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Colors.white.withValues(alpha: 0.82),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ..._clockWorkSiteOptions.map(
-                  (option) => Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: _buildWorkSiteAction(
-                      context: sheetContext,
-                      option: option,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildWorkSiteAction({
-    required BuildContext context,
-    required _ClockWorkSiteOption option,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: () => Navigator.of(context).pop(option.value),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: option.accent.withValues(alpha: 0.06),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: option.accent.withValues(alpha: 0.14)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: option.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(option.icon, color: option.accent),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      option.title,
-                      style: const TextStyle(fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      option.subtitle,
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 16,
-                color: option.accent,
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (_) => _ClockInSheet(options: _clockWorkSiteOptions),
     );
   }
 
@@ -1295,6 +1198,255 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _ClockInInput {
+  const _ClockInInput({
+    required this.workSite,
+    this.plannedClockOut,
+  });
+
+  final String workSite;
+  final DateTime? plannedClockOut;
+}
+
+class _ClockInSheet extends StatefulWidget {
+  const _ClockInSheet({required this.options});
+
+  final List<_ClockWorkSiteOption> options;
+
+  @override
+  State<_ClockInSheet> createState() => _ClockInSheetState();
+}
+
+class _ClockInSheetState extends State<_ClockInSheet> {
+  String? _selectedWorkSite;
+  TimeOfDay? _plannedClockOutTime;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedWorkSite = widget.options.firstOrNull?.value;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: NavalgoColors.heroGradient,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '¿Dónde comienza la jornada?',
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Marca el tipo de jornada y, si lo sabes, la hora aproximada a la que terminarás.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.82),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...widget.options.map(
+              (option) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ClockWorkSiteSelector(
+                  option: option,
+                  selected: option.value == _selectedWorkSite,
+                  onTap: () {
+                    setState(() {
+                      _selectedWorkSite = option.value;
+                    });
+                  },
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.alarm_on_outlined),
+              title: const Text('Hora prevista de cierre'),
+              subtitle: Text(
+                _plannedClockOutTime == null
+                    ? 'Opcional, para autocerrar la jornada'
+                    : _plannedClockOutTime!.format(context),
+              ),
+              trailing: _plannedClockOutTime == null
+                  ? const Icon(Icons.edit_outlined)
+                  : IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _plannedClockOutTime = null;
+                        });
+                      },
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+              onTap: () async {
+                final picked = await showTimePicker(
+                  context: context,
+                  initialTime: _plannedClockOutTime ??
+                      const TimeOfDay(hour: 17, minute: 0),
+                );
+                if (!mounted || picked == null) {
+                  return;
+                }
+                setState(() {
+                  _plannedClockOutTime = picked;
+                  _error = null;
+                });
+              },
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _error!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _selectedWorkSite == null ? null : _submit,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: const Text('Iniciar jornada'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final selectedWorkSite = _selectedWorkSite;
+    if (selectedWorkSite == null) {
+      return;
+    }
+
+    DateTime? plannedClockOut;
+    if (_plannedClockOutTime != null) {
+      final now = DateTime.now();
+      plannedClockOut = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        _plannedClockOutTime!.hour,
+        _plannedClockOutTime!.minute,
+      );
+      if (!plannedClockOut.isAfter(now)) {
+        setState(() {
+          _error =
+              'La hora prevista debe ser posterior a la hora actual para hoy.';
+        });
+        return;
+      }
+    }
+
+    Navigator.of(context).pop(
+      _ClockInInput(
+        workSite: selectedWorkSite,
+        plannedClockOut: plannedClockOut,
+      ),
+    );
+  }
+}
+
+class _ClockWorkSiteSelector extends StatelessWidget {
+  const _ClockWorkSiteSelector({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _ClockWorkSiteOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: selected
+                ? option.accent.withValues(alpha: 0.12)
+                : option.accent.withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: selected
+                  ? option.accent.withValues(alpha: 0.32)
+                  : option.accent.withValues(alpha: 0.14),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: option.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(option.icon, color: option.accent),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      option.title,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      option.subtitle,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                selected
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off_outlined,
+                color: option.accent,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

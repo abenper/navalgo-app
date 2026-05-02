@@ -64,3 +64,6 @@ app:
     service-account-json: ${APP_FIREBASE_SERVICE_ACCOUNT_JSON:}
   scheduling:
     work-order-close-reminders-cron: ${APP_SCHEDULING_WORK_ORDER_CLOSE_REMINDERS_CRON:0 0 9 * * *}
+    time-tracking-missing-clock-in-cron: ${APP_SCHEDULING_TIME_TRACKING_MISSING_CLOCK_IN_CRON:0 0 8 * * MON-FRI}
+    time-tracking-open-shift-reminder-cron: ${APP_SCHEDULING_TIME_TRACKING_OPEN_SHIFT_REMINDER_CRON:0 0 16 * * MON-FRI}
+    time-tracking-auto-close-cron: ${APP_SCHEDULING_TIME_TRACKING_AUTO_CLOSE_CRON:0 */5 * * * *}
