@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../firebase_options.dart';
+import '../utils/browser_notification.dart';
 import 'notification_service.dart';
 
 // VAPID public key from Firebase Console > Project Settings > Cloud Messaging
@@ -119,6 +120,11 @@ class PushNotificationService {
       debugPrint(
         'Push permission status: ${settings.authorizationStatus.name}',
       );
+      if (kIsWeb) {
+        debugPrint(
+          'Push browser notification permission: ${browserNotificationPermissionStatus()}',
+        );
+      }
 
       if (!kIsWeb) {
         await _messaging.setForegroundNotificationPresentationOptions(
@@ -168,16 +174,19 @@ class PushNotificationService {
       await refreshNotifications();
     }
 
-    // On web the browser surfaces foreground messages itself when the SW is
-    // registered; flutter_local_notifications doesn't support web.
-    if (kIsWeb) {
-      return;
-    }
-
     final notification = message.notification;
     final title = notification?.title ?? message.data['title']?.toString();
     final body = notification?.body ?? message.data['body']?.toString();
     if ((title == null || title.isEmpty) && (body == null || body.isEmpty)) {
+      return;
+    }
+
+    if (kIsWeb) {
+      await showBrowserNotification(
+        title: title ?? 'NavalGO',
+        body: body,
+        tag: message.messageId,
+      );
       return;
     }
 

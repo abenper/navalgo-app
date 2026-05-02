@@ -278,7 +278,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Cancelar vacaciones'),
+        title: const Text('Eliminar solicitud'),
         content: const Text(
           'Esta acción cancelará la solicitud actual. ¿Deseas continuar?',
         ),
@@ -314,7 +314,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         return;
       }
       messenger.showSnackBar(
-        const SnackBar(content: Text('Solicitud cancelada.')),
+        const SnackBar(content: Text('Solicitud eliminada.')),
       );
       await _loadData();
     } catch (e) {
@@ -875,94 +875,107 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     );
   }
 
-  Widget? _buildRequestActionsMenu({
-    required LeaveRequestModel request,
-    required bool workerCanEditOrCancel,
-    required bool adminCanChangeStatus,
-  }) {
-    if (!workerCanEditOrCancel && !adminCanChangeStatus) {
+  List<Widget> _buildAdminRequestActions(LeaveRequestModel request) {
+    final actions = <Widget>[];
+
+    if (request.status == 'PENDING') {
+      actions.add(
+        FilledButton.tonalIcon(
+          onPressed: () => _updateStatus(request.id, 'APPROVED'),
+          icon: const Icon(Icons.check_rounded, size: 18),
+          label: const Text('Aceptar'),
+        ),
+      );
+      actions.add(
+        OutlinedButton.icon(
+          onPressed: () => _updateStatus(request.id, 'REJECTED'),
+          icon: const Icon(Icons.close_rounded, size: 18),
+          label: const Text('Rechazar'),
+        ),
+      );
+    } else if (request.status == 'APPROVED') {
+      actions.add(
+        OutlinedButton.icon(
+          onPressed: () => _updateStatus(request.id, 'PENDING'),
+          icon: const Icon(Icons.hourglass_top_rounded, size: 18),
+          label: const Text('En espera'),
+        ),
+      );
+      actions.add(
+        OutlinedButton.icon(
+          onPressed: () => _updateStatus(request.id, 'REJECTED'),
+          icon: const Icon(Icons.close_rounded, size: 18),
+          label: const Text('Rechazar'),
+        ),
+      );
+    } else if (request.status == 'REJECTED') {
+      actions.add(
+        OutlinedButton.icon(
+          onPressed: () => _updateStatus(request.id, 'PENDING'),
+          icon: const Icon(Icons.hourglass_top_rounded, size: 18),
+          label: const Text('En espera'),
+        ),
+      );
+      actions.add(
+        FilledButton.tonalIcon(
+          onPressed: () => _updateStatus(request.id, 'APPROVED'),
+          icon: const Icon(Icons.check_rounded, size: 18),
+          label: const Text('Aceptar'),
+        ),
+      );
+    } else if (request.status == 'CANCELLED') {
+      actions.add(
+        OutlinedButton.icon(
+          onPressed: () => _updateStatus(request.id, 'PENDING'),
+          icon: const Icon(Icons.hourglass_top_rounded, size: 18),
+          label: const Text('En espera'),
+        ),
+      );
+    }
+
+    actions.add(
+      OutlinedButton.icon(
+        onPressed: request.status == 'CANCELLED'
+            ? null
+            : () => _updateStatus(request.id, 'CANCELLED'),
+        icon: const Icon(Icons.delete_outline_rounded, size: 18),
+        label: const Text('Eliminar'),
+      ),
+    );
+
+    return actions;
+  }
+
+  Widget? _buildWorkerRequestActions(LeaveRequestModel request) {
+    if (_isAdmin) {
       return null;
     }
 
-    return PopupMenuButton<String>(
-      tooltip: 'Acciones',
-      onSelected: (value) {
-        if (value == 'EDIT') {
-          _editRequest(request);
-          return;
-        }
-        if (value == 'CANCEL') {
-          _cancelRequest(request);
-          return;
-        }
-        _updateStatus(request.id, value);
-      },
-      itemBuilder: (_) {
-        final items = <PopupMenuEntry<String>>[];
-        if (workerCanEditOrCancel) {
-          items.add(
-            const PopupMenuItem(
-              value: 'EDIT',
-              child: Text('Editar (volver a pendiente)'),
-            ),
-          );
-          items.add(
-            const PopupMenuItem(
-              value: 'CANCEL',
-              child: Text('Cancelar solicitud'),
-            ),
-          );
-        }
-        if (adminCanChangeStatus) {
-          if (request.status != 'PENDING') {
-            items.add(
-              const PopupMenuItem(
-                value: 'PENDING',
-                child: Text('Marcar pendiente'),
-              ),
-            );
-          }
-          if (request.status != 'APPROVED') {
-            items.add(
-              const PopupMenuItem(
-                value: 'APPROVED',
-                child: Text('Marcar aceptada'),
-              ),
-            );
-          }
-          if (request.status != 'REJECTED') {
-            items.add(
-              const PopupMenuItem(
-                value: 'REJECTED',
-                child: Text('Marcar rechazada'),
-              ),
-            );
-          }
-          if (request.status != 'CANCELLED') {
-            items.add(
-              const PopupMenuItem(
-                value: 'CANCELLED',
-                child: Text('Marcar cancelada'),
-              ),
-            );
-          }
-        }
-        return items;
-      },
-      icon: const Icon(Icons.more_horiz, size: 20),
+    final canEdit = request.status != 'CANCELLED';
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        OutlinedButton.icon(
+          onPressed: canEdit ? () => _editRequest(request) : null,
+          icon: const Icon(Icons.edit_outlined, size: 18),
+          label: const Text('Editar'),
+        ),
+        OutlinedButton.icon(
+          onPressed: canEdit ? () => _cancelRequest(request) : null,
+          icon: const Icon(Icons.delete_outline_rounded, size: 18),
+          label: const Text('Eliminar'),
+        ),
+      ],
     );
   }
 
   Widget _buildRequestCard(LeaveRequestModel req) {
     final color = _statusColor(req.status);
     final statusLabel = _statusLabel(req.status);
-    final workerCanEditOrCancel = !_isAdmin && req.status == 'APPROVED';
-    final adminCanChangeStatus = _isAdmin;
-    final actionsMenu = _buildRequestActionsMenu(
-      request: req,
-      workerCanEditOrCancel: workerCanEditOrCancel,
-      adminCanChangeStatus: adminCanChangeStatus,
-    );
+    final workerActions = _buildWorkerRequestActions(req);
+    final adminActions = _isAdmin ? _buildAdminRequestActions(req) : const <Widget>[];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1000,64 +1013,90 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
 
           return Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: compact
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: color.withValues(alpha: 0.12),
-                            child: Icon(Icons.event_note, color: color),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(child: details),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: NavalgoStatusChip(
-                                label: statusLabel,
-                                color: color,
-                              ),
-                            ),
-                          ),
-                          ...?(actionsMenu == null
-                              ? null
-                              : <Widget>[actionsMenu]),
-                        ],
-                      ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      backgroundColor: color.withValues(alpha: 0.12),
+                      child: Icon(Icons.event_note, color: color),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(child: details),
+                    if (!compact) ...[
+                      const SizedBox(width: 12),
+                      NavalgoStatusChip(label: statusLabel, color: color),
                     ],
-                  )
-                : Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: color.withValues(alpha: 0.12),
-                        child: Icon(Icons.event_note, color: color),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: details),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          NavalgoStatusChip(label: statusLabel, color: color),
-                          ...?(actionsMenu == null
-                              ? null
-                              : <Widget>[actionsMenu]),
-                        ],
-                      ),
-                    ],
+                  ],
+                ),
+                if (compact) ...[
+                  const SizedBox(height: 12),
+                  NavalgoStatusChip(label: statusLabel, color: color),
+                ],
+                if (adminActions.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: adminActions,
                   ),
+                ],
+                if (workerActions != null) ...[
+                  const SizedBox(height: 12),
+                  workerActions,
+                ],
+              ],
+            ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildAdminMobileSummary() {
+    final pendingCount = _requests.where((item) => item.status == 'PENDING').length;
+    final approvedCount = _requests
+        .where((item) => item.status == 'APPROVED')
+        .length;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: NavalgoPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Ausencias del equipo',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'En móvil mostramos las solicitudes directamente en tarjetas para revisar el equipo más rápido.',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                NavalgoStatusChip(
+                  label: 'Pendientes $pendingCount',
+                  color: NavalgoColors.sand,
+                ),
+                NavalgoStatusChip(
+                  label: 'Aceptadas $approvedCount',
+                  color: NavalgoColors.kelp,
+                ),
+                NavalgoStatusChip(
+                  label: 'Total ${_requests.length}',
+                  color: NavalgoColors.tide,
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1114,6 +1153,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final useAdminCardsLayout =
+        _isAdmin && MediaQuery.sizeOf(context).width < 900;
+
     if (_isLoading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -1134,10 +1176,11 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            if (_isAdmin) ...[
+            if (_isAdmin && !useAdminCardsLayout) ...[
               _buildAdminCalendar(),
               const SizedBox(height: 18),
             ],
+            if (useAdminCardsLayout) _buildAdminMobileSummary(),
             if (_balance != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 14),

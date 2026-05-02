@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
 import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 
 import '../models/app_notification.dart';
 import '../services/notification_service.dart';
+import '../utils/browser_notification.dart';
 import 'session_view_model.dart';
 
 class NotificationsViewModel extends ChangeNotifier {
@@ -26,6 +28,8 @@ class NotificationsViewModel extends ChangeNotifier {
   int _unreadCount = 0;
   Timer? _pollTimer;
   String? _lastSessionToken;
+  bool _webNotificationsPrimed = false;
+  final Set<int> _webNotifiedIds = <int>{};
 
   bool get isLoading => _isLoading;
   String? get error => _error;
@@ -66,6 +70,7 @@ class NotificationsViewModel extends ChangeNotifier {
     _error = null;
 
     try {
+      final previousNotifications = _notifications;
       final notifications = await _notificationService.getNotifications(token);
       final unreadCount = await _notificationService.getUnreadCount(token);
       final changed =
@@ -73,6 +78,10 @@ class NotificationsViewModel extends ChangeNotifier {
           _unreadCount != unreadCount ||
           _error != null ||
           _isLoading;
+      _showWebNotificationFallback(
+        previous: previousNotifications,
+        next: notifications,
+      );
       _notifications = notifications;
       _unreadCount = unreadCount;
       _error = null;
@@ -132,14 +141,51 @@ class NotificationsViewModel extends ChangeNotifier {
       _unreadCount = 0;
       _error = null;
       _isLoading = false;
+      _webNotificationsPrimed = false;
+      _webNotifiedIds.clear();
       notifyListeners();
       return;
     }
 
+    _webNotificationsPrimed = false;
+    _webNotifiedIds.clear();
     unawaited(_refresh(showLoading: false));
     _pollTimer = Timer.periodic(_pollInterval, (_) {
       unawaited(_refresh(showLoading: false));
     });
+  }
+
+  void _showWebNotificationFallback({
+    required List<AppNotification> previous,
+    required List<AppNotification> next,
+  }) {
+    if (!kIsWeb) {
+      return;
+    }
+
+    if (!_webNotificationsPrimed) {
+      _webNotificationsPrimed = true;
+      _webNotifiedIds.addAll(next.map((notification) => notification.id));
+      return;
+    }
+
+    final previousIds = previous.map((notification) => notification.id).toSet();
+    final freshNotifications = next.where((notification) {
+      return !notification.isRead &&
+          !previousIds.contains(notification.id) &&
+          !_webNotifiedIds.contains(notification.id);
+    });
+
+    for (final notification in freshNotifications) {
+      _webNotifiedIds.add(notification.id);
+      unawaited(
+        showBrowserNotification(
+          title: notification.title,
+          body: notification.message,
+          tag: 'notification-${notification.id}',
+        ),
+      );
+    }
   }
 
   bool _sameNotifications(

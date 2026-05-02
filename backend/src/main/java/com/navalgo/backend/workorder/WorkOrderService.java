@@ -349,6 +349,15 @@ public class WorkOrderService {
             }
         }
 
+        if (!admin) {
+            notificationService.notifyAdmins(
+                    "Parte actualizado por trabajador",
+                    current.getFullName() + " ha actualizado el parte \"" + saved.getTitle() + "\".",
+                    "PARTES",
+                    NotificationType.INFO
+            );
+        }
+
         return toDto(saved);
     }
 
@@ -419,7 +428,24 @@ public class WorkOrderService {
         revisionRequest.setCreatedAt(Instant.now());
 
         workOrder.getMaterialRevisionRequests().add(revisionRequest);
-        return toDto(workOrderRepository.save(workOrder));
+        WorkOrder saved = workOrderRepository.save(workOrder);
+        String materialLabel = checklistItem.getArticleName() != null && !checklistItem.getArticleName().isBlank()
+                ? checklistItem.getArticleName()
+                : checklistItem.getReference();
+
+        notificationService.notifyAdmins(
+                "Solicitud de cambio de material",
+                current.getFullName()
+                        + " ha solicitado revisar material en el parte \""
+                        + workOrder.getTitle()
+                        + "\": "
+                        + materialLabel
+                        + ".",
+                "PARTES",
+                NotificationType.WARNING
+        );
+
+        return toDto(saved);
     }
 
     @Transactional
@@ -709,7 +735,18 @@ public class WorkOrderService {
             workOrder.getAttachments().add(att);
         }
 
-        return toDto(workOrderRepository.save(workOrder));
+        WorkOrder saved = workOrderRepository.save(workOrder);
+
+        if (!isAdmin(signer)) {
+            notificationService.notifyAdmins(
+                    "Parte firmado por trabajador",
+                    signer.getFullName() + " ha firmado y cerrado el parte \"" + saved.getTitle() + "\".",
+                    "PARTES",
+                    NotificationType.SUCCESS
+            );
+        }
+
+        return toDto(saved);
     }
 
     @Transactional

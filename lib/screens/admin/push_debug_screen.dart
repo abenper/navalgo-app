@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -5,6 +6,7 @@ import '../../models/push_debug.dart';
 import '../../services/push_debug_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
+import '../../utils/browser_notification.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 
@@ -100,6 +102,25 @@ class _PushDebugScreenState extends State<PushDebugScreen> {
     }
   }
 
+  Future<void> _sendBrowserLocalTest() async {
+    try {
+      await showBrowserNotification(
+        title: 'NavalGO',
+        body: 'Prueba local de notificaciones web.',
+        tag: 'navalgo-browser-local-test',
+      );
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(context, 'Prueba local lanzada en el navegador.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo lanzar la prueba local: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -137,6 +158,16 @@ class _PushDebugScreenState extends State<PushDebugScreen> {
                       foregroundColor: NavalgoColors.tide,
                     ),
                   ),
+                  if (kIsWeb)
+                    OutlinedButton.icon(
+                      onPressed: _loading ? null : _sendBrowserLocalTest,
+                      icon: const Icon(Icons.desktop_windows_outlined),
+                      label: const Text('Prueba local web'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white30),
+                      ),
+                    ),
                 ],
               ),
             ),
