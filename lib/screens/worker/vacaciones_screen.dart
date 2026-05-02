@@ -935,9 +935,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
 
     actions.add(
       OutlinedButton.icon(
-        onPressed: request.status == 'CANCELLED'
-            ? null
-            : () => _updateStatus(request.id, 'CANCELLED'),
+        onPressed: () => _cancelRequest(request),
         icon: const Icon(Icons.delete_outline_rounded, size: 18),
         label: const Text('Eliminar'),
       ),

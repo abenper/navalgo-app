@@ -84,6 +84,17 @@ public class LeaveRequestController {
         return ResponseEntity.ok(service.cancelRequest(id, currentWorkerId, isAdmin));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    public ResponseEntity<Void> deleteRequest(@PathVariable Long id,
+                                              Authentication authentication) {
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
+        Long currentWorkerId = isAdmin ? null : currentUserWorkerResolver.findWorkerIdByEmail(authentication.getName());
+        service.deleteRequest(id, currentWorkerId, isAdmin);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/admin-assign")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<LeaveRequestDto> adminAssign(@RequestBody @Valid AdminAssignLeaveRequest request) {

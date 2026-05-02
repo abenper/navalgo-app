@@ -82,17 +82,14 @@ class LeaveService {
     return LeaveRequestModel.fromJson(data as Map<String, dynamic>);
   }
 
-  Future<LeaveRequestModel> cancelLeaveRequest(
+  Future<void> cancelLeaveRequest(
     String token, {
     required int leaveRequestId,
   }) async {
-    final data = await _apiClient.patch(
-      '/leave-requests/$leaveRequestId/cancel',
+    await _apiClient.delete(
+      '/leave-requests/$leaveRequestId',
       headers: {'Authorization': 'Bearer $token'},
-      body: const <String, dynamic>{},
     );
-
-    return LeaveRequestModel.fromJson(data as Map<String, dynamic>);
   }
 
   Future<LeaveBalance> getLeaveBalance(

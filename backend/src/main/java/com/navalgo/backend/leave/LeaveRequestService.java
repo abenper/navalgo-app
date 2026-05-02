@@ -72,10 +72,13 @@ public class LeaveRequestService {
 
     public List<LeaveRequestDto> list(Long workerId) {
         if (workerId == null) {
-            return repository.findAll().stream().map(LeaveRequestDto::from).toList();
+            return repository.findByStatusNotOrderByStartDateDesc(LeaveStatus.CANCELLED)
+                    .stream()
+                    .map(LeaveRequestDto::from)
+                    .toList();
         }
 
-        return repository.findByWorkerIdOrderByStartDateDesc(workerId)
+        return repository.findByWorkerIdAndStatusNotOrderByStartDateDesc(workerId, LeaveStatus.CANCELLED)
                 .stream()
                 .map(LeaveRequestDto::from)
                 .toList();
@@ -135,6 +138,27 @@ public class LeaveRequestService {
 
         applyStatusChange(entity, LeaveStatus.CANCELLED);
         return LeaveRequestDto.from(repository.save(entity));
+    }
+
+    @Transactional
+    public void deleteRequest(Long id, Long currentWorkerId, boolean isAdmin) {
+        LeaveRequestEntity entity = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Solicitud no encontrada"));
+
+        ensureCanModify(entity, currentWorkerId, isAdmin);
+
+        boolean workerDeletingOwnRequest = !isAdmin;
+        String workerName = entity.getWorker().getFullName();
+        repository.delete(entity);
+
+        if (workerDeletingOwnRequest) {
+            notificationService.notifyAdmins(
+                    "Solicitud de ausencia eliminada",
+                    workerName + " ha eliminado una solicitud de ausencia.",
+                    "AUSENCIAS",
+                    NotificationType.WARNING
+            );
+        }
     }
 
     public LeaveBalanceDto getBalance(Long workerId) {
