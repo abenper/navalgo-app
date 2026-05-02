@@ -81,6 +81,17 @@ class TimeTrackingService {
         .toList();
   }
 
+  Future<WorkerTimeTrackingInsight> getWorkerInsight(
+    String token, {
+    required int workerId,
+  }) async {
+    final data = await _apiClient.get(
+      '/time-entries/admin/workers/$workerId/insight',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+    return WorkerTimeTrackingInsight.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<TimeEntry> updateTimeEntry(
     String token, {
     required int entryId,

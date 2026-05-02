@@ -4,6 +4,9 @@ import com.navalgo.backend.common.Role;
 import com.navalgo.backend.leave.LeaveRequestEntity;
 import com.navalgo.backend.leave.LeaveRequestRepository;
 import com.navalgo.backend.leave.LeaveStatus;
+import com.navalgo.backend.workorder.WorkOrder;
+import com.navalgo.backend.workorder.WorkOrderRepository;
+import com.navalgo.backend.workorder.WorkOrderStatus;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -17,6 +20,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -31,13 +35,16 @@ public class TimeTrackingService {
 
     private final LeaveRequestRepository leaveRequestRepository;
     private final TimeEntryRepository timeEntryRepository;
+    private final WorkOrderRepository workOrderRepository;
     private final WorkerRepository workerRepository;
 
     public TimeTrackingService(LeaveRequestRepository leaveRequestRepository,
                                TimeEntryRepository timeEntryRepository,
+                               WorkOrderRepository workOrderRepository,
                                WorkerRepository workerRepository) {
         this.leaveRequestRepository = leaveRequestRepository;
         this.timeEntryRepository = timeEntryRepository;
+        this.workOrderRepository = workOrderRepository;
         this.workerRepository = workerRepository;
     }
 
@@ -122,6 +129,108 @@ public class TimeTrackingService {
         return workers.stream()
                 .map(worker -> buildStats(worker, today, currentMonth, now, averageAbsenceDays, absenceDaysByWorker))
                 .toList();
+    }
+
+    public WorkerTimeTrackingInsightDto getWorkerInsight(Long workerId) {
+        ZoneId zoneId = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(zoneId);
+        Instant now = Instant.now();
+        YearMonth currentMonth = YearMonth.from(today);
+
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+
+        List<Worker> activeWorkers = workerRepository.findByRoleAndActiveTrueOrderByFullNameAsc(Role.WORKER);
+        Map<Long, Long> absenceDaysByWorker = new HashMap<>();
+        Map<Long, Double> throughputByWorker = new HashMap<>();
+        Map<Long, Double> signatureCompletionByWorker = new HashMap<>();
+        Map<Long, Double> closeDisciplineByWorker = new HashMap<>();
+
+        for (Worker item : activeWorkers) {
+            absenceDaysByWorker.put(item.getId(), calculateApprovedNonVacationAbsenceDaysThisYear(item.getId(), today));
+            throughputByWorker.put(item.getId(), calculateThroughputScoreBasis(item.getId(), now));
+            signatureCompletionByWorker.put(item.getId(), calculateSignatureCompletionBasis(item.getId()));
+            closeDisciplineByWorker.put(item.getId(), calculateCloseDisciplineBasis(item.getId()));
+        }
+
+        double averageAbsenceDays = averageLong(absenceDaysByWorker.values());
+        double averageThroughput = averageDouble(throughputByWorker.values());
+        double averageSignatureCompletion = averageDouble(signatureCompletionByWorker.values());
+        double averageCloseDiscipline = averageDouble(closeDisciplineByWorker.values());
+
+        WorkerTimeTrackingStatsDto summary = buildStats(
+                worker,
+                today,
+                currentMonth,
+                now,
+                averageAbsenceDays,
+                absenceDaysByWorker
+        );
+
+        double absenceFactor = invertAgainstAverage(
+                absenceDaysByWorker.getOrDefault(workerId, 0L),
+                averageAbsenceDays,
+                100.0
+        );
+        double throughputFactor = scoreRelativeToAverage(
+                throughputByWorker.getOrDefault(workerId, 0.0),
+                averageThroughput
+        );
+        double signatureFactor = scoreRelativeToAverage(
+                signatureCompletionByWorker.getOrDefault(workerId, 0.0),
+                averageSignatureCompletion
+        );
+        double disciplineFactor = scoreRelativeToAverage(
+                closeDisciplineByWorker.getOrDefault(workerId, 0.0),
+                averageCloseDiscipline
+        );
+
+        List<WorkerPerformanceFactorDto> factors = List.of(
+                new WorkerPerformanceFactorDto(
+                        "Ausencias no vacacionales",
+                        absenceFactor,
+                        summary.approvedNonVacationAbsenceDaysThisYear()
+                                + " dia(s) este año frente a una media de "
+                                + formatOneDecimal(averageAbsenceDays)
+                ),
+                new WorkerPerformanceFactorDto(
+                        "Partes por hora",
+                        throughputFactor,
+                        formatOneDecimal(throughputByWorker.getOrDefault(workerId, 0.0))
+                                + " partes cerrados por cada 10 horas de trabajo"
+                ),
+                new WorkerPerformanceFactorDto(
+                        "Cierres sin incidencia",
+                        disciplineFactor,
+                        formatOneDecimal(closeDisciplineByWorker.getOrDefault(workerId, 0.0))
+                                + "% de jornadas sin cierre forzado"
+                ),
+                new WorkerPerformanceFactorDto(
+                        "Firmas completas",
+                        signatureFactor,
+                        formatOneDecimal(signatureCompletionByWorker.getOrDefault(workerId, 0.0))
+                                + "% de partes cerrados con firma cliente/trabajador"
+                )
+        );
+
+        double qualityScore = factors.stream()
+                .mapToDouble(WorkerPerformanceFactorDto::score)
+                .average()
+                .orElse(0.0);
+
+        return new WorkerTimeTrackingInsightDto(
+                summary.workerId(),
+                summary.workerName(),
+                qualityScore,
+                summary.currentlyClockedIn(),
+                summary.workedMinutesToday(),
+                summary.workedMinutesThisMonth(),
+                summary.workedMinutesThisYear(),
+                summary.approvedNonVacationAbsenceDaysThisYear(),
+                summary.absenceVsAveragePercent(),
+                factors,
+                buildResolvedWorkOrderRows(workerId, now)
+        );
     }
 
     public TodayClockedWorkersSummaryDto getTodaySummary() {
@@ -212,6 +321,103 @@ public class TimeTrackingService {
         );
     }
 
+    private List<WorkerResolvedWorkOrderStatsRowDto> buildResolvedWorkOrderRows(Long workerId, Instant now) {
+        List<TimeEntry> entries = timeEntryRepository.findByWorkerIdOrderByClockInDesc(workerId);
+        List<WorkOrder> workOrders = workOrderRepository.findByAssignedWorkersIdOrderByCreatedAtDesc(workerId).stream()
+                .filter(order -> order.getStatus() == WorkOrderStatus.DONE)
+                .toList();
+        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        YearMonth month = YearMonth.from(today);
+
+        return List.of(
+                buildResolvedWorkOrderRow("Este mes", entries, workOrders, now, workDate -> YearMonth.from(workDate).equals(month)),
+                buildResolvedWorkOrderRow("Este año", entries, workOrders, now, workDate -> workDate.getYear() == today.getYear()),
+                buildResolvedWorkOrderRow("Historico", entries, workOrders, now, workDate -> true)
+        );
+    }
+
+    private WorkerResolvedWorkOrderStatsRowDto buildResolvedWorkOrderRow(String label,
+                                                                         List<TimeEntry> entries,
+                                                                         List<WorkOrder> workOrders,
+                                                                         Instant now,
+                                                                         java.util.function.Predicate<LocalDate> matchesDate) {
+        long workedMinutes = entries.stream()
+                .filter(entry -> matchesDate.test(entry.getClockIn().atZone(ZoneId.systemDefault()).toLocalDate()))
+                .mapToLong(entry -> durationMinutes(entry, now))
+                .sum();
+
+        List<WorkOrder> matchingOrders = workOrders.stream()
+                .filter(order -> matchesDate.test(resolveWorkOrderCompletedDate(order)))
+                .toList();
+
+        double loggedLaborHours = matchingOrders.stream()
+                .map(WorkOrder::getLaborHours)
+                .filter(java.util.Objects::nonNull)
+                .mapToDouble(value -> value.doubleValue())
+                .sum();
+
+        double averageWorkedHoursPerOrder = matchingOrders.isEmpty()
+                ? 0.0
+                : (workedMinutes / 60.0) / matchingOrders.size();
+
+        return new WorkerResolvedWorkOrderStatsRowDto(
+                label,
+                matchingOrders.size(),
+                workedMinutes,
+                loggedLaborHours,
+                averageWorkedHoursPerOrder
+        );
+    }
+
+    private LocalDate resolveWorkOrderCompletedDate(WorkOrder workOrder) {
+        Instant resolvedAt = workOrder.getClientSignedAt() != null
+                ? workOrder.getClientSignedAt()
+                : workOrder.getSignedAt() != null
+                ? workOrder.getSignedAt()
+                : workOrder.getCreatedAt();
+        return resolvedAt.atZone(ZoneId.systemDefault()).toLocalDate();
+    }
+
+    private double calculateThroughputScoreBasis(Long workerId, Instant now) {
+        List<WorkOrder> completedOrders = workOrderRepository.findByAssignedWorkersIdOrderByCreatedAtDesc(workerId).stream()
+                .filter(order -> order.getStatus() == WorkOrderStatus.DONE)
+                .toList();
+        long workedMinutes = timeEntryRepository.findByWorkerIdOrderByClockInDesc(workerId).stream()
+                .mapToLong(entry -> durationMinutes(entry, now))
+                .sum();
+        if (workedMinutes <= 0) {
+            return 0.0;
+        }
+        return completedOrders.size() / (workedMinutes / 600.0);
+    }
+
+    private double calculateSignatureCompletionBasis(Long workerId) {
+        List<WorkOrder> completedOrders = workOrderRepository.findByAssignedWorkersIdOrderByCreatedAtDesc(workerId).stream()
+                .filter(order -> order.getStatus() == WorkOrderStatus.DONE)
+                .toList();
+        if (completedOrders.isEmpty()) {
+            return 100.0;
+        }
+        long completeSignatures = completedOrders.stream()
+                .filter(order -> order.getSignedAt() != null && order.getClientSignedAt() != null)
+                .count();
+        return (completeSignatures * 100.0) / completedOrders.size();
+    }
+
+    private double calculateCloseDisciplineBasis(Long workerId) {
+        List<TimeEntry> entries = timeEntryRepository.findByWorkerIdOrderByClockInDesc(workerId);
+        List<TimeEntry> closedEntries = entries.stream()
+                .filter(entry -> entry.getClockOut() != null)
+                .toList();
+        if (closedEntries.isEmpty()) {
+            return 100.0;
+        }
+        long healthyClosures = closedEntries.stream()
+                .filter(entry -> entry.getAutoCloseReason() != TimeEntryAutoCloseReason.END_OF_DAY_FORCE_CLOSE)
+                .count();
+        return (healthyClosures * 100.0) / closedEntries.size();
+    }
+
     private long calculateApprovedNonVacationAbsenceDaysThisYear(Long workerId, LocalDate today) {
         return leaveRequestRepository.findByWorkerIdAndStatusIn(workerId, Set.of(LeaveStatus.APPROVED))
                 .stream()
@@ -277,5 +483,37 @@ public class TimeTrackingService {
         String normalized = Normalizer.normalize(reason, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}+", "");
         return normalized.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private double averageLong(java.util.Collection<Long> values) {
+        return values.isEmpty() ? 0.0 : values.stream().mapToLong(Long::longValue).average().orElse(0.0);
+    }
+
+    private double averageDouble(java.util.Collection<Double> values) {
+        return values.isEmpty() ? 0.0 : values.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
+    }
+
+    private double scoreRelativeToAverage(double value, double average) {
+        if (average <= 0.0) {
+            return 100.0;
+        }
+        double ratio = value / average;
+        return clampScore(70.0 + ((ratio - 1.0) * 30.0));
+    }
+
+    private double invertAgainstAverage(long value, double average, double fallback) {
+        if (average <= 0.0) {
+            return fallback;
+        }
+        double ratio = value / average;
+        return clampScore(70.0 - ((ratio - 1.0) * 30.0));
+    }
+
+    private double clampScore(double value) {
+        return Math.max(0.0, Math.min(100.0, value));
+    }
+
+    private String formatOneDecimal(double value) {
+        return String.format(Locale.US, "%.1f", value);
     }
 }

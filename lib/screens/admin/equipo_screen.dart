@@ -9,6 +9,7 @@ import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/workers_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import 'admin_time_tracking_screen.dart';
 
 class EquipoScreen extends StatefulWidget {
   const EquipoScreen({super.key});
@@ -275,6 +276,14 @@ class _EquipoScreenState extends State<EquipoScreen> {
     );
   }
 
+  Future<void> _openWorkerJornadaAdjustment(WorkerProfile worker) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => WorkerJornadaAdjustmentScreen(worker: worker),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<WorkersViewModel>();
@@ -327,6 +336,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
                               onToggleActive: () =>
                                   _toggleActive(worker, !worker.active),
                               onResetPassword: () => _resetPassword(worker),
+                              onAdjustSchedule: () =>
+                                  _openWorkerJornadaAdjustment(worker),
                               onDelete: () => _deleteWorker(worker),
                             ),
                           );
@@ -369,6 +380,7 @@ class _WorkerCard extends StatelessWidget {
     required this.onEdit,
     required this.onToggleActive,
     required this.onResetPassword,
+    required this.onAdjustSchedule,
     required this.onDelete,
   });
 
@@ -377,6 +389,7 @@ class _WorkerCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
   final VoidCallback onResetPassword;
+  final VoidCallback onAdjustSchedule;
   final VoidCallback onDelete;
 
   @override
@@ -501,6 +514,12 @@ class _WorkerCard extends StatelessWidget {
                 icon: const Icon(Icons.password_outlined),
                 label: const Text('Contraseña temporal'),
               ),
+              if (worker.role != 'ADMIN')
+                FilledButton.icon(
+                  onPressed: onAdjustSchedule,
+                  icon: const Icon(Icons.query_stats_outlined),
+                  label: const Text('Ajuste de jornada'),
+                ),
               OutlinedButton.icon(
                 onPressed: onDelete,
                 icon: const Icon(Icons.delete_outline),

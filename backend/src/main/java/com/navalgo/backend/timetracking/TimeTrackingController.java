@@ -59,6 +59,12 @@ public class TimeTrackingController {
         return ResponseEntity.ok(service.getWorkerStats());
     }
 
+    @GetMapping("/admin/workers/{workerId}/insight")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<WorkerTimeTrackingInsightDto> workerInsight(@PathVariable Long workerId) {
+        return ResponseEntity.ok(service.getWorkerInsight(workerId));
+    }
+
     @PatchMapping("/{entryId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<TimeEntryDto> updateEntry(@PathVariable Long entryId,

@@ -2,39 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/time_entry.dart';
+import '../../models/worker_profile.dart';
 import '../../services/time_tracking_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
+import '../../utils/media_url.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 
-class AdminTimeTrackingScreen extends StatefulWidget {
-  const AdminTimeTrackingScreen({super.key});
+class WorkerJornadaAdjustmentScreen extends StatefulWidget {
+  const WorkerJornadaAdjustmentScreen({super.key, required this.worker});
+
+  final WorkerProfile worker;
 
   @override
-  State<AdminTimeTrackingScreen> createState() => _AdminTimeTrackingScreenState();
+  State<WorkerJornadaAdjustmentScreen> createState() =>
+      _WorkerJornadaAdjustmentScreenState();
 }
 
-class _AdminTimeTrackingScreenState extends State<AdminTimeTrackingScreen> {
-  final TextEditingController _searchController = TextEditingController();
-
+class _WorkerJornadaAdjustmentScreenState
+    extends State<WorkerJornadaAdjustmentScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
   String? _error;
-  int? _selectedWorkerId;
-  List<WorkerTimeTrackingStats> _stats = <WorkerTimeTrackingStats>[];
+  WorkerTimeTrackingInsight? _insight;
   List<TimeEntry> _entries = <TimeEntry>[];
 
   @override
   void initState() {
     super.initState();
     _load();
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   Future<void> _load() async {
@@ -54,26 +51,13 @@ class _AdminTimeTrackingScreenState extends State<AdminTimeTrackingScreen> {
 
     try {
       final service = context.read<TimeTrackingService>();
-      final stats = await service.getWorkerStats(token);
-      int? selectedWorkerId = _selectedWorkerId;
-      if (stats.isEmpty) {
-        selectedWorkerId = null;
-      } else if (selectedWorkerId == null ||
-          !stats.any((item) => item.workerId == selectedWorkerId)) {
-        selectedWorkerId = stats.first.workerId;
-      }
-
-      List<TimeEntry> entries = <TimeEntry>[];
-      if (selectedWorkerId != null) {
-        entries = await service.getByWorker(token, workerId: selectedWorkerId);
-      }
-
+      final insight = await service.getWorkerInsight(token, workerId: widget.worker.id);
+      final entries = await service.getByWorker(token, workerId: widget.worker.id);
       if (!mounted) {
         return;
       }
       setState(() {
-        _stats = stats;
-        _selectedWorkerId = selectedWorkerId;
+        _insight = insight;
         _entries = entries;
       });
     } catch (e) {
@@ -83,46 +67,6 @@ class _AdminTimeTrackingScreenState extends State<AdminTimeTrackingScreen> {
       setState(() {
         _error = '$e';
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _selectWorker(int workerId) async {
-    if (_selectedWorkerId == workerId) {
-      return;
-    }
-
-    final token = context.read<SessionViewModel>().token;
-    if (token == null || token.isEmpty) {
-      return;
-    }
-
-    setState(() {
-      _selectedWorkerId = workerId;
-      _isLoading = true;
-    });
-
-    try {
-      final entries = await context.read<TimeTrackingService>().getByWorker(
-        token,
-        workerId: workerId,
-      );
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _entries = entries;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      AppToast.error(context, 'No se pudo cargar la jornada: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -175,247 +119,253 @@ class _AdminTimeTrackingScreenState extends State<AdminTimeTrackingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading && _stats.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+    if (_isLoading && _insight == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-    if (_error != null && _stats.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_error!),
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar'),
-            ),
-          ],
-        ),
+
+    if (_error != null && _insight == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Ajuste de jornada')),
+        body: Center(child: Text(_error!)),
       );
     }
 
-    final query = _searchController.text.trim().toLowerCase();
-    final filteredStats = _stats.where((item) {
-      if (query.isEmpty) {
-        return true;
-      }
-      return item.workerName.toLowerCase().contains(query);
-    }).toList();
-    final selectedStats = _stats.cast<WorkerTimeTrackingStats?>().firstWhere(
-      (item) => item?.workerId == _selectedWorkerId,
-      orElse: () => filteredStats.isEmpty ? null : filteredStats.first,
-    );
-    final compact = MediaQuery.sizeOf(context).width < 1120;
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        NavalgoSectionHeader(
-          title: 'Fichajes',
-          subtitle:
-              'Controla horas, ausencias fuera de vacaciones y corrige jornadas del equipo desde un solo sitio.',
-          action: compact
-              ? null
-              : FilledButton.icon(
-                  onPressed: _isLoading ? null : _load,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Actualizar'),
-                ),
-        ),
-        const SizedBox(height: 12),
-        NavalgoPanel(
-          child: Column(
-            children: [
-              TextField(
-                controller: _searchController,
-                onChanged: (_) => setState(() {}),
-                decoration: InputDecoration(
-                  hintText: 'Buscar trabajador',
-                  prefixIcon: const Icon(Icons.search_rounded),
-                  suffixIcon: _searchController.text.isEmpty
-                      ? null
-                      : IconButton(
-                          onPressed: () {
-                            _searchController.clear();
-                            setState(() {});
-                          },
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                ),
-              ),
-              if (compact) ...[
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton.icon(
-                    onPressed: _isLoading ? null : _load,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Actualizar'),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        if (compact) ...[
-          _buildWorkerStrip(filteredStats),
-          const SizedBox(height: 16),
-          if (selectedStats != null) _buildStatsArea(selectedStats),
-          const SizedBox(height: 16),
-          _buildEntriesArea(selectedStats),
-        ] else
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 4,
-                child: _buildWorkerList(filteredStats),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 8,
-                child: Column(
-                  children: [
-                    if (selectedStats != null) _buildStatsArea(selectedStats),
-                    const SizedBox(height: 16),
-                    _buildEntriesArea(selectedStats),
-                  ],
-                ),
-              ),
-            ],
-          ),
-      ],
-    );
-  }
-
-  Widget _buildWorkerStrip(List<WorkerTimeTrackingStats> stats) {
-    if (stats.isEmpty) {
-      return const NavalgoPanel(
-        child: Text('No hay trabajadores que coincidan con la busqueda.'),
-      );
+    final insight = _insight;
+    if (insight == null) {
+      return const Scaffold(body: SizedBox.shrink());
     }
 
-    return SizedBox(
-      height: 128,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: stats.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final item = stats[index];
-          final selected = item.workerId == _selectedWorkerId;
-          return SizedBox(
-            width: 250,
-            child: _WorkerStatsCard(
-              item: item,
-              selected: selected,
-              onTap: () => _selectWorker(item.workerId),
-            ),
-          );
-        },
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Ajuste de jornada'),
+        actions: [
+          IconButton(
+            onPressed: _isLoading ? null : _load,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildWorkerList(List<WorkerTimeTrackingStats> stats) {
-    if (stats.isEmpty) {
-      return const NavalgoPanel(
-        child: Text('No hay trabajadores que coincidan con la busqueda.'),
-      );
-    }
-
-    return Column(
-      children: stats
-          .map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _WorkerStatsCard(
-                item: item,
-                selected: item.workerId == _selectedWorkerId,
-                onTap: () => _selectWorker(item.workerId),
-              ),
-            ),
-          )
-          .toList(),
-    );
-  }
-
-  Widget _buildStatsArea(WorkerTimeTrackingStats stats) {
-    return NavalgoPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      body: ListView(
+        padding: const EdgeInsets.all(16),
         children: [
-          Text(
-            stats.workerName,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _MetricCard(
-                label: 'Hoy',
-                value: _formatMinutes(stats.workedMinutesToday),
-                icon: Icons.today_outlined,
-              ),
-              _MetricCard(
-                label: 'Mes',
-                value: _formatMinutes(stats.workedMinutesThisMonth),
-                icon: Icons.calendar_view_month_rounded,
-              ),
-              _MetricCard(
-                label: 'Año',
-                value: _formatMinutes(stats.workedMinutesThisYear),
-                icon: Icons.calendar_month_rounded,
-              ),
-              _MetricCard(
-                label: 'Ausencias no vacacionales',
-                value: '${stats.approvedNonVacationAbsenceDaysThisYear} dia(s)',
-                icon: Icons.event_busy_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: NavalgoColors.shell,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: NavalgoColors.border),
-            ),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                NavalgoStatusChip(
-                  label: stats.currentlyClockedIn
-                      ? 'Jornada abierta'
-                      : 'Jornada cerrada',
-                  color: stats.currentlyClockedIn
-                      ? NavalgoColors.kelp
-                      : NavalgoColors.storm,
-                ),
-                NavalgoStatusChip(
-                  label: _absenceComparisonLabel(stats.absenceVsAveragePercent),
-                  color: stats.absenceVsAveragePercent > 0
-                      ? NavalgoColors.coral
-                      : NavalgoColors.kelp,
-                ),
-              ],
-            ),
-          ),
+          _buildHero(context, insight),
+          const SizedBox(height: 18),
+          _buildQualityFactors(context, insight),
+          const SizedBox(height: 18),
+          _buildResolvedTable(context, insight),
+          const SizedBox(height: 18),
+          _buildEntries(context),
         ],
       ),
     );
   }
 
-  Widget _buildEntriesArea(WorkerTimeTrackingStats? selectedStats) {
+  Widget _buildHero(BuildContext context, WorkerTimeTrackingInsight insight) {
+    final compact = MediaQuery.sizeOf(context).width < 980;
+    final scoreColor = _scoreColor(insight.qualityScore);
+    final token = context.read<SessionViewModel>().token;
+    final photoUrl = resolveMediaUrl(widget.worker.photoUrl);
+
+    return NavalgoPageIntro(
+      eyebrow: 'JORNADA Y RENDIMIENTO',
+      title: widget.worker.fullName,
+      subtitle:
+          'Vista operativa para entender productividad, control de cierres y ajustar jornadas cuando haga falta.',
+      trailing: compact
+          ? null
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _QualityGauge(score: insight.qualityScore, color: scoreColor),
+                const SizedBox(width: 18),
+                _WorkerPhotoCard(photoUrl: photoUrl, token: token),
+              ],
+            ),
+      footer: compact
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _QualityGauge(score: insight.qualityScore, color: scoreColor),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _WorkerPhotoCard(photoUrl: photoUrl, token: token),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildHeroPills(insight),
+              ],
+            )
+          : _buildHeroPills(insight),
+    );
+  }
+
+  Widget _buildHeroPills(WorkerTimeTrackingInsight insight) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        NavalgoStatusChip(
+          label: insight.currentlyClockedIn ? 'Jornada abierta' : 'Jornada cerrada',
+          color: insight.currentlyClockedIn
+              ? NavalgoColors.kelp
+              : NavalgoColors.storm,
+        ),
+        NavalgoStatusChip(
+          label: _absenceComparisonLabel(insight.absenceVsAveragePercent),
+          color: insight.absenceVsAveragePercent > 0
+              ? NavalgoColors.coral
+              : NavalgoColors.kelp,
+        ),
+        NavalgoStatusChip(
+          label: widget.worker.speciality?.trim().isNotEmpty == true
+              ? widget.worker.speciality!
+              : 'Sin especialidad',
+          color: NavalgoColors.harbor,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildQualityFactors(BuildContext context, WorkerTimeTrackingInsight insight) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const NavalgoSectionHeader(
+          title: 'Calidad del trabajador',
+          subtitle:
+              'La media combina ausencias no vacacionales, partes resueltos por hora, disciplina de cierre y firmas completas.',
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            NavalgoMetricCard(
+              label: 'Horas hoy',
+              value: _formatMinutes(insight.workedMinutesToday),
+              icon: const Icon(Icons.today_outlined),
+              accent: NavalgoColors.tide,
+              note: 'Sesión actual del día',
+            ),
+            NavalgoMetricCard(
+              label: 'Horas este mes',
+              value: _formatMinutes(insight.workedMinutesThisMonth),
+              icon: const Icon(Icons.calendar_view_month_rounded),
+              accent: NavalgoColors.harbor,
+              note: 'Carga acumulada del mes',
+            ),
+            NavalgoMetricCard(
+              label: 'Horas este año',
+              value: _formatMinutes(insight.workedMinutesThisYear),
+              icon: const Icon(Icons.calendar_month_rounded),
+              accent: NavalgoColors.kelp,
+              note: 'Ritmo global anual',
+            ),
+            NavalgoMetricCard(
+              label: 'Ausencias no vacacionales',
+              value: '${insight.approvedNonVacationAbsenceDaysThisYear}',
+              icon: const Icon(Icons.event_busy_outlined),
+              accent: NavalgoColors.coral,
+              note: 'No cuenta vacaciones',
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        ...insight.qualityFactors.map(
+          (factor) => Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: NavalgoPanel(
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: _scoreColor(factor.score).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Center(
+                      child: Text(
+                        factor.score.toStringAsFixed(0),
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          color: _scoreColor(factor.score),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          factor.label,
+                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(factor.detail),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResolvedTable(BuildContext context, WorkerTimeTrackingInsight insight) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const NavalgoSectionHeader(
+          title: 'Partes y horas',
+          subtitle:
+              'Aquí ves cuántos partes resuelve y cuánto tiempo le cuesta resolverlos según las jornadas registradas.',
+        ),
+        const SizedBox(height: 12),
+        NavalgoPanel(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columns: const [
+                DataColumn(label: Text('Periodo')),
+                DataColumn(label: Text('Partes cerrados')),
+                DataColumn(label: Text('Horas fichadas')),
+                DataColumn(label: Text('Horas imputadas')),
+                DataColumn(label: Text('Media h/parte')),
+              ],
+              rows: insight.resolvedWorkOrderStats
+                  .map(
+                    (row) => DataRow(
+                      cells: [
+                        DataCell(Text(row.label)),
+                        DataCell(Text('${row.completedWorkOrders}')),
+                        DataCell(Text(_formatMinutes(row.workedMinutes))),
+                        DataCell(Text(row.loggedLaborHours.toStringAsFixed(1))),
+                        DataCell(
+                          Text(row.averageWorkedHoursPerOrder.toStringAsFixed(1)),
+                        ),
+                      ],
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEntries(BuildContext context) {
     return NavalgoPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -424,9 +374,7 @@ class _AdminTimeTrackingScreenState extends State<AdminTimeTrackingScreen> {
             children: [
               Expanded(
                 child: Text(
-                  selectedStats == null
-                      ? 'Jornadas'
-                      : 'Jornadas de ${selectedStats.workerName}',
+                  'Jornadas del trabajador',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -441,12 +389,10 @@ class _AdminTimeTrackingScreenState extends State<AdminTimeTrackingScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (_selectedWorkerId == null)
-            const Text('Selecciona un trabajador para ver sus jornadas.')
-          else if (_entries.isEmpty)
-            const Text('Todavia no hay jornadas registradas para este trabajador.')
+          if (_entries.isEmpty)
+            const Text('Todavía no hay jornadas registradas.')
           else
-            ..._entries.take(30).map(
+            ..._entries.take(45).map(
               (entry) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _TimeEntryAdminCard(
@@ -461,110 +407,85 @@ class _AdminTimeTrackingScreenState extends State<AdminTimeTrackingScreen> {
   }
 }
 
-class _WorkerStatsCard extends StatelessWidget {
-  const _WorkerStatsCard({
-    required this.item,
-    required this.selected,
-    required this.onTap,
-  });
+class _WorkerPhotoCard extends StatelessWidget {
+  const _WorkerPhotoCard({required this.photoUrl, required this.token});
 
-  final WorkerTimeTrackingStats item;
-  final bool selected;
-  final VoidCallback onTap;
+  final String photoUrl;
+  final String? token;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(24),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: selected ? NavalgoColors.deepSea : Colors.white,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: selected ? NavalgoColors.deepSea : NavalgoColors.border,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                item.workerName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: selected ? Colors.white : NavalgoColors.deepSea,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Mes: ${_formatMinutes(item.workedMinutesThisMonth)}',
-                style: TextStyle(
-                  color: selected ? Colors.white70 : NavalgoColors.storm,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                item.currentlyClockedIn ? 'Jornada abierta' : 'Jornada cerrada',
-                style: TextStyle(
-                  color: selected ? Colors.white70 : NavalgoColors.storm,
-                ),
-              ),
-            ],
-          ),
-        ),
+    final hasPhoto = photoUrl.isNotEmpty;
+    return Container(
+      width: 132,
+      height: 132,
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: hasPhoto
+            ? Image.network(
+                photoUrl,
+                fit: BoxFit.cover,
+                headers: buildMediaHeaders(token),
+                errorBuilder: (_, _, _) => _fallback(),
+              )
+            : _fallback(),
+      ),
+    );
+  }
+
+  Widget _fallback() {
+    return Container(
+      color: Colors.white.withValues(alpha: 0.12),
+      child: const Icon(Icons.person_outline_rounded, size: 56, color: Colors.white),
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
+class _QualityGauge extends StatelessWidget {
+  const _QualityGauge({required this.score, required this.color});
 
-  final String label;
-  final String value;
-  final IconData icon;
+  final double score;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 180),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: NavalgoColors.shell,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: NavalgoColors.border),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    return SizedBox(
+      width: 132,
+      height: 132,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
+          SizedBox(
+            width: 132,
+            height: 132,
+            child: CircularProgressIndicator(
+              value: (score.clamp(0, 100)) / 100,
+              strokeWidth: 12,
+              backgroundColor: Colors.white.withValues(alpha: 0.14),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
-            child: Icon(icon, color: NavalgoColors.tide),
           ),
-          const SizedBox(width: 12),
           Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(label, style: Theme.of(context).textTheme.labelMedium),
+              Text(
+                score.toStringAsFixed(0),
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
-                value,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w900,
+                'Calidad',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: Colors.white.withValues(alpha: 0.78),
                 ),
               ),
             ],
@@ -628,7 +549,7 @@ class _TimeEntryAdminCard extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: onEdit,
                 icon: const Icon(Icons.edit_outlined),
-                label: const Text('Editar'),
+                label: const Text('Ajustar'),
               ),
             ],
           ),
@@ -636,8 +557,8 @@ class _TimeEntryAdminCard extends StatelessWidget {
             const SizedBox(height: 10),
             NavalgoStatusChip(
               label: entry.autoCloseReason == 'PLANNED_END_TIME'
-                  ? 'Cierre automatico por hora prevista'
-                  : 'Cierre automatico fin de dia',
+                  ? 'Cierre automático por hora prevista'
+                  : 'Cierre automático fin de día',
               color: NavalgoColors.sand,
             ),
           ],
@@ -696,7 +617,7 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Editar jornada'),
+      title: const Text('Ajustar jornada'),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
@@ -919,6 +840,19 @@ class _TimePickerTile extends StatelessWidget {
   }
 }
 
+Color _scoreColor(double score) {
+  if (score >= 80) {
+    return NavalgoColors.kelp;
+  }
+  if (score >= 60) {
+    return NavalgoColors.harbor;
+  }
+  if (score >= 40) {
+    return NavalgoColors.sand;
+  }
+  return NavalgoColors.coral;
+}
+
 String _formatMinutes(int minutes) {
   final hours = minutes ~/ 60;
   final remainingMinutes = minutes % 60;
@@ -940,7 +874,7 @@ String _absenceComparisonLabel(double percent) {
     return 'En la media del equipo';
   }
   if (percent > 0) {
-    return '${percent.toStringAsFixed(0)}% mas ausencias que la media';
+    return '${percent.toStringAsFixed(0)}% más ausencias que la media';
   }
   return '${percent.abs().toStringAsFixed(0)}% menos ausencias que la media';
 }
