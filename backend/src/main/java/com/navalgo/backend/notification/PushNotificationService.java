@@ -22,6 +22,7 @@ import java.util.TreeMap;
 public class PushNotificationService {
 
     private static final Logger log = LoggerFactory.getLogger(PushNotificationService.class);
+    private static final int MAX_ACTIVE_TOKENS_PER_WORKER_PLATFORM = 3;
 
     private final FirebasePushGateway firebasePushGateway;
     private final WorkerPushTokenRepository workerPushTokenRepository;
@@ -54,6 +55,7 @@ public class PushNotificationService {
         entity.setActive(true);
         entity.setLastSeenAt(now);
         workerPushTokenRepository.save(entity);
+        pruneExcessTokens(worker.getId(), entity.getPlatform(), normalizedToken);
         log.info(
                 "Push token registrado. workerId={}, platform={}, token={}",
                 worker.getId(),
@@ -174,6 +176,36 @@ public class PushNotificationService {
             return "UNKNOWN";
         }
         return platform.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private void pruneExcessTokens(Long workerId, String platform, String keepToken) {
+        List<WorkerPushToken> activeTokens = workerPushTokenRepository
+                .findByWorkerIdAndPlatformAndActiveTrueOrderByLastSeenAtDesc(workerId, platform);
+        if (activeTokens.size() <= MAX_ACTIVE_TOKENS_PER_WORKER_PLATFORM) {
+            return;
+        }
+
+        Instant now = Instant.now();
+        int kept = 0;
+        for (WorkerPushToken token : activeTokens) {
+            if (keepToken.equals(token.getToken())) {
+                kept += 1;
+                continue;
+            }
+            if (kept < MAX_ACTIVE_TOKENS_PER_WORKER_PLATFORM - 1) {
+                kept += 1;
+                continue;
+            }
+            token.setActive(false);
+            token.setLastSeenAt(now);
+        }
+        workerPushTokenRepository.saveAll(activeTokens);
+        log.info(
+                "Push tokens podados para workerId={}, platform={}. maxActivos={}",
+                workerId,
+                platform,
+                MAX_ACTIVE_TOKENS_PER_WORKER_PLATFORM
+        );
     }
 
     private String maskToken(String token) {

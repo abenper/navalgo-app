@@ -12,6 +12,7 @@ import 'package:navalgo/services/fleet_service.dart';
 import 'package:navalgo/services/leave_service.dart';
 import 'package:navalgo/services/material_checklist_template_service.dart';
 import 'package:navalgo/services/notification_service.dart';
+import 'package:navalgo/services/push_debug_service.dart';
 import 'package:navalgo/services/push_notification_service.dart';
 import 'package:navalgo/services/time_tracking_service.dart';
 import 'package:navalgo/services/worker_service.dart';
@@ -71,6 +72,7 @@ Future<void> main() async {
         Provider<FleetService>(create: (_) => FleetService()),
         Provider<LeaveService>(create: (_) => LeaveService()),
         Provider<NotificationService>(create: (_) => NotificationService()),
+        Provider<PushDebugService>(create: (_) => PushDebugService()),
         Provider<PushNotificationService>(
           create: (_) => PushNotificationService(),
         ),
@@ -153,7 +155,8 @@ class _PushNotificationBootstrap extends StatefulWidget {
       _PushNotificationBootstrapState();
 }
 
-class _PushNotificationBootstrapState extends State<_PushNotificationBootstrap> {
+class _PushNotificationBootstrapState
+    extends State<_PushNotificationBootstrap> {
   String? _lastAuthToken;
 
   @override

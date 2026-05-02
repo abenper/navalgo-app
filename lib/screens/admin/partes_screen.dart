@@ -36,6 +36,8 @@ class PartesScreen extends StatefulWidget {
 }
 
 class _PartesScreenState extends State<PartesScreen> {
+  final TextEditingController _searchCtrl = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +65,12 @@ class _PartesScreenState extends State<PartesScreen> {
         workerId: user.role == 'ADMIN' ? null : user.id,
       );
     });
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _openCreateDialog() async {
@@ -222,6 +230,18 @@ class _PartesScreenState extends State<PartesScreen> {
         highPriorityCount += 1;
       }
     }
+    final searchQuery = _searchCtrl.text.trim().toLowerCase();
+    final filteredWorkOrders = searchQuery.isEmpty
+        ? workOrders
+        : workOrders.where((item) {
+            final haystack = <String>[
+              item.title,
+              item.ownerName,
+              item.vesselName ?? '',
+              ...item.workerNames,
+            ].join(' ').toLowerCase();
+            return haystack.contains(searchQuery);
+          }).toList();
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -256,92 +276,105 @@ class _PartesScreenState extends State<PartesScreen> {
                     );
                   },
                   child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 120),
-                    itemCount: workOrders.isEmpty ? 1 : workOrders.length + 1,
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                    itemCount: filteredWorkOrders.isEmpty
+                        ? 1
+                        : filteredWorkOrders.length + 1,
                     itemBuilder: (context, index) {
                       if (index == 0) {
-                        return Center(
-                          child: ConstrainedBox(
-                            constraints: const BoxConstraints(maxWidth: 1240),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Partes de trabajo',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const SizedBox(height: 14),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: NavalgoColors.border),
+                              ),
+                              child: TextField(
+                                controller: _searchCtrl,
+                                onChanged: (_) => setState(() {}),
+                                decoration: InputDecoration(
+                                  border: InputBorder.none,
+                                  icon: const Icon(Icons.search_rounded),
+                                  hintText:
+                                      'Buscar por parte, propietario, embarcación o mecánico',
+                                  suffixIcon: _searchCtrl.text.isEmpty
+                                      ? null
+                                      : IconButton(
+                                          onPressed: () {
+                                            _searchCtrl.clear();
+                                            setState(() {});
+                                          },
+                                          icon: const Icon(Icons.close_rounded),
+                                        ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
-                                NavalgoPageIntro(
-                                  title: 'Partes de trabajo',
-                                  footer: LayoutBuilder(
-                                    builder: (context, constraints) {
-                                      final compact =
-                                          constraints.maxWidth < 720;
-                                      final metricWidth = compact
-                                          ? constraints.maxWidth
-                                          : (constraints.maxWidth - 28) / 3;
-
-                                      return Wrap(
-                                        spacing: 14,
-                                        runSpacing: 14,
-                                        children: [
-                                          SizedBox(
-                                            width: metricWidth,
-                                            child: NavalgoMetricCard(
-                                              label: 'Firmados',
-                                              value: '$signedCount',
-                                              icon: const Icon(
-                                                Icons.verified_outlined,
-                                              ),
-                                              accent: const Color(0xFF3BAA6E),
-                                            ),
-                                          ),
-                                          SizedBox(
-                                            width: metricWidth,
-                                            child: NavalgoMetricCard(
-                                              label: 'Pendientes de firma',
-                                              value: '$pendingSignatureCount',
-                                              icon: const Icon(
-                                                Icons.draw_outlined,
-                                              ),
-                                              accent: const Color(0xFFD55A4E),
-                                            ),
-                                          ),
-                                          SizedBox(
-                                            width: metricWidth,
-                                            child: NavalgoMetricCard(
-                                              label: 'Prioridad alta',
-                                              value: '$highPriorityCount',
-                                              icon: const Icon(
-                                                Icons.priority_high_rounded,
-                                              ),
-                                              accent: const Color(0xFFD5A021),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
+                                _PartBadge(
+                                  label: 'Firmados: $signedCount',
+                                  textColor: const Color(0xFF2E8B57),
+                                  backgroundColor: const Color(0xFFEAF8EF),
                                 ),
-                                const SizedBox(height: 26),
-                                const NavalgoSectionHeader(
-                                  title: 'Partes activos',
-                                  subtitle:
-                                      'Verde para firmados, rojo para pendientes de firma y amarillo para prioridad alta.',
+                                _PartBadge(
+                                  label: 'Pendientes: $pendingSignatureCount',
+                                  textColor: const Color(0xFFD55A4E),
+                                  backgroundColor: const Color(0xFFFFEFED),
                                 ),
-                                const SizedBox(height: 18),
-                                if (workOrders.isEmpty)
-                                  const NavalgoPanel(
-                                    child: Text(
-                                      'No hay partes para mostrar. Crea un nuevo parte para comenzar.',
-                                      style: TextStyle(
-                                        color: Color(0xFF48626D),
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
+                                _PartBadge(
+                                  label: 'Prioridad alta: $highPriorityCount',
+                                  textColor: const Color(0xFF8A6200),
+                                  backgroundColor: const Color(0xFFFFF2CC),
+                                ),
+                                if (searchQuery.isNotEmpty)
+                                  _PartBadge(
+                                    label:
+                                        'Resultados: ${filteredWorkOrders.length}',
+                                    textColor: NavalgoColors.tide,
+                                    backgroundColor: NavalgoColors.mist,
                                   ),
                               ],
                             ),
-                          ),
+                            const SizedBox(height: 16),
+                            if (workOrders.isEmpty)
+                              const NavalgoPanel(
+                                child: Text(
+                                  'No hay partes para mostrar. Crea un nuevo parte para comenzar.',
+                                  style: TextStyle(
+                                    color: Color(0xFF48626D),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              )
+                            else if (filteredWorkOrders.isEmpty)
+                              const NavalgoPanel(
+                                child: Text(
+                                  'No hay partes que coincidan con la búsqueda.',
+                                  style: TextStyle(
+                                    color: Color(0xFF48626D),
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                          ],
                         );
                       }
 
-                      final parte = workOrders[index - 1];
+                      final parte = filteredWorkOrders[index - 1];
                       final isSigned = parte.signatureUrl?.isNotEmpty ?? false;
                       final isHighPriority = _isHighPriority(parte.priority);
                       final accentColor = isSigned
@@ -351,230 +384,195 @@ class _PartesScreenState extends State<PartesScreen> {
                           ? const Color(0xFFF2FBF6)
                           : const Color(0xFFFFF4F3);
 
-                      return Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: 1240),
-                          child: Padding(
-                            padding: const EdgeInsets.only(bottom: 16),
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(24),
+                            onTap: () => _openPartDetails(parte),
+                            child: Ink(
+                              decoration: BoxDecoration(
+                                color: surfaceColor,
                                 borderRadius: BorderRadius.circular(24),
-                                onTap: () => _openPartDetails(parte),
-                                child: Ink(
-                                  decoration: BoxDecoration(
-                                    color: surfaceColor,
-                                    borderRadius: BorderRadius.circular(24),
-                                    border: Border.all(
-                                      color: accentColor.withValues(
-                                        alpha: 0.28,
+                                border: Border.all(
+                                  color: accentColor.withValues(alpha: 0.28),
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: accentColor.withValues(alpha: 0.08),
+                                    blurRadius: 24,
+                                    offset: const Offset(0, 12),
+                                  ),
+                                ],
+                              ),
+                              child: Stack(
+                                children: [
+                                  Positioned(
+                                    left: 0,
+                                    top: 0,
+                                    bottom: 0,
+                                    child: Container(
+                                      width: 8,
+                                      decoration: BoxDecoration(
+                                        color: accentColor,
+                                        borderRadius:
+                                            const BorderRadius.horizontal(
+                                              left: Radius.circular(24),
+                                            ),
                                       ),
                                     ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: accentColor.withValues(
-                                          alpha: 0.08,
-                                        ),
-                                        blurRadius: 24,
-                                        offset: const Offset(0, 12),
-                                      ),
-                                    ],
                                   ),
-                                  child: Stack(
-                                    children: [
-                                      Positioned(
-                                        left: 0,
-                                        top: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          width: 8,
-                                          decoration: BoxDecoration(
-                                            color: accentColor,
-                                            borderRadius:
-                                                const BorderRadius.horizontal(
-                                                  left: Radius.circular(24),
-                                                ),
-                                          ),
-                                        ),
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: 8),
+                                    child: Padding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        22,
+                                        20,
+                                        22,
+                                        20,
                                       ),
-                                      Padding(
-                                        padding: const EdgeInsets.only(left: 8),
-                                        child: Padding(
-                                          padding: const EdgeInsets.fromLTRB(
-                                            22,
-                                            20,
-                                            22,
-                                            20,
-                                          ),
-                                          child: Column(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              Row(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
-                                                children: [
-                                                  Expanded(
-                                                    child: Column(
-                                                      crossAxisAlignment:
-                                                          CrossAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Text(
-                                                          parte.title,
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 20,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w800,
-                                                                color: Color(
-                                                                  0xFF0F2530,
-                                                                ),
-                                                              ),
+                                              Expanded(
+                                                child: Column(
+                                                  crossAxisAlignment:
+                                                      CrossAxisAlignment.start,
+                                                  children: [
+                                                    Text(
+                                                      parte.title,
+                                                      style: const TextStyle(
+                                                        fontSize: 20,
+                                                        fontWeight:
+                                                            FontWeight.w800,
+                                                        color: Color(
+                                                          0xFF0F2530,
                                                         ),
-                                                        const SizedBox(
-                                                          height: 6,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    Text(
+                                                      parte.ownerName,
+                                                      style: const TextStyle(
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                        color: Color(
+                                                          0xFF40606C,
                                                         ),
-                                                        Text(
-                                                          parte.ownerName,
-                                                          style:
-                                                              const TextStyle(
-                                                                fontSize: 15,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w600,
-                                                                color: Color(
-                                                                  0xFF40606C,
-                                                                ),
-                                                              ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                  ),
-                                                  if (isAdmin)
-                                                    IconButton(
-                                                      tooltip: 'Borrar parte',
-                                                      onPressed: () =>
-                                                          _deleteWorkOrderFromList(
-                                                            parte,
-                                                          ),
-                                                      icon: const Icon(
-                                                        Icons.delete_outline,
-                                                      ),
-                                                      color: const Color(
-                                                        0xFF9B2C20,
                                                       ),
                                                     ),
-                                                  const SizedBox(width: 8),
-                                                  const Icon(
-                                                    Icons.arrow_forward_ios,
-                                                    size: 16,
-                                                    color: Color(0xFF64808B),
-                                                  ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 16),
-                                              Wrap(
-                                                spacing: 8,
-                                                runSpacing: 8,
-                                                children: [
-                                                  _PartBadge(
-                                                    label: isSigned
-                                                        ? 'Firmado'
-                                                        : 'Pendiente de firma',
-                                                    textColor: accentColor,
-                                                    backgroundColor: accentColor
-                                                        .withValues(
-                                                          alpha: 0.12,
-                                                        ),
-                                                  ),
-                                                  if (isHighPriority)
-                                                    const _PartBadge(
-                                                      label: 'Prioridad alta',
-                                                      textColor: Color(
-                                                        0xFF8A6200,
-                                                      ),
-                                                      backgroundColor: Color(
-                                                        0xFFFFF2CC,
-                                                      ),
-                                                    ),
-                                                  if (parte.vesselName !=
-                                                          null &&
-                                                      parte.vesselName!
-                                                          .trim()
-                                                          .isNotEmpty)
-                                                    _PartBadge(
-                                                      label: parte.vesselName!,
-                                                      textColor: const Color(
-                                                        0xFF1E5166,
-                                                      ),
-                                                      backgroundColor:
-                                                          const Color(
-                                                            0xFFDDF0F6,
-                                                          ),
-                                                    ),
-                                                  if (_isOverdueWorkOrder(
-                                                    parte,
-                                                  ))
-                                                    const _PartBadge(
-                                                      label: 'Cierre vencido',
-                                                      textColor: Color(
-                                                        0xFF9B1C1C,
-                                                      ),
-                                                      backgroundColor: Color(
-                                                        0xFFFDE8E8,
-                                                      ),
-                                                    ),
-                                                ],
-                                              ),
-                                              const SizedBox(height: 14),
-                                              Text(
-                                                'Mecánicos: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF4F6771),
-                                                  fontWeight: FontWeight.w500,
+                                                  ],
                                                 ),
                                               ),
-                                              const SizedBox(height: 8),
-                                              Text(
-                                                'Creado: ${_formatDateTime(parte.createdAt)}',
-                                                style: const TextStyle(
-                                                  color: Color(0xFF738892),
-                                                ),
-                                              ),
-                                              if (parte.closeDueDate !=
-                                                  null) ...[
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'Cierre: ${_formatCalendarDate(parte.closeDueDate!)}',
-                                                  style: TextStyle(
-                                                    color:
-                                                        _isOverdueWorkOrder(
-                                                          parte,
-                                                        )
-                                                        ? const Color(
-                                                            0xFF9B1C1C,
-                                                          )
-                                                        : const Color(
-                                                            0xFF738892,
-                                                          ),
-                                                    fontWeight:
-                                                        _isOverdueWorkOrder(
-                                                          parte,
-                                                        )
-                                                        ? FontWeight.w700
-                                                        : FontWeight.w500,
+                                              if (isAdmin)
+                                                IconButton(
+                                                  tooltip: 'Borrar parte',
+                                                  onPressed: () =>
+                                                      _deleteWorkOrderFromList(
+                                                        parte,
+                                                      ),
+                                                  icon: const Icon(
+                                                    Icons.delete_outline,
+                                                  ),
+                                                  color: const Color(
+                                                    0xFF9B2C20,
                                                   ),
                                                 ),
-                                              ],
+                                              const SizedBox(width: 8),
+                                              const Icon(
+                                                Icons.arrow_forward_ios,
+                                                size: 16,
+                                                color: Color(0xFF64808B),
+                                              ),
                                             ],
                                           ),
-                                        ),
+                                          const SizedBox(height: 16),
+                                          Wrap(
+                                            spacing: 8,
+                                            runSpacing: 8,
+                                            children: [
+                                              _PartBadge(
+                                                label: isSigned
+                                                    ? 'Firmado'
+                                                    : 'Pendiente de firma',
+                                                textColor: accentColor,
+                                                backgroundColor: accentColor
+                                                    .withValues(alpha: 0.12),
+                                              ),
+                                              if (isHighPriority)
+                                                const _PartBadge(
+                                                  label: 'Prioridad alta',
+                                                  textColor: Color(0xFF8A6200),
+                                                  backgroundColor: Color(
+                                                    0xFFFFF2CC,
+                                                  ),
+                                                ),
+                                              if (parte.vesselName != null &&
+                                                  parte.vesselName!
+                                                      .trim()
+                                                      .isNotEmpty)
+                                                _PartBadge(
+                                                  label: parte.vesselName!,
+                                                  textColor: const Color(
+                                                    0xFF1E5166,
+                                                  ),
+                                                  backgroundColor: const Color(
+                                                    0xFFDDF0F6,
+                                                  ),
+                                                ),
+                                              if (_isOverdueWorkOrder(parte))
+                                                const _PartBadge(
+                                                  label: 'Cierre vencido',
+                                                  textColor: Color(0xFF9B1C1C),
+                                                  backgroundColor: Color(
+                                                    0xFFFDE8E8,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                          const SizedBox(height: 14),
+                                          Text(
+                                            'Mecánicos: ${parte.workerNames.isEmpty ? 'Sin asignar' : parte.workerNames.join(', ')}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF4F6771),
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          Text(
+                                            'Creado: ${_formatDateTime(parte.createdAt)}',
+                                            style: const TextStyle(
+                                              color: Color(0xFF738892),
+                                            ),
+                                          ),
+                                          if (parte.closeDueDate != null) ...[
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              'Cierre: ${_formatCalendarDate(parte.closeDueDate!)}',
+                                              style: TextStyle(
+                                                color:
+                                                    _isOverdueWorkOrder(parte)
+                                                    ? const Color(0xFF9B1C1C)
+                                                    : const Color(0xFF738892),
+                                                fontWeight:
+                                                    _isOverdueWorkOrder(parte)
+                                                    ? FontWeight.w700
+                                                    : FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
-                                    ],
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ),
                           ),

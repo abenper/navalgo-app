@@ -9,6 +9,7 @@ import java.util.Optional;
 public interface WorkerPushTokenRepository extends JpaRepository<WorkerPushToken, Long> {
     Optional<WorkerPushToken> findByToken(String token);
     List<WorkerPushToken> findByWorkerIdAndActiveTrue(Long workerId);
+    List<WorkerPushToken> findByWorkerIdAndPlatformAndActiveTrueOrderByLastSeenAtDesc(Long workerId, String platform);
     List<WorkerPushToken> findByActiveTrueOrderByLastSeenAtDesc();
     List<WorkerPushToken> findByTokenIn(Collection<String> tokens);
 }
