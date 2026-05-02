@@ -618,95 +618,79 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(color: NavalgoColors.border),
                       ),
-                      child: LayoutBuilder(
-                        builder: (context, railConstraints) {
-                          return SingleChildScrollView(
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minHeight: railConstraints.maxHeight,
-                              ),
-                              child: NavigationRail(
-                                selectedIndex: _selectedIndex,
-                                onDestinationSelected: _onDestinationSelected,
-                                labelType: NavigationRailLabelType.all,
-                                minWidth: 84,
-                                leading: Padding(
-                                  padding: const EdgeInsets.only(
-                                    top: 12,
-                                    bottom: 18,
+                      child: NavigationRail(
+                        selectedIndex: _selectedIndex,
+                        onDestinationSelected: _onDestinationSelected,
+                        labelType: NavigationRailLabelType.all,
+                        minWidth: 84,
+                        scrollable: true,
+                        leading: Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 18),
+                          child: Container(
+                            width: 52,
+                            height: 52,
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: NavalgoColors.border),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: NavalgoColors.deepSea.withValues(
+                                    alpha: 0.08,
                                   ),
-                                  child: Container(
-                                    width: 52,
-                                    height: 52,
-                                    padding: const EdgeInsets.all(6),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(18),
-                                      border: Border.all(
-                                        color: NavalgoColors.border,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: NavalgoColors.deepSea
-                                              .withValues(alpha: 0.08),
-                                          blurRadius: 18,
-                                          offset: const Offset(0, 8),
-                                        ),
-                                      ],
-                                    ),
-                                    child: const NavalgoLogo(
-                                      variant: NavalgoLogoVariant.colorBadge,
-                                    ),
-                                  ),
+                                  blurRadius: 18,
+                                  offset: const Offset(0, 8),
                                 ),
-                                destinations: const [
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.dashboard_outlined),
-                                    selectedIcon: Icon(Icons.dashboard),
-                                    label: Text('Panel'),
-                                  ),
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.assignment_outlined),
-                                    selectedIcon: Icon(Icons.assignment),
-                                    label: Text('Partes'),
-                                  ),
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.inventory_2_outlined),
-                                    selectedIcon: Icon(Icons.inventory_2),
-                                    label: Text('Plantillas'),
-                                  ),
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.directions_boat_outlined),
-                                    selectedIcon: Icon(Icons.directions_boat),
-                                    label: Text('Flota'),
-                                  ),
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.people_outline),
-                                    selectedIcon: Icon(Icons.people),
-                                    label: Text('Equipo'),
-                                  ),
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.access_time_outlined),
-                                    selectedIcon: Icon(
-                                      Icons.access_time_filled,
-                                    ),
-                                    label: Text('Fichaje'),
-                                  ),
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.event_note_outlined),
-                                    selectedIcon: Icon(Icons.event_note),
-                                    label: Text('Ausencias'),
-                                  ),
-                                  NavigationRailDestination(
-                                    icon: Icon(Icons.bug_report_outlined),
-                                    selectedIcon: Icon(Icons.bug_report),
-                                    label: Text('Push Debug'),
-                                  ),
-                                ],
-                              ),
+                              ],
                             ),
-                          );
-                        },
+                            child: const NavalgoLogo(
+                              variant: NavalgoLogoVariant.colorBadge,
+                            ),
+                          ),
+                        ),
+                        destinations: const [
+                          NavigationRailDestination(
+                            icon: Icon(Icons.dashboard_outlined),
+                            selectedIcon: Icon(Icons.dashboard),
+                            label: Text('Panel'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.assignment_outlined),
+                            selectedIcon: Icon(Icons.assignment),
+                            label: Text('Partes'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.inventory_2_outlined),
+                            selectedIcon: Icon(Icons.inventory_2),
+                            label: Text('Plantillas'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.directions_boat_outlined),
+                            selectedIcon: Icon(Icons.directions_boat),
+                            label: Text('Flota'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.people_outline),
+                            selectedIcon: Icon(Icons.people),
+                            label: Text('Equipo'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.access_time_outlined),
+                            selectedIcon: Icon(Icons.access_time_filled),
+                            label: Text('Fichaje'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.event_note_outlined),
+                            selectedIcon: Icon(Icons.event_note),
+                            label: Text('Ausencias'),
+                          ),
+                          NavigationRailDestination(
+                            icon: Icon(Icons.bug_report_outlined),
+                            selectedIcon: Icon(Icons.bug_report),
+                            label: Text('Push Debug'),
+                          ),
+                        ],
                       ),
                     ),
                   ),

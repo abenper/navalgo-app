@@ -172,87 +172,111 @@ class _MaterialTemplatesScreenState extends State<MaterialTemplatesScreen> {
   @override
   Widget build(BuildContext context) {
     final filteredTemplates = _filteredTemplates;
+    final basicCount = _templates
+        .where((template) => template.templateType == 'BASIC')
+        .length;
+    final completeCount = _templates
+        .where((template) => template.templateType == 'COMPLETE')
+        .length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Plantillas de material'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: NavalgoGradientButton(
-              label: 'Nueva plantilla',
-              icon: Icons.playlist_add_outlined,
-              onPressed: () => _openEditor(),
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: Colors.transparent,
       body: Container(
         decoration: const BoxDecoration(gradient: NavalgoColors.pageGradient),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: RefreshIndicator(
+            onRefresh: _loadTemplates,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
-                NavalgoPageIntro(
-                  eyebrow: 'MATERIAL',
-                  title: 'Gestiona las plantillas de revisión',
-                  footer: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (value) =>
-                          setState(() => _searchQuery = value),
-                      decoration:
-                          NavalgoFormStyles.inputDecoration(
-                            context,
-                            label: 'Buscar revisiones',
-                            hint:
-                                'Nombre, tipo, básica asociada, material o referencia',
-                            prefixIcon: const Icon(Icons.search_rounded),
-                          ).copyWith(
-                            filled: true,
-                            fillColor: Colors.white.withValues(alpha: 0.96),
-                          ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.allowSelection
+                            ? 'Seleccionar plantilla'
+                            : 'Plantillas de material',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    if (!widget.allowSelection)
+                      NavalgoGradientButton(
+                        label: 'Nueva plantilla',
+                        icon: Icons.playlist_add_outlined,
+                        onPressed: () => _openEditor(),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: NavalgoColors.border),
+                  ),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    decoration: const InputDecoration(
+                      border: InputBorder.none,
+                      icon: Icon(Icons.search_rounded),
+                      hintText:
+                          'Buscar por nombre, tipo, revisi?n base, material o referencia',
                     ),
                   ),
                 ),
-                const SizedBox(height: 18),
-                NavalgoSectionHeader(
-                  title: 'Plantillas disponibles',
-                  subtitle: widget.allowSelection
-                      ? 'Puedes editar cualquier plantilla o seleccionar una para usarla en el parte actual.'
-                      : 'Edita la configuración y revisa sus incidencias recientes.',
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    NavalgoStatusChip(
+                      label: 'Básicas: $basicCount',
+                      color: NavalgoColors.harbor,
+                    ),
+                    NavalgoStatusChip(
+                      label: 'Completas: $completeCount',
+                      color: NavalgoColors.coral,
+                    ),
+                    NavalgoStatusChip(
+                      label: 'Total: ${_templates.length}',
+                      color: NavalgoColors.tide,
+                    ),
+                    if (_searchQuery.trim().isNotEmpty)
+                      NavalgoStatusChip(
+                        label: 'Resultados: ${filteredTemplates.length}',
+                        color: NavalgoColors.sand,
+                      ),
+                  ],
                 ),
-                const SizedBox(height: 14),
-                Expanded(
-                  child: _loading
-                      ? const Center(child: CircularProgressIndicator())
-                      : _templates.isEmpty
-                      ? _EmptyTemplatesState(error: _error)
-                      : filteredTemplates.isEmpty
-                      ? const _EmptyTemplatesState(emptySearch: true)
-                      : ListView(
-                          children: [
-                            if (_error != null) ...[
-                              Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: Text(
-                                  _error!,
-                                  style: Theme.of(context).textTheme.bodyMedium
-                                      ?.copyWith(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.error,
-                                      ),
-                                ),
-                              ),
-                            ],
-                            ...filteredTemplates.map(_buildTemplateCard),
-                          ],
+                const SizedBox(height: 16),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 64),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (_templates.isEmpty)
+                  _EmptyTemplatesState(error: _error)
+                else if (filteredTemplates.isEmpty)
+                  const _EmptyTemplatesState(emptySearch: true)
+                else ...[
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(
+                        _error!,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.error,
                         ),
-                ),
+                      ),
+                    ),
+                  ...filteredTemplates.map(_buildTemplateCard),
+                ],
               ],
             ),
           ),

@@ -222,19 +222,28 @@ public class FirebasePushGateway {
         }
         if (properties.getServiceAccountPath() != null && !properties.getServiceAccountPath().isBlank()) {
             Path path = Path.of(properties.getServiceAccountPath().trim());
-            return Files.isReadable(path)
+            if (Files.isDirectory(path)) {
+                return CredentialSource.SERVICE_ACCOUNT_PATH_IS_DIRECTORY;
+            }
+            return Files.isRegularFile(path) && Files.isReadable(path)
                     ? CredentialSource.SERVICE_ACCOUNT_PATH
                     : CredentialSource.SERVICE_ACCOUNT_PATH_UNREADABLE;
         }
         String googleApplicationCredentials = System.getenv(GOOGLE_APPLICATION_CREDENTIALS_ENV);
         if (googleApplicationCredentials != null && !googleApplicationCredentials.isBlank()) {
             Path path = Path.of(googleApplicationCredentials.trim());
-            return Files.isReadable(path)
+            if (Files.isDirectory(path)) {
+                return CredentialSource.GOOGLE_APPLICATION_CREDENTIALS_IS_DIRECTORY;
+            }
+            return Files.isRegularFile(path) && Files.isReadable(path)
                     ? CredentialSource.GOOGLE_APPLICATION_CREDENTIALS
                     : CredentialSource.GOOGLE_APPLICATION_CREDENTIALS_UNREADABLE;
         }
         if (Files.exists(DEFAULT_DOCKER_SECRET_PATH)) {
-            return Files.isReadable(DEFAULT_DOCKER_SECRET_PATH)
+            if (Files.isDirectory(DEFAULT_DOCKER_SECRET_PATH)) {
+                return CredentialSource.DEFAULT_DOCKER_SECRET_IS_DIRECTORY;
+            }
+            return Files.isRegularFile(DEFAULT_DOCKER_SECRET_PATH) && Files.isReadable(DEFAULT_DOCKER_SECRET_PATH)
                     ? CredentialSource.DEFAULT_DOCKER_SECRET
                     : CredentialSource.DEFAULT_DOCKER_SECRET_UNREADABLE;
         }
@@ -261,10 +270,13 @@ public class FirebasePushGateway {
     private enum CredentialSource {
         SERVICE_ACCOUNT_JSON(true),
         SERVICE_ACCOUNT_PATH(true),
+        SERVICE_ACCOUNT_PATH_IS_DIRECTORY(false),
         SERVICE_ACCOUNT_PATH_UNREADABLE(false),
         GOOGLE_APPLICATION_CREDENTIALS(true),
+        GOOGLE_APPLICATION_CREDENTIALS_IS_DIRECTORY(false),
         GOOGLE_APPLICATION_CREDENTIALS_UNREADABLE(false),
         DEFAULT_DOCKER_SECRET(true),
+        DEFAULT_DOCKER_SECRET_IS_DIRECTORY(false),
         DEFAULT_DOCKER_SECRET_UNREADABLE(false),
         NONE(false);
 
