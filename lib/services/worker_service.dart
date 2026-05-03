@@ -3,10 +3,13 @@ import '../models/worker_profile.dart';
 import 'network/api_client.dart';
 
 class CreateWorkerResult {
-  const CreateWorkerResult({required this.worker, this.temporaryPassword});
+  const CreateWorkerResult({
+    required this.worker,
+    required this.invitationEmailSent,
+  });
 
   final WorkerProfile worker;
-  final String? temporaryPassword;
+  final bool invitationEmailSent;
 }
 
 class UpdateOwnProfileResult {
@@ -54,11 +57,7 @@ class WorkerService {
     final data = await _apiClient.put(
       '/workers/me',
       headers: {'Authorization': 'Bearer $token'},
-      body: {
-        'fullName': fullName,
-        'email': email,
-        'speciality': speciality,
-      },
+      body: {'fullName': fullName, 'email': email, 'speciality': speciality},
     );
 
     final map = data as Map<String, dynamic>;
@@ -95,7 +94,7 @@ class WorkerService {
     final map = data as Map<String, dynamic>;
     return CreateWorkerResult(
       worker: WorkerProfile.fromJson(map['worker'] as Map<String, dynamic>),
-      temporaryPassword: map['temporaryPassword'] as String?,
+      invitationEmailSent: map['invitationEmailSent'] as bool? ?? false,
     );
   }
 

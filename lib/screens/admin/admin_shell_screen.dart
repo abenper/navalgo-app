@@ -10,6 +10,7 @@ import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
+import '../common/privacy_policy_screen.dart';
 import 'push_debug_screen.dart';
 import '../common/login_screen.dart';
 import '../worker/fichaje_screen.dart';
@@ -498,6 +499,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   const SizedBox(height: 8),
                   _buildAccountAction(
                     context: sheetContext,
+                    value: 'privacy',
+                    icon: Icons.privacy_tip_outlined,
+                    title: 'Política de Privacidad',
+                  ),
+                  const SizedBox(height: 8),
+                  _buildAccountAction(
+                    context: sheetContext,
                     value: 'logout',
                     icon: Icons.logout_rounded,
                     title: 'Cerrar sesión',
@@ -522,6 +530,13 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 
     if (action == 'password') {
       await _showChangePasswordDialog();
+      return;
+    }
+
+    if (action == 'privacy') {
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()));
       return;
     }
 

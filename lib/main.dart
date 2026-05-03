@@ -28,7 +28,9 @@ import 'package:navalgo/viewmodels/session_view_model.dart';
 import 'package:navalgo/viewmodels/work_orders_view_model.dart';
 import 'package:navalgo/viewmodels/workers_view_model.dart';
 import 'package:provider/provider.dart';
+import 'screens/common/complete_registration_screen.dart';
 import 'screens/common/login_screen.dart';
+import 'screens/common/privacy_policy_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -219,6 +221,16 @@ class _RootScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (isCompleteRegistrationEntryUri(Uri.base)) {
+      return CompleteRegistrationScreen(
+        token: Uri.base.queryParameters['token'] ?? '',
+      );
+    }
+
+    if (isPrivacyPolicyEntryUri(Uri.base)) {
+      return const PrivacyPolicyScreen(isPublicEntry: true);
+    }
+
     final session = context.watch<SessionViewModel>();
 
     if (!session.isReady) {

@@ -77,9 +77,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
       if (!mounted) {
         return;
       }
-      final tempPwd = response.temporaryPassword;
+      final invitationEmailSent = response.invitationEmailSent;
+      final String? tempPwd = null;
       messenger.showSnackBar(
-        const SnackBar(content: Text('Trabajador creado')),
+        SnackBar(
+          content: Text(
+            invitationEmailSent
+                ? 'Trabajador creado y correo de activacion enviado'
+                : 'Trabajador creado, pero no se pudo enviar el correo de activacion',
+          ),
+        ),
       );
       if (tempPwd != null && tempPwd.isNotEmpty) {
         await _showTemporaryPasswordDialog(
@@ -713,7 +720,7 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
       eyebrow: 'EQUIPO',
       title: 'Crear trabajador',
       subtitle:
-          'Alta operativa del mecánico con rol, permisos y fecha de contratación.',
+          'Se creará la cuenta y se enviará un correo para que el trabajador defina su contraseña.',
       actions: [
         NavalgoGhostButton(
           label: 'Cancelar',

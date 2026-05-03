@@ -14,6 +14,31 @@ class AuthService {
 
   final ApiClient _apiClient;
 
+  Future<RegistrationInvitationInfo> getRegistrationInvitationStatus(
+    String token,
+  ) async {
+    final data = await _apiClient.get(
+      '/auth/registration-invitations/status',
+      queryParameters: {'token': token},
+    );
+    final map = data as Map<String, dynamic>;
+    return RegistrationInvitationInfo(
+      fullName: (map['fullName'] as String?) ?? '',
+      email: (map['email'] as String?) ?? '',
+      expiresAt: DateTime.parse(map['expiresAt'] as String),
+    );
+  }
+
+  Future<void> completeRegistration({
+    required String token,
+    required String password,
+  }) async {
+    await _apiClient.post(
+      '/auth/registration-invitations/complete',
+      body: {'token': token, 'password': password},
+    );
+  }
+
   Future<User> login(String email, String password) async {
     if (ApiConfig.useMockApi && kDebugMode) {
       return _mockLogin(email, password);
@@ -140,4 +165,16 @@ class AuthService {
 
     return null;
   }
+}
+
+class RegistrationInvitationInfo {
+  const RegistrationInvitationInfo({
+    required this.fullName,
+    required this.email,
+    required this.expiresAt,
+  });
+
+  final String fullName;
+  final String email;
+  final DateTime expiresAt;
 }

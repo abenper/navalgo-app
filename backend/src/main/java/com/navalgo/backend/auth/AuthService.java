@@ -23,6 +23,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final AuthCookieService authCookieService;
     private final LoginAttemptService loginAttemptService;
+    private final RegistrationInvitationService registrationInvitationService;
 
     public AuthService(WorkerRepository workerRepository,
                        PasswordEncoder passwordEncoder,
@@ -30,7 +31,8 @@ public class AuthService {
                        WorkerService workerService,
                        RefreshTokenService refreshTokenService,
                        AuthCookieService authCookieService,
-                       LoginAttemptService loginAttemptService) {
+                       LoginAttemptService loginAttemptService,
+                       RegistrationInvitationService registrationInvitationService) {
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
@@ -38,6 +40,7 @@ public class AuthService {
         this.refreshTokenService = refreshTokenService;
         this.authCookieService = authCookieService;
         this.loginAttemptService = loginAttemptService;
+        this.registrationInvitationService = registrationInvitationService;
     }
 
     @Transactional
@@ -93,6 +96,15 @@ public class AuthService {
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
         workerService.changeOwnPassword(email, request.currentPassword(), request.newPassword());
+    }
+
+    public RegistrationInvitationStatusResponse getRegistrationInvitationStatus(String token) {
+        return registrationInvitationService.getInvitationStatus(token);
+    }
+
+    @Transactional
+    public void completeRegistration(CompleteRegistrationRequest request) {
+        registrationInvitationService.completeRegistration(request);
     }
 
     public ResponseCookie buildRefreshCookie(String refreshToken) {

@@ -39,6 +39,8 @@ app:
     secret: ${APP_JWT_SECRET}
     expiration-ms: ${APP_JWT_EXPIRATION_MS:3600000}
     refresh-expiration-ms: ${APP_JWT_REFRESH_EXPIRATION_MS:604800000}
+  frontend:
+    base-url: ${APP_FRONTEND_BASE_URL:https://naval-go.com}
   security:
     cors:
       allowed-origins: ${APP_SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:*,http://127.0.0.1:*}
@@ -62,6 +64,15 @@ app:
     enabled: ${APP_FIREBASE_ENABLED:true}
     service-account-path: ${APP_FIREBASE_SERVICE_ACCOUNT_PATH:}
     service-account-json: ${APP_FIREBASE_SERVICE_ACCOUNT_JSON:}
+  auth:
+    registration-invitation-ttl-hours: ${APP_AUTH_REGISTRATION_INVITATION_TTL_HOURS:72}
+  email:
+    enabled: ${APP_EMAIL_ENABLED:false}
+    from: ${APP_EMAIL_FROM:Naval-GO <no-reply@naval-go.com>}
+    reply-to: ${APP_EMAIL_REPLY_TO:soporte@naval-go.com}
+    resend:
+      api-key: ${APP_EMAIL_RESEND_API_KEY:}
+      api-url: ${APP_EMAIL_RESEND_API_URL:https://api.resend.com/emails}
   scheduling:
     work-order-close-reminders-cron: ${APP_SCHEDULING_WORK_ORDER_CLOSE_REMINDERS_CRON:0 0 9 * * *}
     time-tracking-missing-clock-in-cron: ${APP_SCHEDULING_TIME_TRACKING_MISSING_CLOCK_IN_CRON:0 0 8 * * MON-FRI}

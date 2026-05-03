@@ -62,6 +62,19 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/registration-invitations/status")
+    public ResponseEntity<RegistrationInvitationStatusResponse> registrationInvitationStatus(
+            @RequestParam("token") String token
+    ) {
+        return ResponseEntity.ok(authService.getRegistrationInvitationStatus(token));
+    }
+
+    @PostMapping("/registration-invitations/complete")
+    public ResponseEntity<Void> completeRegistration(@RequestBody @Valid CompleteRegistrationRequest request) {
+        authService.completeRegistration(request);
+        return ResponseEntity.noContent().build();
+    }
+
     private String extractClientIp(HttpServletRequest request) {
         String remoteAddr = request.getRemoteAddr();
         if (isTrustedProxy(remoteAddr)) {

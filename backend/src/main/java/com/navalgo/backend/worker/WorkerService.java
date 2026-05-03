@@ -1,6 +1,7 @@
 package com.navalgo.backend.worker;
 
 import com.navalgo.backend.auth.RefreshTokenService;
+import com.navalgo.backend.auth.RegistrationInvitationService;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.workorder.WorkOrderRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,6 +22,7 @@ public class WorkerService {
     private final RefreshTokenService refreshTokenService;
     private final WorkOrderRepository workOrderRepository;
     private final InputSanitizer inputSanitizer;
+    private final RegistrationInvitationService registrationInvitationService;
     private final SecureRandom secureRandom = new SecureRandom();
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
 
@@ -28,12 +30,14 @@ public class WorkerService {
                          PasswordEncoder passwordEncoder,
                          RefreshTokenService refreshTokenService,
                          WorkOrderRepository workOrderRepository,
-                         InputSanitizer inputSanitizer) {
+                         InputSanitizer inputSanitizer,
+                         RegistrationInvitationService registrationInvitationService) {
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
         this.workOrderRepository = workOrderRepository;
         this.inputSanitizer = inputSanitizer;
+        this.registrationInvitationService = registrationInvitationService;
     }
 
     public List<WorkerDto> findAll() {
@@ -52,28 +56,20 @@ public class WorkerService {
             throw new IllegalArgumentException("Ya existe un trabajador con ese email");
         });
 
-        if (request.password() != null && !request.password().isBlank() && !isStrongPassword(request.password().trim())) {
-            throw new IllegalArgumentException("La contrasena debe tener minimo 12 caracteres e incluir mayuscula, minuscula, numero y simbolo");
-        }
-
-        String rawPassword = (request.password() == null || request.password().isBlank())
-                ? generateTemporaryPassword(12)
-                : request.password().trim();
-        boolean generatedPassword = request.password() == null || request.password().isBlank();
-
         Worker worker = new Worker();
         worker.setFullName(inputSanitizer.requiredText(request.fullName(), "El nombre", 255));
         worker.setEmail(inputSanitizer.email(request.email()));
-        worker.setPasswordHash(passwordEncoder.encode(rawPassword));
+        worker.setPasswordHash(passwordEncoder.encode(generateTemporaryPassword(24)));
         worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
         worker.setRole(request.role());
         worker.setActive(true);
-        worker.setMustChangePassword(true);
+        worker.setMustChangePassword(false);
         worker.setCanEditWorkOrders(request.canEditWorkOrders());
         worker.setContractStartDate(request.contractStartDate() != null ? request.contractStartDate() : LocalDate.now());
 
         Worker saved = workerRepository.save(worker);
-        return new CreateWorkerResponse(WorkerDto.from(saved), generatedPassword ? rawPassword : null);
+        boolean invitationEmailSent = registrationInvitationService.issueInvitation(saved);
+        return new CreateWorkerResponse(WorkerDto.from(saved), invitationEmailSent);
     }
 
     @Transactional
