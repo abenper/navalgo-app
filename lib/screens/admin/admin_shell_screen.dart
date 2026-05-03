@@ -11,7 +11,6 @@ import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../common/privacy_policy_screen.dart';
-import 'push_debug_screen.dart';
 import '../common/login_screen.dart';
 import '../worker/fichaje_screen.dart';
 import '../worker/vacaciones_screen.dart';
@@ -41,7 +40,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     const EquipoScreen(),
     const FichajeScreen(),
     const AusenciasScreen(),
-    const PushDebugScreen(),
   ];
 
   final List<String> _titles = const [
@@ -52,7 +50,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     'Equipo',
     'Fichaje',
     'Ausencias',
-    'Push Debug',
   ];
 
   final List<IconData> _sectionIcons = const [
@@ -63,7 +60,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     Icons.people_outline,
     Icons.access_time_outlined,
     Icons.event_note_outlined,
-    Icons.bug_report_outlined,
   ];
 
   @override
@@ -702,11 +698,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                             selectedIcon: Icon(Icons.event_note),
                             label: Text('Ausencias'),
                           ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.bug_report_outlined),
-                            selectedIcon: Icon(Icons.bug_report),
-                            label: Text('Push Debug'),
-                          ),
                         ],
                       ),
                     ),
@@ -796,11 +787,6 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     icon: Icon(Icons.event_note_outlined),
                     selectedIcon: Icon(Icons.event_note),
                     label: 'Ausencias',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.bug_report_outlined),
-                    selectedIcon: Icon(Icons.bug_report),
-                    label: 'Push Debug',
                   ),
                 ],
               ),

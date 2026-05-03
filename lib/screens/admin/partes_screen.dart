@@ -37,6 +37,17 @@ class PartesScreen extends StatefulWidget {
   State<PartesScreen> createState() => _PartesScreenState();
 }
 
+Future<bool?> openWorkOrderDetailsScreen(
+  BuildContext context, {
+  required WorkOrder initialWorkOrder,
+}) {
+  return Navigator.of(context).push<bool>(
+    MaterialPageRoute(
+      builder: (_) => _WorkOrderDetailsSheet(initialWorkOrder: initialWorkOrder),
+    ),
+  );
+}
+
 class _PartesScreenState extends State<PartesScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
 
@@ -149,10 +160,9 @@ class _PartesScreenState extends State<PartesScreen> {
   }
 
   Future<void> _openPartDetails(WorkOrder parte) async {
-    final signed = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => _WorkOrderDetailsSheet(initialWorkOrder: parte),
-      ),
+    final signed = await openWorkOrderDetailsScreen(
+      context,
+      initialWorkOrder: parte,
     );
 
     if (!mounted) {

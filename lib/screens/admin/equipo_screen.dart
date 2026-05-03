@@ -11,6 +11,8 @@ import '../../viewmodels/workers_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 import 'admin_time_tracking_screen.dart';
 
+const String _superAdminEmail = 'admin@naval-go.com';
+
 class EquipoScreen extends StatefulWidget {
   const EquipoScreen({super.key});
 
@@ -42,15 +44,27 @@ class _EquipoScreenState extends State<EquipoScreen> {
     return error.toString();
   }
 
+  bool _isSuperAdmin(String? email) {
+    return (email ?? '').trim().toLowerCase() == _superAdminEmail;
+  }
+
+  bool _canManageAdminAccount(WorkerProfile worker, String? currentEmail) {
+    if (worker.role != 'ADMIN') {
+      return true;
+    }
+    return _isSuperAdmin(currentEmail);
+  }
+
   Future<void> _openCreateWorkerDialog() async {
     final messenger = ScaffoldMessenger.of(context);
     final session = context.read<SessionViewModel>();
     final workerService = context.read<WorkerService>();
     final workersViewModel = context.read<WorkersViewModel>();
+    final canManageAdmins = _isSuperAdmin(session.user?.email);
 
     final result = await showDialog<_CreateWorkerInput>(
       context: context,
-      builder: (_) => const _CreateWorkerDialog(),
+      builder: (_) => _CreateWorkerDialog(canManageAdmins: canManageAdmins),
     );
     if (!mounted || result == null) {
       return;
@@ -115,10 +129,22 @@ class _EquipoScreenState extends State<EquipoScreen> {
     final session = context.read<SessionViewModel>();
     final workerService = context.read<WorkerService>();
     final workersViewModel = context.read<WorkersViewModel>();
+    final currentEmail = session.user?.email;
+    if (!_canManageAdminAccount(worker, currentEmail)) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Solo el superadmin puede editar cuentas de administrador'),
+        ),
+      );
+      return;
+    }
 
     final result = await showDialog<_EditWorkerInput>(
       context: context,
-      builder: (_) => _EditWorkerDialog(worker: worker),
+      builder: (_) => _EditWorkerDialog(
+        worker: worker,
+        canManageAdmins: _isSuperAdmin(currentEmail),
+      ),
     );
     if (!mounted || result == null) {
       return;
@@ -158,6 +184,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
   }
 
   Future<void> _deleteWorker(WorkerProfile worker) async {
+    final currentEmail = context.read<SessionViewModel>().user?.email;
+    if (!_canManageAdminAccount(worker, currentEmail)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo el superadmin puede eliminar cuentas de administrador'),
+        ),
+      );
+      return;
+    }
+
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => NavalgoConfirmDialog(
@@ -203,6 +239,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
   }
 
   Future<void> _toggleActive(WorkerProfile worker, bool active) async {
+    final currentEmail = context.read<SessionViewModel>().user?.email;
+    if (!_canManageAdminAccount(worker, currentEmail)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo el superadmin puede cambiar el estado de otro administrador'),
+        ),
+      );
+      return;
+    }
+
     final token = context.read<SessionViewModel>().token;
     final workerService = context.read<WorkerService>();
     final workersViewModel = context.read<WorkersViewModel>();
@@ -229,6 +275,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
   }
 
   Future<void> _resetPassword(WorkerProfile worker) async {
+    final currentEmail = context.read<SessionViewModel>().user?.email;
+    if (!_canManageAdminAccount(worker, currentEmail)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Solo el superadmin puede restablecer contraseñas de administradores'),
+        ),
+      );
+      return;
+    }
+
     final token = context.read<SessionViewModel>().token;
     final workerService = context.read<WorkerService>();
     final workersViewModel = context.read<WorkersViewModel>();
@@ -294,6 +350,10 @@ class _EquipoScreenState extends State<EquipoScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<WorkersViewModel>();
+    final currentUserEmail = context.select<SessionViewModel, String?>(
+      (session) => session.user?.email,
+    );
+    final canManageAdmins = _isSuperAdmin(currentUserEmail);
 
     return Scaffold(
       body: vm.isLoading
@@ -316,6 +376,10 @@ class _EquipoScreenState extends State<EquipoScreen> {
                     builder: (context, value, _) {
                       final query = value.text.trim().toLowerCase();
                       final filteredWorkers = vm.workers.where((worker) {
+                        if (worker.email.trim().toLowerCase() ==
+                            (currentUserEmail ?? '').trim().toLowerCase()) {
+                          return false;
+                        }
                         if (query.isEmpty) {
                           return true;
                         }
@@ -339,6 +403,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
                             child: _WorkerCard(
                               worker: worker,
                               formattedDate: _fmtDate(worker.contractStartDate),
+                              canManageAdminAccount:
+                                  worker.role != 'ADMIN' || canManageAdmins,
                               onEdit: () => _openEditWorkerDialog(worker),
                               onToggleActive: () =>
                                   _toggleActive(worker, !worker.active),
@@ -384,6 +450,7 @@ class _WorkerCard extends StatelessWidget {
   const _WorkerCard({
     required this.worker,
     required this.formattedDate,
+    required this.canManageAdminAccount,
     required this.onEdit,
     required this.onToggleActive,
     required this.onResetPassword,
@@ -393,6 +460,7 @@ class _WorkerCard extends StatelessWidget {
 
   final WorkerProfile worker;
   final String formattedDate;
+  final bool canManageAdminAccount;
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
   final VoidCallback onResetPassword;
@@ -502,39 +570,42 @@ class _WorkerCard extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             children: [
-              OutlinedButton.icon(
-                onPressed: onEdit,
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Editar'),
-              ),
-              OutlinedButton.icon(
-                onPressed: onToggleActive,
-                icon: Icon(
-                  worker.active
-                      ? Icons.pause_circle_outline
-                      : Icons.play_circle_outline,
+              if (canManageAdminAccount) ...[
+                OutlinedButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Editar'),
                 ),
-                label: Text(worker.active ? 'Desactivar' : 'Activar'),
-              ),
-              FilledButton.tonalIcon(
-                onPressed: onResetPassword,
-                icon: const Icon(Icons.password_outlined),
-                label: const Text('Contraseña temporal'),
-              ),
+                OutlinedButton.icon(
+                  onPressed: onToggleActive,
+                  icon: Icon(
+                    worker.active
+                        ? Icons.pause_circle_outline
+                        : Icons.play_circle_outline,
+                  ),
+                  label: Text(worker.active ? 'Desactivar' : 'Activar'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: onResetPassword,
+                  icon: const Icon(Icons.password_outlined),
+                  label: const Text('Contrase?a temporal'),
+                ),
+              ],
               if (worker.role != 'ADMIN')
                 FilledButton.icon(
                   onPressed: onAdjustSchedule,
                   icon: const Icon(Icons.query_stats_outlined),
                   label: const Text('Ajuste de jornada'),
                 ),
-              OutlinedButton.icon(
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Eliminar'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: NavalgoColors.coral,
+              if (canManageAdminAccount)
+                OutlinedButton.icon(
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Eliminar'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: NavalgoColors.coral,
+                  ),
                 ),
-              ),
             ],
           ),
         ],
@@ -691,7 +762,9 @@ class _EditWorkerInput {
 }
 
 class _CreateWorkerDialog extends StatefulWidget {
-  const _CreateWorkerDialog();
+  const _CreateWorkerDialog({required this.canManageAdmins});
+
+  final bool canManageAdmins;
 
   @override
   State<_CreateWorkerDialog> createState() => _CreateWorkerDialogState();
@@ -806,12 +879,16 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
                   label: 'Rol',
                   prefixIcon: const Icon(Icons.admin_panel_settings_outlined),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'WORKER', child: Text('Trabajador')),
-                  DropdownMenuItem(
-                    value: 'ADMIN',
-                    child: Text('Administrador'),
+                items: [
+                  const DropdownMenuItem(
+                    value: 'WORKER',
+                    child: Text('Trabajador'),
                   ),
+                  if (widget.canManageAdmins)
+                    const DropdownMenuItem(
+                      value: 'ADMIN',
+                      child: Text('Administrador'),
+                    ),
                 ],
                 onChanged: (value) {
                   setState(() {
@@ -894,9 +971,13 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
 }
 
 class _EditWorkerDialog extends StatefulWidget {
-  const _EditWorkerDialog({required this.worker});
+  const _EditWorkerDialog({
+    required this.worker,
+    required this.canManageAdmins,
+  });
 
   final WorkerProfile worker;
+  final bool canManageAdmins;
 
   @override
   State<_EditWorkerDialog> createState() => _EditWorkerDialogState();
@@ -1025,12 +1106,16 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
                   label: 'Rol',
                   prefixIcon: const Icon(Icons.admin_panel_settings_outlined),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'WORKER', child: Text('Trabajador')),
-                  DropdownMenuItem(
-                    value: 'ADMIN',
-                    child: Text('Administrador'),
+                items: [
+                  const DropdownMenuItem(
+                    value: 'WORKER',
+                    child: Text('Trabajador'),
                   ),
+                  if (widget.canManageAdmins)
+                    const DropdownMenuItem(
+                      value: 'ADMIN',
+                      child: Text('Administrador'),
+                    ),
                 ],
                 onChanged: (value) {
                   setState(() {

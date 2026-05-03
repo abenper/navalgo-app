@@ -3,6 +3,7 @@ package com.navalgo.backend.worker;
 import com.navalgo.backend.auth.RefreshTokenService;
 import com.navalgo.backend.auth.RegistrationInvitationService;
 import com.navalgo.backend.common.InputSanitizer;
+import com.navalgo.backend.common.Role;
 import com.navalgo.backend.workorder.WorkOrderRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -16,6 +17,7 @@ import java.util.List;
 @Service
 @Transactional(readOnly = true)
 public class WorkerService {
+    private static final String SUPERADMIN_EMAIL = "admin@naval-go.com";
 
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
@@ -51,7 +53,8 @@ public class WorkerService {
     }
 
     @Transactional
-    public CreateWorkerResponse create(CreateWorkerRequest request) {
+    public CreateWorkerResponse create(CreateWorkerRequest request, String requesterEmail) {
+        ensureCanManageAdminRole(request.role(), requesterEmail);
         workerRepository.findByEmailIgnoreCase(request.email()).ifPresent(existing -> {
             throw new IllegalArgumentException("Ya existe un trabajador con ese email");
         });
@@ -73,9 +76,11 @@ public class WorkerService {
     }
 
     @Transactional
-    public WorkerDto update(Long workerId, UpdateWorkerRequest request) {
+    public WorkerDto update(Long workerId, UpdateWorkerRequest request, String requesterEmail) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        ensureCanManageTarget(worker, requesterEmail);
+        ensureCanManageAdminRole(request.role(), requesterEmail);
 
         workerRepository.findByEmailIgnoreCase(request.email()).ifPresent(existing -> {
             if (!existing.getId().equals(workerId)) {
@@ -110,10 +115,10 @@ public class WorkerService {
     }
 
     @Transactional
-    public void delete(Long workerId) {
-        if (!workerRepository.existsById(workerId)) {
-            throw new EntityNotFoundException("Trabajador no encontrado");
-        }
+    public void delete(Long workerId, String requesterEmail) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        ensureCanManageTarget(worker, requesterEmail);
         refreshTokenService.revokeAllForWorker(workerId);
         workOrderRepository.removeWorkerFromAllWorkOrders(workerId);
         workOrderRepository.clearSignedByWorker(workerId);
@@ -121,9 +126,10 @@ public class WorkerService {
     }
 
     @Transactional
-    public ResetWorkerPasswordResponse resetPassword(Long workerId) {
+    public ResetWorkerPasswordResponse resetPassword(Long workerId, String requesterEmail) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        ensureCanManageTarget(worker, requesterEmail);
 
         String temporaryPassword = generateTemporaryPassword(12);
         worker.setPasswordHash(passwordEncoder.encode(temporaryPassword));
@@ -135,9 +141,10 @@ public class WorkerService {
     }
 
     @Transactional
-    public WorkerDto setWorkOrderEditPermission(Long workerId, boolean canEditWorkOrders) {
+    public WorkerDto setWorkOrderEditPermission(Long workerId, boolean canEditWorkOrders, String requesterEmail) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        ensureCanManageTarget(worker, requesterEmail);
         worker.setCanEditWorkOrders(canEditWorkOrders);
         return WorkerDto.from(workerRepository.save(worker));
     }
@@ -162,9 +169,10 @@ public class WorkerService {
     }
 
     @Transactional
-    public WorkerDto setActive(Long workerId, boolean active) {
+    public WorkerDto setActive(Long workerId, boolean active, String requesterEmail) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        ensureCanManageTarget(worker, requesterEmail);
         worker.setActive(active);
         if (!active) {
             refreshTokenService.revokeAllForWorker(workerId);
@@ -181,6 +189,22 @@ public class WorkerService {
         }
         worker.setPhotoUrl(photoUrl);
         return WorkerDto.from(workerRepository.save(worker));
+    }
+
+    private void ensureCanManageAdminRole(Role requestedRole, String requesterEmail) {
+        if (requestedRole == Role.ADMIN && !isSuperAdmin(requesterEmail)) {
+            throw new org.springframework.security.access.AccessDeniedException("Solo el superadmin puede asignar el rol de administrador");
+        }
+    }
+
+    private void ensureCanManageTarget(Worker target, String requesterEmail) {
+        if (target.getRole() == Role.ADMIN && !isSuperAdmin(requesterEmail)) {
+            throw new org.springframework.security.access.AccessDeniedException("Solo el superadmin puede modificar cuentas de administrador");
+        }
+    }
+
+    private boolean isSuperAdmin(String email) {
+        return email != null && email.equalsIgnoreCase(SUPERADMIN_EMAIL);
     }
 
     private String generateTemporaryPassword(int length) {

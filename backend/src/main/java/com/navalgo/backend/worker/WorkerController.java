@@ -55,42 +55,51 @@ public class WorkerController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<CreateWorkerResponse> create(@RequestBody @Valid CreateWorkerRequest request) {
-        return ResponseEntity.ok(workerService.create(request));
+    public ResponseEntity<CreateWorkerResponse> create(@RequestBody @Valid CreateWorkerRequest request,
+                                                       Authentication authentication) {
+        return ResponseEntity.ok(workerService.create(request, authentication.getName()));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WorkerDto> update(@PathVariable Long id,
-                                            @RequestBody @Valid UpdateWorkerRequest request) {
-        return ResponseEntity.ok(workerService.update(id, request));
+                                            @RequestBody @Valid UpdateWorkerRequest request,
+                                            Authentication authentication) {
+        return ResponseEntity.ok(workerService.update(id, request, authentication.getName()));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        workerService.delete(id);
+    public ResponseEntity<Void> delete(@PathVariable Long id, Authentication authentication) {
+        workerService.delete(id, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 
     @PatchMapping("/{id}/active")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WorkerDto> updateStatus(@PathVariable Long id,
-                                                  @RequestBody UpdateWorkerStatusRequest request) {
-        return ResponseEntity.ok(workerService.setActive(id, request.active()));
+                                                  @RequestBody UpdateWorkerStatusRequest request,
+                                                  Authentication authentication) {
+        return ResponseEntity.ok(workerService.setActive(id, request.active(), authentication.getName()));
     }
 
     @PatchMapping("/{id}/reset-password")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ResetWorkerPasswordResponse> resetPassword(@PathVariable Long id) {
-        return ResponseEntity.ok(workerService.resetPassword(id));
+    public ResponseEntity<ResetWorkerPasswordResponse> resetPassword(@PathVariable Long id,
+                                                                     Authentication authentication) {
+        return ResponseEntity.ok(workerService.resetPassword(id, authentication.getName()));
     }
 
     @PatchMapping("/{id}/permissions/work-orders")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WorkerDto> updateWorkOrderPermission(@PathVariable Long id,
-                                                               @RequestBody UpdateWorkOrderEditPermissionRequest request) {
-        return ResponseEntity.ok(workerService.setWorkOrderEditPermission(id, request.canEditWorkOrders()));
+                                                               @RequestBody UpdateWorkOrderEditPermissionRequest request,
+                                                               Authentication authentication) {
+        return ResponseEntity.ok(workerService.setWorkOrderEditPermission(
+                id,
+                request.canEditWorkOrders(),
+                authentication.getName()
+        ));
     }
 
     @PostMapping(value = "/{id}/photo", consumes = "multipart/form-data")
