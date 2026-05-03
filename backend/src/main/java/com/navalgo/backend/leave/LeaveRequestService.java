@@ -3,6 +3,7 @@ package com.navalgo.backend.leave;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
+import com.navalgo.backend.notification.NotificationDeliveryOptions;
 import com.navalgo.backend.timetracking.TimeEntry;
 import com.navalgo.backend.timetracking.TimeEntryRepository;
 import com.navalgo.backend.timetracking.TimeEntryWorkSite;
@@ -204,7 +205,8 @@ public class LeaveRequestService {
                     "Nueva solicitud de ausencia",
                     worker.getFullName() + " ha enviado una nueva solicitud de ausencia.",
                     "AUSENCIAS",
-                    NotificationType.INFO
+                    NotificationType.INFO,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         }
 
@@ -214,7 +216,8 @@ public class LeaveRequestService {
                     "Ausencia asignada",
                     "Se te ha asignado una nueva ausencia.",
                     "AUSENCIAS",
-                    NotificationType.SUCCESS
+                    NotificationType.SUCCESS,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         }
 
@@ -241,7 +244,8 @@ public class LeaveRequestService {
                     "Solicitud aceptada",
                     "Tu solicitud de ausencia ha sido aceptada.",
                     "AUSENCIAS",
-                    NotificationType.SUCCESS
+                    NotificationType.SUCCESS,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         } else if (newStatus == LeaveStatus.REJECTED) {
             notificationService.notifyWorker(
@@ -249,7 +253,8 @@ public class LeaveRequestService {
                     "Solicitud rechazada",
                     "Tu solicitud de ausencia ha sido rechazada.",
                     "AUSENCIAS",
-                    NotificationType.WARNING
+                    NotificationType.WARNING,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         } else if (newStatus == LeaveStatus.CANCELLED) {
             notificationService.notifyWorker(
@@ -257,7 +262,8 @@ public class LeaveRequestService {
                     "Solicitud cancelada",
                     "Tu solicitud de ausencia ha sido cancelada.",
                     "AUSENCIAS",
-                    NotificationType.WARNING
+                    NotificationType.WARNING,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         }
 

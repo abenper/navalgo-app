@@ -9,7 +9,6 @@ import com.google.firebase.messaging.Aps;
 import com.google.firebase.messaging.BatchResponse;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.FirebaseMessagingException;
-import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
@@ -54,14 +53,14 @@ public class FirebasePushGateway {
         this.properties = properties;
     }
 
-    public Set<String> send(List<String> tokens,
-                            String title,
-                            String message,
-                            String actionRoute,
-                            NotificationType type,
-                            Long notificationId) {
+    public FirebasePushSendResult send(List<String> tokens,
+                                       String title,
+                                       String message,
+                                       String actionRoute,
+                                       NotificationType type,
+                                       Long notificationId) {
         if (tokens == null || tokens.isEmpty()) {
-            return Set.of();
+            return FirebasePushSendResult.notAttempted("No hay tokens para enviar");
         }
 
         lastSendAttemptAt = Instant.now();
@@ -69,7 +68,7 @@ public class FirebasePushGateway {
         FirebaseMessaging messaging = resolveMessaging();
         if (messaging == null) {
             lastSendError = "Firebase Messaging no disponible";
-            return Set.of();
+            return FirebasePushSendResult.notAttempted(lastSendError);
         }
 
         MulticastMessage pushMessage = MulticastMessage.builder()
@@ -102,11 +101,17 @@ public class FirebasePushGateway {
                     response.getFailureCount(),
                     invalidTokens.size()
             );
-            return invalidTokens;
+            return new FirebasePushSendResult(
+                    true,
+                    response.getSuccessCount(),
+                    response.getFailureCount(),
+                    invalidTokens,
+                    null
+            );
         } catch (FirebaseMessagingException ex) {
             lastSendError = ex.getMessage();
             log.warn("No se pudo enviar notificacion push por Firebase: {}", ex.getMessage());
-            return Set.of();
+            return FirebasePushSendResult.notAttempted(lastSendError);
         }
     }
 
@@ -265,6 +270,18 @@ public class FirebasePushGateway {
             int lastRequestedTokenCount,
             int lastInvalidTokenCount
     ) {
+    }
+
+    public record FirebasePushSendResult(
+            boolean attempted,
+            int successCount,
+            int failureCount,
+            Set<String> invalidTokens,
+            String failureReason
+    ) {
+        public static FirebasePushSendResult notAttempted(String failureReason) {
+            return new FirebasePushSendResult(false, 0, 0, Set.of(), failureReason);
+        }
     }
 
     private enum CredentialSource {

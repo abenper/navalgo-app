@@ -3,6 +3,7 @@ package com.navalgo.backend.timetracking;
 import com.navalgo.backend.common.Role;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
+import com.navalgo.backend.notification.NotificationDeliveryOptions;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -65,7 +66,8 @@ public class TimeAdjustmentRequestService {
                 "Solicitud de ajuste de fichaje",
                 worker.getFullName() + " ha solicitado revisar el fichaje del " + formatDate(request.workDate()) + ".",
                 "FICHAJES",
-                NotificationType.WARNING
+                NotificationType.WARNING,
+                NotificationDeliveryOptions.EMAIL_FALLBACK
         );
         return TimeAdjustmentRequestDto.from(saved);
     }
@@ -166,7 +168,8 @@ public class TimeAdjustmentRequestService {
                 "FICHAJES",
                 request.status() == TimeAdjustmentRequestStatus.APPROVED
                         ? NotificationType.SUCCESS
-                        : NotificationType.WARNING
+                        : NotificationType.WARNING,
+                NotificationDeliveryOptions.EMAIL_FALLBACK
         );
         return TimeAdjustmentRequestDto.from(saved);
     }

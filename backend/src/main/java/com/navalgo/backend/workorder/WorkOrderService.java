@@ -7,6 +7,7 @@ import com.navalgo.backend.fleet.Vessel;
 import com.navalgo.backend.fleet.VesselRepository;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
+import com.navalgo.backend.notification.NotificationDeliveryOptions;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import org.springframework.security.access.AccessDeniedException;
@@ -176,7 +177,8 @@ public class WorkOrderService {
                     "Nuevo parte asignado",
                     buildAssignmentMessage(saved),
                     "PARTES",
-                    saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO
+                    saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         }
 
@@ -344,7 +346,8 @@ public class WorkOrderService {
                         "Nuevo parte asignado",
                     buildAssignmentMessage(saved),
                         "PARTES",
-                        saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO
+                        saved.getPriority() == WorkOrderPriority.URGENT ? NotificationType.WARNING : NotificationType.INFO,
+                        NotificationDeliveryOptions.EMAIL_FALLBACK
                 );
             }
         }
@@ -742,7 +745,8 @@ public class WorkOrderService {
                     "Parte firmado por trabajador",
                     signer.getFullName() + " ha firmado y cerrado el parte \"" + saved.getTitle() + "\".",
                     "PARTES",
-                    NotificationType.SUCCESS
+                    NotificationType.SUCCESS,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         }
 

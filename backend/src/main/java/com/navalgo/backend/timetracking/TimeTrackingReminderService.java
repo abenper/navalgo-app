@@ -1,6 +1,7 @@
 package com.navalgo.backend.timetracking;
 
 import com.navalgo.backend.common.Role;
+import com.navalgo.backend.notification.NotificationDeliveryOptions;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.worker.Worker;
@@ -28,9 +29,9 @@ public class TimeTrackingReminderService {
     private final WorkerRepository workerRepository;
 
     public TimeTrackingReminderService(NotificationService notificationService,
-                                      TimeEntryRepository timeEntryRepository,
-                                      TimeTrackingService timeTrackingService,
-                                      WorkerRepository workerRepository) {
+                                       TimeEntryRepository timeEntryRepository,
+                                       TimeTrackingService timeTrackingService,
+                                       WorkerRepository workerRepository) {
         this.notificationService = notificationService;
         this.timeEntryRepository = timeEntryRepository;
         this.timeTrackingService = timeTrackingService;
@@ -64,10 +65,11 @@ public class TimeTrackingReminderService {
 
             notificationService.notifyWorker(
                     worker.getId(),
-                    "No has picado hoy",
-                    "No has picado el dia de hoy.",
+                    "No has fichado hoy",
+                    "No has fichado en el dia de hoy.",
                     "FICHAJES",
-                    NotificationType.WARNING
+                    NotificationType.WARNING,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
             worker.setLastMissingClockInReminderDate(today);
             updatedWorkers.add(worker);
@@ -101,7 +103,8 @@ public class TimeTrackingReminderService {
                     "Recuerda cerrar tu jornada",
                     "Recuerda cerrar tu jornada.",
                     "FICHAJES",
-                    NotificationType.WARNING
+                    NotificationType.WARNING,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
             entry.setCloseReminderSentAt(now);
             updatedEntries.add(entry);
@@ -133,9 +136,10 @@ public class TimeTrackingReminderService {
             notificationService.notifyWorker(
                     entry.getWorker().getId(),
                     "Jornada cerrada automaticamente",
-                    "Tu jornada se ha cerrado a la hora que indicaste, que pases buen dia!",
+                    "Tu jornada se ha cerrado a la hora que indicaste. Que pases buen dia.",
                     "FICHAJES",
-                    NotificationType.SUCCESS
+                    NotificationType.SUCCESS,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         }
     }
@@ -165,9 +169,10 @@ public class TimeTrackingReminderService {
                     entry.getWorker().getFullName()
                             + " no cerro su jornada del dia "
                             + formatDate(clockInDateTime.toLocalDate())
-                            + ". Revísala y modifícala si hace falta.",
+                            + ". Revisala y modificala si hace falta.",
                     "FICHAJES",
-                    NotificationType.WARNING
+                    NotificationType.WARNING,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
         }
     }

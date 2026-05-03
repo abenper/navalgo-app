@@ -14,7 +14,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
 import java.util.TreeMap;
 
 @Service
@@ -83,16 +82,16 @@ public class PushNotificationService {
     }
 
     @Transactional
-    public void sendToWorker(Long workerId,
-                             String title,
-                             String message,
-                             String actionRoute,
-                             NotificationType type,
-                             Long notificationId) {
+    public PushDeliveryResult sendToWorker(Long workerId,
+                                           String title,
+                                           String message,
+                                           String actionRoute,
+                                           NotificationType type,
+                                           Long notificationId) {
         List<WorkerPushToken> activeTokens = workerPushTokenRepository.findByWorkerIdAndActiveTrue(workerId);
         if (activeTokens.isEmpty()) {
             log.info("No hay push tokens activos para workerId={}", workerId);
-            return;
+            return PushDeliveryResult.noActiveTokens();
         }
 
         List<String> tokens = activeTokens.stream()
@@ -100,19 +99,31 @@ public class PushNotificationService {
                 .distinct()
                 .toList();
 
-        Set<String> invalidTokens = firebasePushGateway.send(tokens, title, message, actionRoute, type, notificationId);
-        if (invalidTokens.isEmpty()) {
-            return;
+        FirebasePushGateway.FirebasePushSendResult gatewayResult = firebasePushGateway.send(
+                tokens,
+                title,
+                message,
+                actionRoute,
+                type,
+                notificationId
+        );
+        if (!gatewayResult.attempted()) {
+            return PushDeliveryResult.pushUnavailable(tokens.size(), gatewayResult.failureReason());
         }
 
-        Instant now = Instant.now();
-        List<WorkerPushToken> invalidEntities = workerPushTokenRepository.findByTokenIn(invalidTokens);
-        for (WorkerPushToken invalidEntity : invalidEntities) {
-            invalidEntity.setActive(false);
-            invalidEntity.setLastSeenAt(now);
+        var invalidTokens = gatewayResult.invalidTokens();
+        if (!invalidTokens.isEmpty()) {
+            Instant now = Instant.now();
+            List<WorkerPushToken> invalidEntities = workerPushTokenRepository.findByTokenIn(invalidTokens);
+            for (WorkerPushToken invalidEntity : invalidEntities) {
+                invalidEntity.setActive(false);
+                invalidEntity.setLastSeenAt(now);
+            }
+            workerPushTokenRepository.saveAll(invalidEntities);
+            log.warn("Firebase marco {} token(s) invalidos para workerId={}", invalidEntities.size(), workerId);
         }
-        workerPushTokenRepository.saveAll(invalidEntities);
-        log.warn("Firebase marco {} token(s) invalidos para workerId={}", invalidEntities.size(), workerId);
+
+        return PushDeliveryResult.fromGatewayResult(tokens.size(), gatewayResult);
     }
 
     public PushDebugStatusDto getDebugStatus() {
@@ -216,5 +227,42 @@ public class PushNotificationService {
             return token;
         }
         return token.substring(0, 6) + "..." + token.substring(token.length() - 6);
+    }
+
+    public record PushDeliveryResult(
+            int activeTokenCount,
+            int successCount,
+            int failureCount,
+            int invalidTokenCount,
+            String failureReason
+    ) {
+        public static PushDeliveryResult noActiveTokens() {
+            return new PushDeliveryResult(0, 0, 0, 0, "No hay tokens push activos");
+        }
+
+        public static PushDeliveryResult pushUnavailable(int activeTokenCount, String failureReason) {
+            return new PushDeliveryResult(activeTokenCount, 0, activeTokenCount, 0, failureReason);
+        }
+
+        public static PushDeliveryResult fromGatewayResult(
+                int activeTokenCount,
+                FirebasePushGateway.FirebasePushSendResult gatewayResult
+        ) {
+            return new PushDeliveryResult(
+                    activeTokenCount,
+                    gatewayResult.successCount(),
+                    gatewayResult.failureCount(),
+                    gatewayResult.invalidTokens().size(),
+                    gatewayResult.failureReason()
+            );
+        }
+
+        public boolean deliveredToAtLeastOneDevice() {
+            return successCount > 0;
+        }
+
+        public boolean shouldFallbackToEmail() {
+            return !deliveredToAtLeastOneDevice();
+        }
     }
 }

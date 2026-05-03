@@ -1,5 +1,6 @@
 package com.navalgo.backend.workorder;
 
+import com.navalgo.backend.notification.NotificationDeliveryOptions;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.worker.Worker;
@@ -60,11 +61,12 @@ public class WorkOrderReminderService {
             notificationService.notifyWorkers(
                     workerIds,
                     "Parte pendiente de cierre",
-                    "El parte '" + workOrder.getTitle() + "' debía cerrarse el "
+                    "El parte '" + workOrder.getTitle() + "' debia cerrarse el "
                             + formatDate(workOrder.getCloseDueDate())
-                            + ". Revísalo y ciérralo si procede.",
+                            + ". Revisalo y cierralo si procede.",
                     "PARTES",
-                    NotificationType.WARNING
+                    NotificationType.WARNING,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
             );
 
             workOrder.setLastCloseReminderSentAt(now);
