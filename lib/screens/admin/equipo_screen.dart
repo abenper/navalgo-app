@@ -588,7 +588,7 @@ class _WorkerCard extends StatelessWidget {
                 FilledButton.tonalIcon(
                   onPressed: onResetPassword,
                   icon: const Icon(Icons.password_outlined),
-                  label: const Text('Contrase?a temporal'),
+                  label: const Text('Contraseña temporal'),
                 ),
               ],
               if (worker.role != 'ADMIN')
