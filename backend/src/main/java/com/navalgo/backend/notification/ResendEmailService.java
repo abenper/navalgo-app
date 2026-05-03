@@ -34,7 +34,7 @@ public class ResendEmailService {
             @Value("${app.email.resend.api-key:}") String apiKey,
             @Value("${app.email.resend.api-url:https://api.resend.com/emails}") String apiUrl,
             @Value("${app.email.from:Naval-GO <no-reply@naval-go.com>}") String fromAddress,
-            @Value("${app.email.reply-to:soporte@naval-go.com}") String replyToAddress
+            @Value("${app.email.reply-to:}") String replyToAddress
     ) {
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
@@ -100,18 +100,19 @@ public class ResendEmailService {
     private String buildInvitationHtml(String workerName, String activationLink, String privacyPolicyLink) {
         return """
                 <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
-                  <h2 style="margin-bottom:12px;">Bienvenido a Naval-GO</h2>
+                  <h2 style="margin-bottom:12px;">Bienvenido / Bienvenida a Naval-GO</h2>
                   <p>Hola, %s:</p>
-                  <p>Tu cuenta ya ha sido creada en Naval-GO. Para activar tu acceso, completa el registro creando tu contrasena desde este enlace:</p>
+                  <p>Tu cuenta ya ha sido creada en Naval-GO. Para activar tu acceso, completa el registro creando tu contraseña desde este enlace:</p>
                   <p style="margin:24px 0;">
                     <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
                       Completar registro
                     </a>
                   </p>
-                  <p>Si el boton no funciona, copia y pega esta URL en tu navegador:</p>
+                  <p>Si el botón no funciona, copia y pega esta URL en tu navegador:</p>
                   <p><a href="%s">%s</a></p>
-                  <p>Tratamos tus datos para gestionar tu acceso y el uso de Naval-GO. Puedes consultar la Politica de Privacidad aqui:</p>
+                  <p>Tratamos tus datos para gestionar tu acceso y el uso de Naval-GO. Puedes consultar la Política de Privacidad aquí:</p>
                   <p><a href="%s">%s</a></p>
+                  <p>Este correo se envía desde una dirección no monitorizada. Si respondes a este mensaje, tu respuesta no será atendida.</p>
                   <p>Si no esperabas este correo, puedes ignorarlo.</p>
                   <p>Equipo Naval-GO</p>
                 </div>
@@ -130,11 +131,14 @@ public class ResendEmailService {
                 Hola, %s:
 
                 Tu cuenta ya ha sido creada en Naval-GO.
-                Completa tu registro creando tu contrasena aqui:
+                Completa tu registro creando tu contraseña aquí:
                 %s
 
-                Politica de Privacidad:
+                Política de Privacidad:
                 %s
+
+                Este correo se envía desde una dirección no monitorizada.
+                Si respondes a este mensaje, tu respuesta no será atendida.
 
                 Si no esperabas este correo, puedes ignorarlo.
                 """.formatted(workerName, activationLink, privacyPolicyLink);
