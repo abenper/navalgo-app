@@ -193,4 +193,16 @@ class FleetService {
         .map((e) => EngineHourSummary.fromJson(e as Map<String, dynamic>))
         .toList();
   }
+
+  Future<VesselStats> getVesselStats(
+    String token, {
+    required int vesselId,
+  }) async {
+    final data = await _apiClient.get(
+      '/fleet/vessels/$vesselId/stats',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    return VesselStats.fromJson(data as Map<String, dynamic>);
+  }
 }

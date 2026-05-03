@@ -1,9 +1,13 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/owner.dart';
 import '../../models/vessel.dart';
+import '../../models/work_order.dart';
 import '../../services/fleet_service.dart';
+import '../../services/work_order_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/fleet_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
@@ -69,7 +73,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
   Future<void> _showVesselDetails(Vessel vessel) async {
     await showDialog<void>(
       context: context,
-      builder: (_) => _VesselDetailsDialog(vessel: vessel),
+      builder: (_) => _VesselAnalyticsDialog(vessel: vessel),
     );
   }
 
@@ -1935,4 +1939,968 @@ String _buildAssociatedSerialSummary({
     final serial = index < serialNumbers.length ? serialNumbers[index] : '';
     return '${labels[index]}: ${serial.trim().isEmpty ? 'No indicado' : serial.trim()}';
   }).join('\n');
+}
+
+class _VesselAnalyticsDialog extends StatefulWidget {
+  const _VesselAnalyticsDialog({required this.vessel});
+
+  final Vessel vessel;
+
+  @override
+  State<_VesselAnalyticsDialog> createState() => _VesselAnalyticsDialogState();
+}
+
+class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
+  VesselStats? _stats;
+  String? _statsError;
+  bool _loadingStats = false;
+  bool _openingWorkOrder = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() {
+      _loadingStats = true;
+      _statsError = null;
+    });
+
+    try {
+      final stats = await context.read<FleetService>().getVesselStats(
+        token,
+        vesselId: widget.vessel.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _stats = stats);
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _stats = null;
+        _statsError = 'No se pudieron cargar las estadisticas reales.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _loadingStats = false);
+      }
+    }
+  }
+
+  Future<void> _openWorkOrderFromPoint(VesselEngineHourPoint point) async {
+    if (_openingWorkOrder) {
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    setState(() => _openingWorkOrder = true);
+    try {
+      final workOrder = await context.read<WorkOrderService>().getWorkOrder(
+        token,
+        workOrderId: point.workOrderId,
+      );
+      if (!mounted) {
+        return;
+      }
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _WorkOrderPreviewDialog(workOrder: workOrder),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo abrir el parte: $error')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _openingWorkOrder = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vessel = widget.vessel;
+    final stats = _stats;
+    final engineSummary = vessel.engineLabels.isEmpty
+        ? 'Sin posiciones definidas'
+        : vessel.engineLabels.join(', ');
+
+    return NavalgoFormDialog(
+      eyebrow: 'FLOTA',
+      title: vessel.name,
+      subtitle:
+          'Ficha tecnica con horas reales de motor y partes registrados sobre esta embarcacion.',
+      maxWidth: 920,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              SizedBox(
+                width: 260,
+                child: NavalgoFormFieldBlock(
+                  label: 'Propietario',
+                  child: _VesselDetailValue(
+                    icon: Icons.person_outline,
+                    value: vessel.ownerName,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 260,
+                child: NavalgoFormFieldBlock(
+                  label: 'Matricula',
+                  child: _VesselDetailValue(
+                    icon: Icons.badge_outlined,
+                    value: vessel.registrationNumber,
+                  ),
+                ),
+              ),
+              SizedBox(
+                width: 260,
+                child: NavalgoFormFieldBlock(
+                  label: 'Modelo / eslora',
+                  child: _VesselDetailValue(
+                    icon: Icons.straighten_outlined,
+                    value:
+                        '${vessel.model ?? 'No indicado'} · ${vessel.lengthMeters == null ? 'Eslora no indicada' : '${vessel.lengthMeters!.toStringAsFixed(1)} m'}',
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Configuracion mecanica',
+            child: Column(
+              children: [
+                _VesselDetailValue(
+                  icon: Icons.speed_outlined,
+                  value:
+                      '${vessel.engineCount ?? 0} motor(es) · $engineSummary',
+                ),
+                const SizedBox(height: 10),
+                _VesselDetailValue(
+                  icon: Icons.dialpad,
+                  value: _buildEngineSerialSummary(vessel),
+                ),
+                const SizedBox(height: 10),
+                _VesselDetailValue(
+                  icon: Icons.settings_input_component_outlined,
+                  value:
+                      'Jets: ${_buildAssociatedSerialSummary(labels: vessel.jetLabels, serialNumbers: vessel.jetSerialNumbers, emptyLabel: 'No configurados')}',
+                ),
+                const SizedBox(height: 10),
+                _VesselDetailValue(
+                  icon: Icons.precision_manufacturing_outlined,
+                  value:
+                      'Reductoras: ${_buildAssociatedSerialSummary(labels: vessel.gearboxLabels, serialNumbers: vessel.gearboxSerialNumbers, emptyLabel: 'No configuradas')}',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Resumen operativo',
+            child: _loadingStats
+                ? const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _statsError != null
+                ? _VesselDetailValue(
+                    icon: Icons.error_outline,
+                    value: _statsError!,
+                  )
+                : _VesselStatsOverview(stats: stats),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Ultimas horas registradas',
+            child: stats == null || stats.latestEngineHours.isEmpty
+                ? _VesselDetailValue(
+                    icon: Icons.hourglass_empty_outlined,
+                    value: 'Sin horas registradas',
+                  )
+                : Column(
+                    children: stats.latestEngineHours
+                        .map(
+                          (item) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: _VesselDetailValue(
+                              icon: Icons.speed_outlined,
+                              value: '${item.engineLabel}: ${item.hours} h',
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Grafica historica de horas',
+            child: stats == null || !stats.hasEngineData
+                ? _VesselDetailValue(
+                    icon: Icons.show_chart_outlined,
+                    value:
+                        'Todavia no hay suficientes horas de motor registradas para dibujar la grafica.',
+                  )
+                : _VesselStatsChart(
+                    stats: stats,
+                    onPointTap: _openWorkOrderFromPoint,
+                  ),
+          ),
+          const SizedBox(height: 14),
+          NavalgoFormFieldBlock(
+            label: 'Partes registrados a esas horas',
+            child: stats == null || stats.workOrderMilestones.isEmpty
+                ? _VesselDetailValue(
+                    icon: Icons.assignment_outlined,
+                    value: 'No hay partes asociados a esta embarcacion.',
+                  )
+                : Column(
+                    children: stats.workOrderMilestones
+                        .map(
+                          (milestone) => Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _VesselWorkOrderMilestoneCard(
+                              milestone: milestone,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VesselStatsOverview extends StatelessWidget {
+  const _VesselStatsOverview({required this.stats});
+
+  final VesselStats? stats;
+
+  @override
+  Widget build(BuildContext context) {
+    if (stats == null) {
+      return const _VesselDetailValue(
+        icon: Icons.analytics_outlined,
+        value: 'Aun no hay datos operativos para esta embarcacion.',
+      );
+    }
+
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        _VesselMetricCard(
+          icon: Icons.assignment_turned_in_outlined,
+          label: 'Partes totales',
+          value: '${stats!.totalWorkOrders}',
+        ),
+        _VesselMetricCard(
+          icon: Icons.speed_outlined,
+          label: 'Partes con horas',
+          value: '${stats!.workOrdersWithEngineHours}',
+        ),
+        _VesselMetricCard(
+          icon: Icons.schedule_outlined,
+          label: 'Ultimo registro',
+          value: _formatShortDate(stats!.lastRecordedAt) ?? 'Sin datos',
+        ),
+        _VesselMetricCard(
+          icon: Icons.trending_up_outlined,
+          label: 'Hora maxima',
+          value: stats!.highestRecordedHour == null
+              ? 'Sin datos'
+              : '${stats!.highestRecordedHour} h',
+        ),
+      ],
+    );
+  }
+}
+
+class _VesselMetricCard extends StatelessWidget {
+  const _VesselMetricCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 180,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: NavalgoColors.tide),
+          const SizedBox(height: 12),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: NavalgoColors.deepSea,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VesselStatsChart extends StatelessWidget {
+  const _VesselStatsChart({
+    required this.stats,
+    required this.onPointTap,
+  });
+
+  final VesselStats stats;
+  final ValueChanged<VesselEngineHourPoint> onPointTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final allPoints = stats.engineSeries
+        .expand((series) => series.points)
+        .toList(growable: false);
+    if (allPoints.isEmpty) {
+      return const _VesselDetailValue(
+        icon: Icons.show_chart_outlined,
+        value: 'Sin puntos historicos para la grafica.',
+      );
+    }
+
+    final sortedPoints = [...allPoints]
+      ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
+    final minHours = allPoints
+        .map((point) => point.hours)
+        .reduce((current, next) => math.min(current, next));
+    final maxHours = allPoints
+        .map((point) => point.hours)
+        .reduce((current, next) => math.max(current, next));
+
+    final palette = <Color>[
+      NavalgoColors.tide,
+      NavalgoColors.kelp,
+      NavalgoColors.sand,
+      Colors.deepOrange,
+      Colors.indigo,
+      Colors.teal,
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            for (var index = 0; index < stats.engineSeries.length; index++)
+              _ChartLegendChip(
+                color: palette[index % palette.length],
+                label:
+                    '${stats.engineSeries[index].engineLabel} · ${stats.engineSeries[index].latestHours ?? '-'} h',
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          'Pulsa cualquier punto de la grafica para abrir el parte asociado a ese registro.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: NavalgoColors.border),
+          ),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 220,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: 54,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$maxHours h',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          Text(
+                            '$minHours h',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _TappableVesselChartCanvas(
+                        series: stats.engineSeries,
+                        colors: palette,
+                        onPointTap: onPointTap,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formatShortDate(sortedPoints.first.recordedAt) ?? '',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
+                  ),
+                  Text(
+                    _formatShortDate(sortedPoints.last.recordedAt) ?? '',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ChartLegendChip extends StatelessWidget {
+  const _ChartLegendChip({required this.color, required this.label});
+
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: NavalgoColors.deepSea,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TappableVesselChartCanvas extends StatelessWidget {
+  const _TappableVesselChartCanvas({
+    required this.series,
+    required this.colors,
+    required this.onPointTap,
+  });
+
+  final List<VesselEngineHourSeries> series;
+  final List<Color> colors;
+  final ValueChanged<VesselEngineHourPoint> onPointTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final size = Size(constraints.maxWidth, 220);
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (details) {
+            final point = _findNearestChartPoint(
+              series: series,
+              size: size,
+              tapPosition: details.localPosition,
+            );
+            if (point != null) {
+              onPointTap(point);
+            }
+          },
+          child: CustomPaint(
+            painter: _VesselEngineHoursChartPainter(
+              series: series,
+              colors: colors,
+            ),
+            child: const SizedBox.expand(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _VesselWorkOrderMilestoneCard extends StatelessWidget {
+  const _VesselWorkOrderMilestoneCard({required this.milestone});
+
+  final VesselWorkOrderMilestone milestone;
+
+  @override
+  Widget build(BuildContext context) {
+    final engineHoursSummary = milestone.engineHours.isEmpty
+        ? 'Sin horas registradas en este parte'
+        : milestone.engineHours
+              .map((item) => '${item.engineLabel}: ${item.hours} h')
+              .join(' · ');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  milestone.workOrderTitle,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: NavalgoColors.deepSea,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _StatusPill(
+                label: _formatStatusLabel(milestone.workOrderStatus),
+                color: _statusColor(milestone.workOrderStatus),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${_formatShortDate(milestone.recordedAt)} · ${milestone.maxHours == null ? 'Sin hora maxima' : 'Hasta ${milestone.maxHours} h'}',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.storm),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            engineHoursSummary,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: NavalgoColors.deepSea,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  const _StatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: color,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+}
+
+class _VesselEngineHoursChartPainter extends CustomPainter {
+  _VesselEngineHoursChartPainter({
+    required this.series,
+    required this.colors,
+  });
+
+  final List<VesselEngineHourSeries> series;
+  final List<Color> colors;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final allPoints = series.expand((item) => item.points).toList(growable: false);
+    if (allPoints.isEmpty) {
+      return;
+    }
+
+    final minTime = allPoints
+        .map((point) => point.recordedAt.millisecondsSinceEpoch.toDouble())
+        .reduce(math.min);
+    final maxTime = allPoints
+        .map((point) => point.recordedAt.millisecondsSinceEpoch.toDouble())
+        .reduce(math.max);
+    final minHours =
+        allPoints.map((point) => point.hours.toDouble()).reduce(math.min);
+    final maxHours =
+        allPoints.map((point) => point.hours.toDouble()).reduce(math.max);
+
+    const horizontalPadding = 10.0;
+    const verticalPadding = 12.0;
+    final chartRect = Rect.fromLTWH(
+      horizontalPadding,
+      verticalPadding,
+      size.width - (horizontalPadding * 2),
+      size.height - (verticalPadding * 2),
+    );
+
+    final gridPaint = Paint()
+      ..color = NavalgoColors.border
+      ..strokeWidth = 1;
+    for (var index = 0; index < 4; index++) {
+      final y = chartRect.top + (chartRect.height / 3) * index;
+      canvas.drawLine(
+        Offset(chartRect.left, y),
+        Offset(chartRect.right, y),
+        gridPaint,
+      );
+    }
+
+    double resolveX(DateTime recordedAt) {
+      if (maxTime == minTime) {
+        return chartRect.center.dx;
+      }
+      final ratio =
+          (recordedAt.millisecondsSinceEpoch.toDouble() - minTime) /
+          (maxTime - minTime);
+      return chartRect.left + (chartRect.width * ratio);
+    }
+
+    double resolveY(int hours) {
+      if (maxHours == minHours) {
+        return chartRect.center.dy;
+      }
+      final ratio = (hours - minHours) / (maxHours - minHours);
+      return chartRect.bottom - (chartRect.height * ratio);
+    }
+
+    for (var seriesIndex = 0; seriesIndex < series.length; seriesIndex++) {
+      final engineSeries = series[seriesIndex];
+      if (engineSeries.points.isEmpty) {
+        continue;
+      }
+
+      final color = colors[seriesIndex % colors.length];
+      final linePaint = Paint()
+        ..color = color
+        ..strokeWidth = 3
+        ..style = PaintingStyle.stroke;
+      final pointPaint = Paint()..color = color;
+      final path = Path();
+
+      for (var pointIndex = 0; pointIndex < engineSeries.points.length; pointIndex++) {
+        final point = engineSeries.points[pointIndex];
+        final offset = Offset(resolveX(point.recordedAt), resolveY(point.hours));
+        if (pointIndex == 0) {
+          path.moveTo(offset.dx, offset.dy);
+        } else {
+          path.lineTo(offset.dx, offset.dy);
+        }
+      }
+
+      canvas.drawPath(path, linePaint);
+
+      for (final point in engineSeries.points) {
+        final center = Offset(resolveX(point.recordedAt), resolveY(point.hours));
+        canvas.drawCircle(center, 4.5, pointPaint);
+        canvas.drawCircle(center, 2.2, Paint()..color = Colors.white);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _VesselEngineHoursChartPainter oldDelegate) {
+    return oldDelegate.series != series || oldDelegate.colors != colors;
+  }
+}
+
+class _WorkOrderPreviewDialog extends StatelessWidget {
+  const _WorkOrderPreviewDialog({required this.workOrder});
+
+  final WorkOrder workOrder;
+
+  @override
+  Widget build(BuildContext context) {
+    final engineHoursSummary = workOrder.engineHours.isEmpty
+        ? 'Sin horas registradas'
+        : workOrder.engineHours
+              .map((item) => '${item.engineLabel}: ${item.hours} h')
+              .join(' · ');
+    final workersSummary = workOrder.workerNames.isEmpty
+        ? 'Sin operarios asignados'
+        : workOrder.workerNames.join(', ');
+    final description = (workOrder.description ?? '').trim();
+
+    return NavalgoFormDialog(
+      eyebrow: 'PARTE',
+      title: workOrder.title,
+      subtitle: 'Vista rapida abierta desde la grafica de horas.',
+      maxWidth: 760,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              SizedBox(
+                width: 210,
+                child: _VesselDetailValue(
+                  icon: Icons.flag_outlined,
+                  value: _formatStatusLabel(workOrder.status),
+                ),
+              ),
+              SizedBox(
+                width: 210,
+                child: _VesselDetailValue(
+                  icon: Icons.priority_high_outlined,
+                  value: workOrder.priority,
+                ),
+              ),
+              SizedBox(
+                width: 210,
+                child: _VesselDetailValue(
+                  icon: Icons.calendar_today_outlined,
+                  value: _formatShortDate(workOrder.createdAt) ?? 'Sin fecha',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _VesselDetailValue(
+            icon: Icons.person_outline,
+            value: 'Propietario: ${workOrder.ownerName}',
+          ),
+          const SizedBox(height: 10),
+          _VesselDetailValue(
+            icon: Icons.directions_boat_outlined,
+            value: 'Embarcacion: ${workOrder.vesselName ?? 'Sin embarcacion'}',
+          ),
+          const SizedBox(height: 10),
+          _VesselDetailValue(
+            icon: Icons.group_outlined,
+            value: 'Operarios: $workersSummary',
+          ),
+          const SizedBox(height: 10),
+          _VesselDetailValue(
+            icon: Icons.speed_outlined,
+            value: 'Horas motor: $engineHoursSummary',
+          ),
+          if (workOrder.laborHours != null) ...[
+            const SizedBox(height: 10),
+            _VesselDetailValue(
+              icon: Icons.timer_outlined,
+              value: 'Horas de trabajo: ${workOrder.laborHours} h',
+            ),
+          ],
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Descripcion',
+              child: _VesselDetailValue(
+                icon: Icons.notes_outlined,
+                value: description,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+VesselEngineHourPoint? _findNearestChartPoint({
+  required List<VesselEngineHourSeries> series,
+  required Size size,
+  required Offset tapPosition,
+}) {
+  final allPoints = series.expand((item) => item.points).toList(growable: false);
+  if (allPoints.isEmpty || size.width <= 0 || size.height <= 0) {
+    return null;
+  }
+
+  final minTime = allPoints
+      .map((point) => point.recordedAt.millisecondsSinceEpoch.toDouble())
+      .reduce(math.min);
+  final maxTime = allPoints
+      .map((point) => point.recordedAt.millisecondsSinceEpoch.toDouble())
+      .reduce(math.max);
+  final minHours =
+      allPoints.map((point) => point.hours.toDouble()).reduce(math.min);
+  final maxHours =
+      allPoints.map((point) => point.hours.toDouble()).reduce(math.max);
+
+  const horizontalPadding = 10.0;
+  const verticalPadding = 12.0;
+  final chartRect = Rect.fromLTWH(
+    horizontalPadding,
+    verticalPadding,
+    size.width - (horizontalPadding * 2),
+    size.height - (verticalPadding * 2),
+  );
+
+  double resolveX(DateTime recordedAt) {
+    if (maxTime == minTime) {
+      return chartRect.center.dx;
+    }
+    final ratio =
+        (recordedAt.millisecondsSinceEpoch.toDouble() - minTime) /
+        (maxTime - minTime);
+    return chartRect.left + (chartRect.width * ratio);
+  }
+
+  double resolveY(int hours) {
+    if (maxHours == minHours) {
+      return chartRect.center.dy;
+    }
+    final ratio = (hours - minHours) / (maxHours - minHours);
+    return chartRect.bottom - (chartRect.height * ratio);
+  }
+
+  VesselEngineHourPoint? bestPoint;
+  double? bestDistance;
+  const maxTapDistance = 18.0;
+
+  for (final point in allPoints) {
+    final pointOffset = Offset(resolveX(point.recordedAt), resolveY(point.hours));
+    final distance = (tapPosition - pointOffset).distance;
+    if (distance > maxTapDistance) {
+      continue;
+    }
+    if (bestDistance == null || distance < bestDistance) {
+      bestDistance = distance;
+      bestPoint = point;
+    }
+  }
+
+  return bestPoint;
+}
+
+String? _formatShortDate(DateTime? value) {
+  if (value == null) {
+    return null;
+  }
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  return '$day/$month/${local.year}';
+}
+
+String _formatStatusLabel(String status) {
+  switch (status) {
+    case 'NEW':
+      return 'Nuevo';
+    case 'IN_PROGRESS':
+      return 'En curso';
+    case 'DONE':
+      return 'Cerrado';
+    case 'CANCELLED':
+      return 'Cancelado';
+    default:
+      return status.replaceAll('_', ' ');
+  }
+}
+
+Color _statusColor(String status) {
+  switch (status) {
+    case 'DONE':
+      return NavalgoColors.kelp;
+    case 'CANCELLED':
+      return Colors.redAccent;
+    case 'IN_PROGRESS':
+      return NavalgoColors.tide;
+    case 'NEW':
+    default:
+      return NavalgoColors.sand;
+  }
 }

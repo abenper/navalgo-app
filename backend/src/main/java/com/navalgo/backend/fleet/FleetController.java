@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -204,6 +205,90 @@ public class FleetController {
             }
         }
         return ResponseEntity.ok(new ArrayList<>(latestByLabel.values()));
+    }
+
+    @GetMapping("/vessels/{vesselId}/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<VesselStatsDto> vesselStats(@PathVariable Long vesselId) {
+        if (!vesselRepository.existsById(vesselId)) {
+            throw new EntityNotFoundException("Embarcacion no encontrada");
+        }
+
+        List<WorkOrder> orders = workOrderRepository.findByVesselIdOrderByCreatedAtAsc(vesselId);
+        Map<String, List<VesselEngineHourPointDto>> pointsByLabel = new LinkedHashMap<>();
+        Map<String, EngineHourSummaryDto> latestByLabel = new LinkedHashMap<>();
+        List<VesselWorkOrderMilestoneDto> milestones = new ArrayList<>();
+        Integer highestRecordedHour = null;
+        java.time.Instant firstRecordedAt = null;
+        java.time.Instant lastRecordedAt = null;
+        int workOrdersWithEngineHours = 0;
+
+        for (WorkOrder workOrder : orders) {
+            List<EngineHourSummaryDto> orderEngineHours = workOrder.getEngineHourLogs().stream()
+                    .sorted(Comparator.comparing(EngineHourLog::getEngineLabel, String.CASE_INSENSITIVE_ORDER))
+                    .map(log -> new EngineHourSummaryDto(
+                            log.getEngineLabel(),
+                            log.getHours(),
+                            workOrder.getCreatedAt()
+                    ))
+                    .toList();
+
+            Integer milestoneMaxHours = null;
+            if (!orderEngineHours.isEmpty()) {
+                workOrdersWithEngineHours += 1;
+            }
+
+            for (EngineHourSummaryDto engineHour : orderEngineHours) {
+                pointsByLabel.computeIfAbsent(engineHour.engineLabel(), ignored -> new ArrayList<>())
+                        .add(new VesselEngineHourPointDto(
+                                workOrder.getId(),
+                                workOrder.getTitle(),
+                                workOrder.getStatus().name(),
+                                engineHour.hours(),
+                                workOrder.getCreatedAt()
+                        ));
+                latestByLabel.put(engineHour.engineLabel(), engineHour);
+
+                if (milestoneMaxHours == null || engineHour.hours() > milestoneMaxHours) {
+                    milestoneMaxHours = engineHour.hours();
+                }
+                if (highestRecordedHour == null || engineHour.hours() > highestRecordedHour) {
+                    highestRecordedHour = engineHour.hours();
+                }
+                if (firstRecordedAt == null || workOrder.getCreatedAt().isBefore(firstRecordedAt)) {
+                    firstRecordedAt = workOrder.getCreatedAt();
+                }
+                if (lastRecordedAt == null || workOrder.getCreatedAt().isAfter(lastRecordedAt)) {
+                    lastRecordedAt = workOrder.getCreatedAt();
+                }
+            }
+
+            milestones.add(new VesselWorkOrderMilestoneDto(
+                    workOrder.getId(),
+                    workOrder.getTitle(),
+                    workOrder.getStatus().name(),
+                    workOrder.getCreatedAt(),
+                    milestoneMaxHours,
+                    orderEngineHours
+            ));
+        }
+
+        List<VesselEngineHourSeriesDto> engineSeries = pointsByLabel.entrySet().stream()
+                .map(entry -> new VesselEngineHourSeriesDto(entry.getKey(), List.copyOf(entry.getValue())))
+                .toList();
+
+        VesselStatsDto response = new VesselStatsDto(
+                vesselId,
+                orders.size(),
+                workOrdersWithEngineHours,
+                firstRecordedAt,
+                lastRecordedAt,
+                highestRecordedHour,
+                new ArrayList<>(latestByLabel.values()),
+                engineSeries,
+                milestones
+        );
+        return ResponseEntity.ok(response);
     }
 
     private Vessel buildVesselFromCreateRequest(Vessel vessel, CreateVesselRequest request) {

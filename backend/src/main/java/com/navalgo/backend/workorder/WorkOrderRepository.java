@@ -17,10 +17,11 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     List<WorkOrder> findByAssignedWorkersIdOrderByCreatedAtDesc(Long workerId);
     boolean existsByVesselId(Long vesselId);
     List<WorkOrder> findByVesselIdOrderByCreatedAtDesc(Long vesselId);
-        List<WorkOrder> findByCloseDueDateBeforeAndStatusNotInOrderByCloseDueDateAsc(
+    List<WorkOrder> findByVesselIdOrderByCreatedAtAsc(Long vesselId);
+    List<WorkOrder> findByCloseDueDateBeforeAndStatusNotInOrderByCloseDueDateAsc(
             LocalDate closeDueDate,
             Collection<WorkOrderStatus> statuses
-        );
+    );
 
     @Modifying
     @Query(value = "DELETE FROM work_order_workers WHERE worker_id = :workerId", nativeQuery = true)
