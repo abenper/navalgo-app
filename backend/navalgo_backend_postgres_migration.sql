@@ -305,4 +305,16 @@ END $$;
 ALTER TABLE leave_requests
     ADD CONSTRAINT ck_leave_status CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED'));
 
+CREATE TABLE IF NOT EXISTS registration_invitations (
+    id BIGSERIAL PRIMARY KEY,
+    worker_id BIGINT NOT NULL REFERENCES workers(id) ON DELETE CASCADE,
+    token_hash VARCHAR(64) NOT NULL UNIQUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    consumed_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX IF NOT EXISTS idx_registration_invitations_worker_id
+    ON registration_invitations(worker_id);
+
 COMMIT;

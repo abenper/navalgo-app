@@ -17,6 +17,9 @@ openssl rand -base64 48
 nano .env
 #   - APP_JWT_SECRET (pega el secret generado arriba)
 #   - SPRING_DATASOURCE_PASSWORD (password real de PostgreSQL)
+#   - APP_FRONTEND_BASE_URL (ej: https://naval-go.com)
+#   - APP_EMAIL_ENABLED=true
+#   - APP_EMAIL_RESEND_API_KEY
 
 # 5. Da permisos de ejecución al script
 chmod +x deploy.sh
