@@ -34,6 +34,7 @@ import 'screens/common/privacy_policy_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final authService = AuthService();
 
   // On web, Firebase init can hang silently when the Service Worker is
   // blocked (e.g. site served over HTTP). Don't await it on the critical
@@ -44,7 +45,7 @@ Future<void> main() async {
     await _initFirebaseSafely();
   }
 
-  final sessionViewModel = SessionViewModel();
+  final sessionViewModel = SessionViewModel(authService: authService);
   try {
     await sessionViewModel.restoreSession();
   } catch (error, stackTrace) {
@@ -64,12 +65,16 @@ Future<void> main() async {
       (route) => false,
     );
   });
+  ApiClient.configureAccessTokenRefreshHandler(() async {
+    final refreshed = await sessionViewModel.refreshSession();
+    return refreshed ? sessionViewModel.token : null;
+  });
 
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider<SessionViewModel>.value(value: sessionViewModel),
-        Provider<AuthService>(create: (_) => AuthService()),
+        Provider<AuthService>.value(value: authService),
         Provider<WorkerService>(create: (_) => WorkerService()),
         Provider<FleetService>(create: (_) => FleetService()),
         Provider<LeaveService>(create: (_) => LeaveService()),

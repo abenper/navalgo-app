@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user.dart';
+import '../services/auth_service.dart';
 import '../services/network/api_client.dart';
 
 class SessionViewModel extends ChangeNotifier {
@@ -12,6 +13,10 @@ class SessionViewModel extends ChangeNotifier {
   static const _userSessionKey = 'user_session';
   static const _sessionStartedAtKey = 'session_started_at';
   static const _maxSessionAge = Duration(days: 30);
+
+  SessionViewModel({AuthService? authService}) : _authService = authService;
+
+  final AuthService? _authService;
 
   User? _user;
   bool _isReady = false;
@@ -51,9 +56,12 @@ class SessionViewModel extends ChangeNotifier {
     if (_user == null) {
       await prefs.remove(_userSessionKey);
     } else if (ApiClient.isJwtExpired(_user!.token ?? '')) {
-      _pendingNotice = 'Tu sesión ha expirado. Inicia sesión de nuevo.';
-      _user = null;
-      await _clearPersistedSession(prefs, clearRememberedEmail: false);
+      final refreshed = await _tryRefreshStoredSession(prefs);
+      if (!refreshed) {
+        _pendingNotice = 'Tu sesión ha expirado. Inicia sesión de nuevo.';
+        _user = null;
+        await _clearPersistedSession(prefs, clearRememberedEmail: false);
+      }
     }
 
     _isReady = true;
@@ -97,12 +105,28 @@ class SessionViewModel extends ChangeNotifier {
 
   Future<void> expireSession({String? message}) async {
     _user = null;
-    _pendingNotice = message ?? 'Tu sesión ha expirado. Inicia sesión de nuevo.';
+    _pendingNotice =
+        message ?? 'Tu sesión ha expirado. Inicia sesión de nuevo.';
 
     final prefs = await SharedPreferences.getInstance();
     await _clearPersistedSession(prefs, clearRememberedEmail: false);
 
     notifyListeners();
+  }
+
+  Future<bool> refreshSession() async {
+    final authService = _authService;
+    if (authService == null) {
+      return false;
+    }
+
+    try {
+      final refreshedUser = await authService.refreshSession();
+      await updateUser(refreshedUser);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   bool _isMaxAgeExpired(SharedPreferences prefs) {
@@ -161,6 +185,30 @@ class SessionViewModel extends ChangeNotifier {
     if (clearRememberedEmail) {
       await prefs.setBool(_rememberMeKey, false);
       await prefs.remove(_rememberedEmailKey);
+    }
+  }
+
+  Future<bool> _tryRefreshStoredSession(SharedPreferences prefs) async {
+    final authService = _authService;
+    if (authService == null) {
+      return false;
+    }
+
+    try {
+      final refreshedUser = await authService.refreshSession();
+      _user = refreshedUser;
+      _pendingNotice = null;
+      await prefs.setString(_rememberedEmailKey, refreshedUser.email);
+      if (_rememberMeEnabled) {
+        await prefs.setString(
+          _userSessionKey,
+          jsonEncode(refreshedUser.toJson()),
+        );
+      }
+      _rememberedEmail = refreshedUser.email;
+      return true;
+    } catch (_) {
+      return false;
     }
   }
 }

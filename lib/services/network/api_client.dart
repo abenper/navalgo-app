@@ -4,17 +4,26 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import 'api_exception.dart';
+import 'http_client_factory.dart';
 
 class ApiClient {
   ApiClient({required this.baseUrl, http.Client? httpClient})
-    : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? createHttpClient();
 
   static Future<void> Function(String message)? _sessionExpiredHandler;
+  static Future<String?> Function()? _accessTokenRefreshHandler;
+  static Future<String?>? _refreshInFlight;
 
   static void configureSessionExpiredHandler(
     Future<void> Function(String message)? handler,
   ) {
     _sessionExpiredHandler = handler;
+  }
+
+  static void configureAccessTokenRefreshHandler(
+    Future<String?> Function()? handler,
+  ) {
+    _accessTokenRefreshHandler = handler;
   }
 
   final String baseUrl;
@@ -193,8 +202,35 @@ class ApiClient {
     }
 
     if (isJwtExpired(token)) {
+      final refreshedToken = await _refreshExpiredAccessToken();
+      if (refreshedToken != null && refreshedToken.isNotEmpty) {
+        headers?['Authorization'] = 'Bearer $refreshedToken';
+        return;
+      }
       await _notifySessionExpired();
       throw ApiException.sessionExpired();
+    }
+  }
+
+  static Future<String?> _refreshExpiredAccessToken() async {
+    final handler = _accessTokenRefreshHandler;
+    if (handler == null) {
+      return null;
+    }
+
+    final currentRefresh = _refreshInFlight;
+    if (currentRefresh != null) {
+      return currentRefresh;
+    }
+
+    final refreshFuture = handler();
+    _refreshInFlight = refreshFuture;
+    try {
+      return await refreshFuture;
+    } finally {
+      if (identical(_refreshInFlight, refreshFuture)) {
+        _refreshInFlight = null;
+      }
     }
   }
 

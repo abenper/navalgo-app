@@ -61,6 +61,12 @@ class AuthService {
     }
   }
 
+  Future<User> refreshSession() async {
+    final dynamic data = await _apiClient.post('/auth/refresh');
+    final Map<String, dynamic> mapped = _mapLoginResponse(data);
+    return User.fromJson(mapped);
+  }
+
   Future<void> changePassword(
     String token, {
     required String currentPassword,
