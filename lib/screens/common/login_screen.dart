@@ -123,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 }
 
                 return AlertDialog(
-                  title: const Text('Cambia tu contrasena'),
+                  title: const Text('Cambia tu contrase\u00F1a'),
                   content: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -138,9 +138,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           enableSuggestions: false,
                           autocorrect: false,
                           decoration: const InputDecoration(
-                            labelText: 'Nueva contrasena',
+                            labelText: 'Nueva contrase\u00F1a',
                             helperText:
-                                'Min. 12 caracteres con mayusculas, minusculas, numeros y un simbolo.',
+                                'Min. 12 caracteres con may\u00FAsculas, min\u00FAsculas, n\u00FAmeros y un s\u00EDmbolo.',
                             helperMaxLines: 2,
                             prefixIcon: Icon(Icons.lock_outline_rounded),
                           ),
@@ -156,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           autocorrect: false,
                           onSubmitted: (_) => isSaving ? null : submit(),
                           decoration: const InputDecoration(
-                            labelText: 'Confirmar contrasena',
+                            labelText: 'Confirmar contrase\u00F1a',
                             prefixIcon: Icon(Icons.verified_user_outlined),
                           ),
                         ),
@@ -205,29 +205,30 @@ class _LoginScreenState extends State<LoginScreen> {
     String confirmPassword,
   ) {
     if (newPassword.length < 12) {
-      return 'La contrasena debe tener al menos 12 caracteres.';
+      return 'La contrase\u00F1a debe tener al menos 12 caracteres.';
     }
     if (!RegExp(r'[A-Z]').hasMatch(newPassword) ||
         !RegExp(r'[a-z]').hasMatch(newPassword) ||
         !RegExp(r'[0-9]').hasMatch(newPassword) ||
         !RegExp(r'[^A-Za-z0-9]').hasMatch(newPassword)) {
-      return 'Debe incluir mayusculas, minusculas, numeros y un simbolo.';
+      return 'Debe incluir may\u00FAsculas, min\u00FAsculas, n\u00FAmeros y un s\u00EDmbolo.';
     }
     if (newPassword != confirmPassword) {
-      return 'Las contrasenas no coinciden.';
+      return 'Las contrase\u00F1as no coinciden.';
     }
     return null;
   }
 
   String _describePasswordChangeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? 'No se pudo cambiar la contrasena.';
+      return error.serverMessage ??
+          'No se pudo cambiar la contrase\u00F1a.';
     }
     final message = error.toString();
     if (message.startsWith('Exception: ')) {
       return message.substring('Exception: '.length);
     }
-    return 'No se pudo cambiar la contrasena.';
+    return 'No se pudo cambiar la contrase\u00F1a.';
   }
 
   void _openShellForRole(String role) {
@@ -266,7 +267,7 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      AppToast.warning(context, 'Completa correo y contrasena.');
+      AppToast.warning(context, 'Completa correo y contrase\u00F1a.');
       return;
     }
 
@@ -282,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!success) {
       _showLoginFeedback(
-        loginViewModel.errorMessage ?? 'No se pudo iniciar sesion.',
+        loginViewModel.errorMessage ?? 'No se pudo iniciar sesión.',
       );
       return;
     }
@@ -346,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       AutofillHints.email,
                     ],
                     decoration: const InputDecoration(
-                      labelText: 'Correo electronico',
+                      labelText: 'Correo electr\u00F3nico',
                       prefixIcon: Icon(Icons.alternate_email_rounded),
                     ),
                   ),
@@ -361,7 +362,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     onSubmitted: (_) =>
                         loginViewModel.isLoading ? null : _submit(loginViewModel),
                     decoration: InputDecoration(
-                      labelText: 'Contrasena',
+                      labelText: 'Contrase\u00F1a',
                       prefixIcon: const Icon(Icons.lock_outline_rounded),
                       suffixIcon: IconButton(
                         onPressed: () => setState(
@@ -373,8 +374,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               : Icons.visibility_off_outlined,
                         ),
                         tooltip: _obscurePassword
-                            ? 'Mostrar contrasena'
-                            : 'Ocultar contrasena',
+                            ? 'Mostrar contrase\u00F1a'
+                            : 'Ocultar contrase\u00F1a',
                       ),
                     ),
                   ),
@@ -393,7 +394,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           Expanded(
                             child: Text(
-                              'Mantener sesion iniciada',
+                              'Mantener sesi\u00F3n iniciada',
                               style: textTheme.bodyLarge,
                             ),
                           ),
@@ -415,7 +416,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Iniciar sesion'),
+                        : const Text('Iniciar sesi\u00F3n'),
                   ),
                   const SizedBox(height: 10),
                   TextButton(
@@ -426,7 +427,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       );
                     },
-                    child: const Text('He olvidado mi contrasena'),
+                    child: const Text('He olvidado mi contrase\u00F1a'),
                   ),
                   TextButton(
                     onPressed: () {
@@ -436,7 +437,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       );
                     },
-                    child: const Text('Crear cuenta de cliente'),
+                    child: const Text('\u00BFNo tienes cuenta? Crear cuenta'),
                   ),
                 ],
               ),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../services/auth_service.dart';
@@ -74,7 +74,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
         _shownUnreadToast = true;
         AppToast.info(
           context,
-          'Tienes ${notificationsVm.unreadCount} notificaciÃ³n(es) nuevas.',
+          'Tienes ${notificationsVm.unreadCount} notificaci\u00F3n(es) nuevas.',
         );
       }
     });
@@ -193,7 +193,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
                               : () async {
                                   await notificationsVm.markAllAsRead();
                                 },
-                          child: const Text('Marcar todas como leÃ­das'),
+                          child: const Text('Marcar todas como le\u00EDdas'),
                         ),
                       ],
                     ),
@@ -324,21 +324,21 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
                     context: sheetContext,
                     value: 'password',
                     icon: Icons.lock_outline_rounded,
-                    title: 'Cambiar contraseÃ±a',
+                    title: 'Cambiar contrase\u00F1a',
                   ),
                   const SizedBox(height: 8),
                   _buildAccountAction(
                     context: sheetContext,
                     value: 'privacy',
                     icon: Icons.privacy_tip_outlined,
-                    title: 'PolÃ­tica de Privacidad',
+                    title: 'Pol\u00EDtica de Privacidad',
                   ),
                   const SizedBox(height: 8),
                   _buildAccountAction(
                     context: sheetContext,
                     value: 'logout',
                     icon: Icons.logout_rounded,
-                    title: 'Cerrar sesiÃ³n',
+                    title: 'Cerrar sesi\u00F3n',
                     accent: NavalgoColors.coral,
                   ),
                 ],
@@ -804,3 +804,4 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
     );
   }
 }
+

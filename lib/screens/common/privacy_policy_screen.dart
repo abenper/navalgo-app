@@ -20,10 +20,17 @@ bool isPrivacyPolicyEntryUri(Uri uri) {
       .contains(privacyPolicyPathSegment);
 }
 
+enum PrivacyAudience { worker, client }
+
 class PrivacyPolicyScreen extends StatelessWidget {
-  const PrivacyPolicyScreen({super.key, this.isPublicEntry = false});
+  const PrivacyPolicyScreen({
+    super.key,
+    this.isPublicEntry = false,
+    this.initialAudience = PrivacyAudience.worker,
+  });
 
   final bool isPublicEntry;
+  final PrivacyAudience initialAudience;
 
   static const _privacyEmail = 'soporte@naval-go.com';
   static const _aepdUrl = 'https://www.aepd.es';
@@ -34,7 +41,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
       backgroundColor: NavalgoColors.foam,
       appBar: AppBar(
         automaticallyImplyLeading: !isPublicEntry,
-        title: const Text('Política de Privacidad'),
+        title: const Text('Política de privacidad'),
       ),
       body: SelectionArea(
         child: ListView(
@@ -42,253 +49,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           children: [
             _HeroCard(isPublicEntry: isPublicEntry, onContactTap: _openMail),
             const SizedBox(height: 16),
-            const _SummaryGrid(),
-            const SizedBox(height: 20),
-            const _SectionCard(
-              title: '1. Responsable del tratamiento',
-              children: [
-                _PolicyParagraph(
-                  'El responsable del tratamiento de tus datos personales es Náutica Benítez.',
-                ),
-                _PolicyBullet(
-                  'Correo electrónico de privacidad y soporte: soporte@naval-go.com',
-                ),
-                _PolicyParagraph(
-                  'Si Naval-GO utiliza proveedores tecnológicos para alojamiento, mantenimiento, almacenamiento seguro, correo transaccional o notificaciones, dichos proveedores actúan, con carácter general, como encargados del tratamiento y tratan los datos siguiendo instrucciones del responsable y bajo las garantías contractuales exigidas por la normativa aplicable.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '2. Qué es Naval-GO y para qué se usa',
-              children: [
-                _PolicyParagraph(
-                  'Naval-GO es una herramienta de gestión operativa para la organización del trabajo de Náutica Benítez. Permite gestionar usuarios, fichajes, partes de trabajo, asignaciones, firmas, materiales, revisiones, vacaciones, ausencias, notificaciones y métricas internas de actividad.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '3. Qué datos tratamos',
-              children: [
-                _PolicyBullet('Datos identificativos: nombre y apellidos.'),
-                _PolicyBullet(
-                  'Datos de contacto: correo electrónico profesional.',
-                ),
-                _PolicyBullet(
-                  'Datos laborales y organizativos: rol, especialidad, permisos, estado del usuario, fecha de contratación y asignaciones.',
-                ),
-                _PolicyBullet(
-                  'Datos de autenticación y sesión: credenciales, tokens y registros técnicos de acceso.',
-                ),
-                _PolicyBullet(
-                  'Datos de fichaje: horas de entrada y salida, tipo de jornada, hora prevista de cierre y solicitudes de ajuste.',
-                ),
-                _PolicyBullet(
-                  'Datos de geolocalización puntual: coordenadas asociadas al fichaje y, en su caso, a determinadas evidencias o adjuntos.',
-                ),
-                _PolicyBullet(
-                  'Datos operativos: partes, observaciones, materiales, checklists, revisiones, horas imputadas y estado de tareas.',
-                ),
-                _PolicyBullet(
-                  'Firmas y evidencias: firma del trabajador, firma del cliente y archivos asociados al trabajo realizado.',
-                ),
-                _PolicyBullet(
-                  'Datos de ausencias y vacaciones: motivo, fechas, estado de la solicitud y observaciones.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '4. Cómo obtenemos tus datos',
-              children: [
-                _PolicyParagraph(
-                  'Tus datos pueden ser facilitados inicialmente por Náutica Benítez al crear tu cuenta de usuario. También pueden ser aportados directamente por ti al completar tu registro, editar tu perfil o utilizar las funcionalidades de la app. Además, algunos datos se generan automáticamente durante el uso de la plataforma, como registros de acceso, fichajes, actividad técnica o trazabilidad de acciones.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '5. Finalidades del tratamiento',
-              children: [
-                _PolicyBullet(
-                  'Crear, activar y gestionar tu cuenta de acceso a Naval-GO.',
-                ),
-                _PolicyBullet(
-                  'Permitir la autenticación segura y el uso de la aplicación.',
-                ),
-                _PolicyBullet(
-                  'Gestionar fichajes, jornadas, ajustes y control operativo del trabajo.',
-                ),
-                _PolicyBullet(
-                  'Crear, asignar, documentar, firmar y cerrar partes de trabajo.',
-                ),
-                _PolicyBullet(
-                  'Gestionar materiales, revisiones, checklists y evidencias asociadas a trabajos realizados.',
-                ),
-                _PolicyBullet(
-                  'Tramitar vacaciones, ausencias y solicitudes internas.',
-                ),
-                _PolicyBullet(
-                  'Enviar notificaciones y comunicaciones operativas relacionadas con el servicio.',
-                ),
-                _PolicyBullet(
-                  'Mantener la seguridad, integridad, trazabilidad y correcto funcionamiento del sistema.',
-                ),
-                _PolicyBullet(
-                  'Atender incidencias, reclamaciones y necesidades de soporte.',
-                ),
-                _PolicyBullet(
-                  'Cumplir obligaciones legales y defender derechos e intereses del responsable ante posibles conflictos o procedimientos.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '6. Geolocalización',
-              children: [
-                _PolicyParagraph(
-                  'Naval-GO no realiza geolocalización continua ni seguimiento permanente de los trabajadores.',
-                ),
-                _PolicyParagraph(
-                  'La aplicación utiliza geolocalización puntual únicamente cuando resulta necesaria para registrar un evento concreto, como el inicio de un fichaje y, en su caso, determinadas evidencias vinculadas a un parte de trabajo.',
-                ),
-                _PolicyParagraph(
-                  'La finalidad de este tratamiento es reforzar la trazabilidad del registro realizado, acreditar el contexto del servicio prestado, prevenir usos indebidos del sistema y facilitar, cuando proceda, la defensa ante incidencias, controversias o reclamaciones.',
-                ),
-                _PolicyParagraph(
-                  'Si no autorizas la ubicación en esos supuestos concretos, algunas funciones esenciales, como el fichaje, podrían no completarse correctamente.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '7. Base jurídica',
-              children: [
-                _PolicyParagraph(
-                  'Las bases jurídicas del tratamiento son, según cada caso, la ejecución y gestión de la relación laboral o profesional, el cumplimiento de obligaciones legales aplicables al responsable y el interés legítimo del responsable en proteger la seguridad del sistema, documentar la actividad realizada y prevenir fraude o usos indebidos.',
-                ),
-                _PolicyParagraph(
-                  'El consentimiento solo se utilizará cuando una funcionalidad concreta lo requiera realmente y sea jurídicamente necesario.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '8. Indicadores y analítica interna',
-              children: [
-                _PolicyParagraph(
-                  'La app puede generar indicadores o resúmenes internos de actividad a partir de datos como fichajes, ausencias aprobadas, partes cerrados u otros parámetros operativos, con fines de organización, seguimiento interno y mejora de procesos.',
-                ),
-                _PolicyParagraph(
-                  'Con carácter general, no se adoptan decisiones automatizadas individuales con efectos jurídicos o significativamente similares basadas únicamente en estos indicadores.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '9. Conservación de los datos',
-              children: [
-                _PolicyParagraph(
-                  'Tus datos se conservarán mientras mantengas una relación activa con Náutica Benítez y sea necesario que utilices la app, así como durante el tiempo necesario para la gestión operativa, la trazabilidad, la seguridad, el soporte y el cumplimiento normativo.',
-                ),
-                _PolicyParagraph(
-                  'Los registros de jornada se conservarán, con carácter general, durante 4 años, conforme al artículo 34.9 del Estatuto de los Trabajadores.',
-                ),
-                _PolicyParagraph(
-                  'Otros datos podrán mantenerse durante los plazos legales aplicables o mientras sean necesarios para la formulación, ejercicio o defensa de reclamaciones. Finalizados dichos plazos, serán eliminados, anonimizados o bloqueados de forma segura, según corresponda.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '10. Cesión o comunicación a terceros',
-              children: [
-                _PolicyParagraph(
-                  'Tus datos no se venderán ni se cederán a terceros con fines comerciales.',
-                ),
-                _PolicyBullet(
-                  'Proveedores tecnológicos necesarios para prestar el servicio.',
-                ),
-                _PolicyBullet(
-                  'Autoridades públicas, juzgados, tribunales o fuerzas y cuerpos de seguridad cuando exista obligación legal o requerimiento válido.',
-                ),
-                _PolicyBullet(
-                  'Profesionales o entidades cuando sea imprescindible para la correcta prestación del servicio y exista base jurídica suficiente.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '11. Transferencias internacionales',
-              children: [
-                _PolicyParagraph(
-                  'Con carácter general, se procurará que los datos sean tratados dentro del Espacio Económico Europeo. Si algún proveedor implicara accesos o transferencias internacionales, estas se realizarán únicamente con las garantías adecuadas exigidas por el RGPD.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '12. Almacenamiento y seguridad',
-              children: [
-                _PolicyParagraph(
-                  'Tus datos se almacenan en sistemas y bases de datos privadas con medidas técnicas y organizativas adecuadas para preservar su confidencialidad, integridad, disponibilidad y resiliencia.',
-                ),
-                _PolicyParagraph(
-                  'Entre otras medidas, se aplican controles de acceso, autenticación, trazabilidad, protección de comunicaciones, copias de seguridad y restricciones de acceso al personal autorizado.',
-                ),
-                _PolicyParagraph(
-                  'Tu contraseña no se almacena en texto plano. Se guarda mediante mecanismos de protección criptográfica adecuados, de forma que nadie, ni siquiera los administradores de la plataforma, puede consultar directamente tu contraseña original.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _SectionCard(
-              title: '13. Derechos del usuario',
-              footer: _InlineActionRow(
-                primaryLabel: 'Contactar con privacidad',
-                secondaryLabel: 'Web de la AEPD',
-                onPrimaryTap: _openMail,
-                onSecondaryTap: _openAepd,
-              ),
-              children: const [
-                _PolicyBullet('Derecho de acceso.'),
-                _PolicyBullet('Derecho de rectificación.'),
-                _PolicyBullet('Derecho de supresión.'),
-                _PolicyBullet('Derecho de oposición.'),
-                _PolicyBullet('Derecho de limitación del tratamiento.'),
-                _PolicyBullet(
-                  'Derecho a la portabilidad, cuando resulte aplicable.',
-                ),
-                _PolicyBullet(
-                  'Derecho a retirar el consentimiento, cuando el tratamiento se base en él.',
-                ),
-                _PolicyBullet(
-                  'Derecho a no ser objeto de decisiones automatizadas individuales, cuando proceda.',
-                ),
-                _PolicyParagraph(
-                  'Puedes ejercer tus derechos escribiendo a soporte@naval-go.com. Con carácter general, el responsable debe responder en el plazo de un mes desde la recepción de la solicitud.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '14. Carácter obligatorio de determinados datos',
-              children: [
-                _PolicyParagraph(
-                  'Determinados datos son necesarios para darte de alta, permitir el acceso seguro, gestionar fichajes, registrar partes o utilizar otras funcionalidades esenciales de la app. Si no facilitas esos datos o no autorizas ciertos permisos estrictamente necesarios para una funcionalidad concreta, es posible que no podamos prestarte el servicio correctamente.',
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const _SectionCard(
-              title: '15. Cambios en esta política',
-              children: [
-                _PolicyParagraph(
-                  'Podremos actualizar esta Política de Privacidad para adaptarla a cambios normativos, técnicos, organizativos o funcionales. Cuando los cambios sean relevantes, se comunicarán por medios adecuados dentro de la app o a través de los canales habituales de contacto.',
-                ),
-              ],
-            ),
+            _AudienceAccordion(initialAudience: initialAudience),
           ],
         ),
       ),
@@ -306,6 +67,370 @@ class PrivacyPolicyScreen extends StatelessWidget {
 
   static Future<void> _openAepd() async {
     await launchUrl(Uri.parse(_aepdUrl), mode: LaunchMode.externalApplication);
+  }
+}
+
+class _AudienceAccordion extends StatefulWidget {
+  const _AudienceAccordion({required this.initialAudience});
+
+  final PrivacyAudience initialAudience;
+
+  @override
+  State<_AudienceAccordion> createState() => _AudienceAccordionState();
+}
+
+class _AudienceAccordionState extends State<_AudienceAccordion> {
+  late bool _workerExpanded = widget.initialAudience == PrivacyAudience.worker;
+  late bool _clientExpanded = widget.initialAudience == PrivacyAudience.client;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _AudienceCard(
+          title: 'Política para trabajadores',
+          subtitle:
+              'Acceso, fichajes, partes, ausencias, geolocalización puntual, adjuntos y seguridad de la cuenta.',
+          icon: Icons.badge_outlined,
+          initiallyExpanded: _workerExpanded,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _workerExpanded = expanded;
+            });
+          },
+          child: const _WorkerPrivacyContent(),
+        ),
+        const SizedBox(height: 12),
+        _AudienceCard(
+          title: 'Política para clientes',
+          subtitle:
+              'Alta de cuenta, verificación por email, flota, presupuestos, documentación y futuras caducidades.',
+          icon: Icons.directions_boat_outlined,
+          initiallyExpanded: _clientExpanded,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _clientExpanded = expanded;
+            });
+          },
+          child: const _ClientPrivacyContent(),
+        ),
+      ],
+    );
+  }
+}
+
+class _AudienceCard extends StatelessWidget {
+  const _AudienceCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.initiallyExpanded,
+    required this.onExpansionChanged,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final bool initiallyExpanded;
+  final ValueChanged<bool> onExpansionChanged;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: NavalgoColors.border),
+        ),
+        child: ExpansionTile(
+          initiallyExpanded: initiallyExpanded,
+          onExpansionChanged: onExpansionChanged,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+          iconColor: NavalgoColors.tide,
+          collapsedIconColor: NavalgoColors.storm,
+          leading: Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: NavalgoColors.mist,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: NavalgoColors.tide),
+          ),
+          title: Text(
+            title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: NavalgoColors.deepSea,
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              subtitle,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.storm),
+            ),
+          ),
+          children: [child],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkerPrivacyContent extends StatelessWidget {
+  const _WorkerPrivacyContent();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const _SummaryGrid(
+          items: [
+            _SummaryData(
+              title: 'Qué tratamos',
+              body:
+                  'Datos de identidad, acceso, jornada, partes, adjuntos, firmas y trazabilidad técnica.',
+              icon: Icons.inventory_2_outlined,
+            ),
+            _SummaryData(
+              title: 'Para qué',
+              body:
+                  'Gestionar tu relación profesional, coordinar trabajo, documentar servicios y proteger la plataforma.',
+              icon: Icons.fact_check_outlined,
+            ),
+            _SummaryData(
+              title: 'Ubicación',
+              body:
+                  'Solo se solicita de forma puntual para fichajes o evidencias concretas, nunca de forma continua.',
+              icon: Icons.place_outlined,
+            ),
+            _SummaryData(
+              title: 'Tus derechos',
+              body:
+                  'Puedes pedir acceso, rectificación, supresión, oposición, limitación o portabilidad cuando aplique.',
+              icon: Icons.gavel_outlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const _SectionCard(
+          title: '1. Responsable y finalidad',
+          children: [
+            _PolicyParagraph(
+              'El responsable del tratamiento es Náutica Benítez. Naval-GO trata los datos de trabajadores y colaboradores para gestionar el acceso a la plataforma, la organización del trabajo, el registro de jornada, los partes, las ausencias, las notificaciones internas y la seguridad del servicio.',
+            ),
+            _PolicyBullet(
+              'Contacto de privacidad y soporte: soporte@naval-go.com',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '2. Datos tratados',
+          children: [
+            _PolicyBullet('Datos identificativos y de contacto.'),
+            _PolicyBullet(
+              'Rol, especialidad, permisos, estado del usuario y fecha de alta.',
+            ),
+            _PolicyBullet(
+              'Credenciales, tokens de sesión, confirmaciones de email y registros técnicos de acceso.',
+            ),
+            _PolicyBullet(
+              'Fichajes, horas, ajustes de jornada, ausencias y vacaciones.',
+            ),
+            _PolicyBullet(
+              'Geolocalización puntual asociada al fichaje o a evidencias concretas.',
+            ),
+            _PolicyBullet(
+              'Partes de trabajo, materiales, checklists, revisiones, firmas y archivos adjuntos.',
+            ),
+            _PolicyBullet(
+              'Notificaciones internas, trazabilidad operativa y eventos de seguridad.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '3. Base jurídica',
+          children: [
+            _PolicyParagraph(
+              'La base jurídica principal es la ejecución de la relación laboral o profesional, el cumplimiento de obligaciones legales y el interés legítimo del responsable para organizar el trabajo, documentar la actividad y proteger el sistema.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '4. Seguridad',
+          children: [
+            _PolicyParagraph(
+              'La plataforma aplica controles de acceso por rol, cifrado de contraseñas, revocación de sesiones, trazabilidad de acciones y medidas de protección para comunicaciones, almacenamiento y evidencias.',
+            ),
+            _PolicyParagraph(
+              'Las contraseñas no se almacenan en texto plano. Los enlaces de activación y recuperación usan tokens seguros, con caducidad limitada y un solo uso.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '5. Conservación',
+          children: [
+            _PolicyParagraph(
+              'Los datos se conservan mientras exista relación activa con la empresa y durante los plazos legales aplicables. Los registros de jornada se conservan, con carácter general, durante 4 años.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _SectionCard(
+          title: '6. Derechos',
+          footer: _InlineActionRow(
+            primaryLabel: 'Contactar con privacidad',
+            secondaryLabel: 'Web de la AEPD',
+            onPrimaryTap: PrivacyPolicyScreen._openMail,
+            onSecondaryTap: PrivacyPolicyScreen._openAepd,
+          ),
+          children: const [
+            _PolicyBullet(
+              'Acceso, rectificación, supresión, oposición y limitación.',
+            ),
+            _PolicyBullet('Portabilidad, cuando resulte aplicable.'),
+            _PolicyBullet(
+              'Retirada del consentimiento, si algún tratamiento se basó en él.',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ClientPrivacyContent extends StatelessWidget {
+  const _ClientPrivacyContent();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const _SummaryGrid(
+          items: [
+            _SummaryData(
+              title: 'Qué tratamos',
+              body:
+                  'Nombre, email, teléfono, flota, presupuestos, documentos y futuras caducidades asociadas a tu barco.',
+              icon: Icons.badge_outlined,
+            ),
+            _SummaryData(
+              title: 'Para qué',
+              body:
+                  'Crear tu cuenta, verificarla, vincularla a tu ficha, gestionar presupuestos y documentación.',
+              icon: Icons.assignment_turned_in_outlined,
+            ),
+            _SummaryData(
+              title: 'Correo electrónico',
+              body:
+                  'Se usa para verificar tu cuenta, avisarte de nuevos presupuestos y ayudarte a recuperar tu contraseña.',
+              icon: Icons.mark_email_read_outlined,
+            ),
+            _SummaryData(
+              title: 'Tus derechos',
+              body:
+                  'Puedes pedir acceso, rectificación, supresión, oposición, limitación o portabilidad cuando aplique.',
+              icon: Icons.gavel_outlined,
+            ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        const _SectionCard(
+          title: '1. Responsable y finalidad',
+          children: [
+            _PolicyParagraph(
+              'El responsable del tratamiento es Náutica Benítez. Naval-GO trata los datos del cliente para crear y verificar su cuenta, vincularla a su ficha de propietario, gestionar embarcaciones, presupuestos, documentación y futuras comunicaciones operativas relacionadas con el servicio.',
+            ),
+            _PolicyBullet(
+              'Contacto de privacidad y soporte: soporte@naval-go.com',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '2. Datos tratados',
+          children: [
+            _PolicyBullet('Nombre y apellidos o razón social.'),
+            _PolicyBullet(
+              'Correo electrónico y, en su caso, teléfono de contacto.',
+            ),
+            _PolicyBullet(
+              'Credenciales, verificación de email y registros técnicos de acceso.',
+            ),
+            _PolicyBullet(
+              'Datos vinculados a tu ficha de cliente y a tus embarcaciones.',
+            ),
+            _PolicyBullet(
+              'Presupuestos, observaciones, respuestas, documentos y adjuntos enviados a través de la plataforma.',
+            ),
+            _PolicyBullet(
+              'Caducidades y documentación asociada a artículos de tu embarcación, cuando actives esa funcionalidad.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '3. Base jurídica',
+          children: [
+            _PolicyParagraph(
+              'La base jurídica es la ejecución de la relación precontractual o contractual, el interés legítimo para la gestión del servicio y el cumplimiento de obligaciones legales. El consentimiento se usa cuando sea necesario para funcionalidades específicas o comunicaciones no esenciales.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '4. Seguridad y acceso',
+          children: [
+            _PolicyParagraph(
+              'Tu cuenta se activa solo después de confirmar el correo electrónico. Las contraseñas se almacenan cifradas y los enlaces de verificación y recuperación usan tokens seguros, de un solo uso y con caducidad limitada.',
+            ),
+            _PolicyParagraph(
+              'La plataforma puede revocar sesiones y registrar eventos técnicos para proteger el acceso y prevenir usos indebidos.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        const _SectionCard(
+          title: '5. Conservación',
+          children: [
+            _PolicyParagraph(
+              'Los datos se conservarán mientras exista relación comercial o contractual y durante los plazos necesarios para gestionar presupuestos, documentación, incidencias, obligaciones legales y posibles reclamaciones.',
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _SectionCard(
+          title: '6. Derechos',
+          footer: _InlineActionRow(
+            primaryLabel: 'Contactar con privacidad',
+            secondaryLabel: 'Web de la AEPD',
+            onPrimaryTap: PrivacyPolicyScreen._openMail,
+            onSecondaryTap: PrivacyPolicyScreen._openAepd,
+          ),
+          children: const [
+            _PolicyBullet(
+              'Acceso, rectificación, supresión, oposición y limitación.',
+            ),
+            _PolicyBullet('Portabilidad, cuando resulte aplicable.'),
+            _PolicyBullet(
+              'Retirada del consentimiento, si algún tratamiento se basó en él.',
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }
 
@@ -350,10 +475,10 @@ class _HeroCard extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'Aquí puedes consultar, sin iniciar sesión, qué datos tratamos, para qué los usamos, cuándo utilizamos geolocalización puntual y cómo ejercer tus derechos.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.9),
-            ),
+            'Aquí puedes consultar qué datos tratamos para trabajadores y clientes, con qué finalidad, qué medidas de seguridad aplicamos y cómo ejercer tus derechos.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
           ),
           const SizedBox(height: 18),
           Wrap(
@@ -361,16 +486,16 @@ class _HeroCard extends StatelessWidget {
             runSpacing: 10,
             children: const [
               _HeroChip(
-                icon: Icons.lock_outline_rounded,
-                label: 'Contraseña cifrada',
+                icon: Icons.mark_email_read_outlined,
+                label: 'Verificación por email',
               ),
               _HeroChip(
-                icon: Icons.location_searching_outlined,
-                label: 'Sin geolocalización continua',
+                icon: Icons.lock_reset_outlined,
+                label: 'Recuperación segura',
               ),
               _HeroChip(
                 icon: Icons.shield_outlined,
-                label: 'Base de datos privada',
+                label: 'Tokens seguros',
               ),
             ],
           ),
@@ -411,9 +536,9 @@ class _HeroChip extends StatelessWidget {
           const SizedBox(width: 8),
           Text(
             label,
-            style: Theme.of(
-              context,
-            ).textTheme.labelLarge?.copyWith(color: Colors.white),
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+            ),
           ),
         ],
       ),
@@ -422,45 +547,22 @@ class _HeroChip extends StatelessWidget {
 }
 
 class _SummaryGrid extends StatelessWidget {
-  const _SummaryGrid();
+  const _SummaryGrid({required this.items});
+
+  final List<_SummaryData> items;
 
   @override
   Widget build(BuildContext context) {
     return Wrap(
       spacing: 12,
       runSpacing: 12,
-      children: const [
-        _SummaryCard(
-          title: 'Qué datos usamos',
-          body:
-              'Identidad, acceso, fichajes, partes, firmas, adjuntos, ausencias y metadatos operativos.',
-          icon: Icons.inventory_2_outlined,
-        ),
-        _SummaryCard(
-          title: 'Para qué',
-          body:
-              'Gestionar el trabajo, organizar jornadas, documentar servicios y mantener la seguridad del sistema.',
-          icon: Icons.fact_check_outlined,
-        ),
-        _SummaryCard(
-          title: 'Ubicación',
-          body:
-              'Solo se solicita de forma puntual para fichajes o evidencias concretas, nunca de forma continua.',
-          icon: Icons.place_outlined,
-        ),
-        _SummaryCard(
-          title: 'Tus derechos',
-          body:
-              'Puedes solicitar acceso, rectificación, supresión, oposición, limitación o portabilidad.',
-          icon: Icons.gavel_outlined,
-        ),
-      ],
+      children: items.map((item) => _SummaryCard(data: item)).toList(),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _SummaryData {
+  const _SummaryData({
     required this.title,
     required this.body,
     required this.icon,
@@ -469,6 +571,12 @@ class _SummaryCard extends StatelessWidget {
   final String title;
   final String body;
   final IconData icon;
+}
+
+class _SummaryCard extends StatelessWidget {
+  const _SummaryCard({required this.data});
+
+  final _SummaryData data;
 
   @override
   Widget build(BuildContext context) {
@@ -491,17 +599,17 @@ class _SummaryCard extends StatelessWidget {
                 color: NavalgoColors.mist,
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: NavalgoColors.tide),
+              child: Icon(data.icon, color: NavalgoColors.tide),
             ),
             const SizedBox(height: 14),
             Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              data.title,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 8),
-            Text(body, style: Theme.of(context).textTheme.bodyMedium),
+            Text(data.body, style: Theme.of(context).textTheme.bodyMedium),
           ],
         ),
       ),

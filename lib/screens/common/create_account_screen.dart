@@ -5,6 +5,7 @@ import '../../services/auth_service.dart';
 import '../../services/network/api_exception.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../widgets/navalgo_logo.dart';
+import 'privacy_policy_screen.dart';
 
 class CreateAccountScreen extends StatefulWidget {
   const CreateAccountScreen({super.key});
@@ -19,6 +20,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
+  bool _acceptedPrivacy = false;
   bool _loading = false;
   bool _done = false;
   String? _error;
@@ -88,17 +90,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
       return 'Completa los campos obligatorios.';
     }
     if (!email.contains('@')) {
-      return 'Introduce un correo electronico valido.';
+      return 'Introduce un correo electrónico válido.';
     }
     if (password.length < 12 ||
         !RegExp(r'[A-Z]').hasMatch(password) ||
         !RegExp(r'[a-z]').hasMatch(password) ||
         !RegExp(r'[0-9]').hasMatch(password) ||
         !RegExp(r'[^A-Za-z0-9]').hasMatch(password)) {
-      return 'La contrasena debe tener 12 caracteres e incluir mayusculas, minusculas, numeros y simbolos.';
+      return 'La contraseña debe tener 12 caracteres e incluir mayúsculas, minúsculas, números y símbolos.';
     }
     if (password != confirm) {
-      return 'Las contrasenas no coinciden.';
+      return 'Las contraseñas no coinciden.';
+    }
+    if (!_acceptedPrivacy) {
+      return 'Debes aceptar la política de privacidad para crear la cuenta.';
     }
     return null;
   }
@@ -145,7 +150,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       const SizedBox(height: 16),
                       if (_done)
                         const Text(
-                          'Te hemos enviado un correo para confirmar tu direccion email. Hasta que no lo confirmes no podras iniciar sesion.',
+                          'Te hemos enviado un correo para confirmar tu dirección email. Hasta que no lo confirmes no podrás iniciar sesión.',
                           textAlign: TextAlign.center,
                         )
                       else ...[
@@ -160,14 +165,14 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           controller: _emailCtrl,
                           keyboardType: TextInputType.emailAddress,
                           decoration: const InputDecoration(
-                            labelText: 'Correo electronico',
+                            labelText: 'Correo electrónico',
                           ),
                         ),
                         const SizedBox(height: 12),
                         TextField(
                           controller: _phoneCtrl,
                           decoration: const InputDecoration(
-                            labelText: 'Telefono',
+                            labelText: 'Teléfono',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -175,7 +180,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           controller: _passwordCtrl,
                           obscureText: true,
                           decoration: const InputDecoration(
-                            labelText: 'Contrasena',
+                            labelText: 'Contraseña',
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -184,7 +189,46 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                           obscureText: true,
                           onSubmitted: (_) => _loading ? null : _submit(),
                           decoration: const InputDecoration(
-                            labelText: 'Confirmar contrasena',
+                            labelText: 'Confirmar contraseña',
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        CheckboxListTile(
+                          value: _acceptedPrivacy,
+                          onChanged: _loading
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _acceptedPrivacy = value ?? false;
+                                  });
+                                },
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text(
+                            'He leído y acepto la política de privacidad',
+                          ),
+                          subtitle: TextButton(
+                            onPressed: _loading
+                                ? null
+                                : () {
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => const PrivacyPolicyScreen(
+                                          initialAudience:
+                                              PrivacyAudience.client,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              alignment: Alignment.centerLeft,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              'Consultar política de privacidad',
+                            ),
                           ),
                         ),
                         if (_error != null) ...[
@@ -214,7 +258,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                       const SizedBox(height: 10),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
-                        child: Text(_done ? 'Volver al login' : 'Ya tengo cuenta'),
+                        child: Text(
+                          _done ? 'Volver al login' : 'Ya tengo cuenta',
+                        ),
                       ),
                     ],
                   ),
