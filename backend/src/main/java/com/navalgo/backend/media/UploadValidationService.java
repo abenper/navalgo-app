@@ -28,17 +28,20 @@ public class UploadValidationService {
     private final long maxVideoBytes;
     private final long maxSignatureBytes;
     private final long maxProfilePhotoBytes;
+    private final long maxBudgetPdfBytes;
 
     public UploadValidationService(
             @Value("${app.media.max-image-size-bytes:10485760}") long maxImageBytes,
             @Value("${app.media.max-video-size-bytes:26214400}") long maxVideoBytes,
             @Value("${app.media.max-signature-size-bytes:5242880}") long maxSignatureBytes,
-            @Value("${app.media.max-profile-photo-size-bytes:5242880}") long maxProfilePhotoBytes
+            @Value("${app.media.max-profile-photo-size-bytes:5242880}") long maxProfilePhotoBytes,
+            @Value("${app.media.max-budget-pdf-size-bytes:15728640}") long maxBudgetPdfBytes
     ) {
         this.maxImageBytes = maxImageBytes;
         this.maxVideoBytes = maxVideoBytes;
         this.maxSignatureBytes = maxSignatureBytes;
         this.maxProfilePhotoBytes = maxProfilePhotoBytes;
+        this.maxBudgetPdfBytes = maxBudgetPdfBytes;
     }
 
     public void validateWorkOrderAttachment(MultipartFile file, boolean allowVideo) {
@@ -72,6 +75,16 @@ public class UploadValidationService {
             throw new IllegalArgumentException("La foto de perfil debe ser una imagen valida");
         }
         validateMaxSize(file, maxProfilePhotoBytes, "La foto de perfil supera el tamano maximo permitido de 5MB");
+    }
+
+    public void validateBudgetPdf(MultipartFile file) {
+        validateCommon(file);
+        String contentType = normalizeContentType(file);
+        if (!"application/pdf".equals(contentType)) {
+            throw new IllegalArgumentException("El presupuesto debe subirse en PDF");
+        }
+        validateMaxSize(file, maxBudgetPdfBytes, "El PDF supera el tamano maximo permitido de 15MB");
+        validatePdfSignature(file);
     }
 
     private void validateCommon(MultipartFile file) {
@@ -136,5 +149,21 @@ public class UploadValidationService {
                 && (header[1] & 0xFF) == 0x45
                 && (header[2] & 0xFF) == 0xDF
                 && (header[3] & 0xFF) == 0xA3;
+    }
+
+    private void validatePdfSignature(MultipartFile file) {
+        try (InputStream stream = file.getInputStream()) {
+            byte[] header = stream.readNBytes(4);
+            if (header.length == 4
+                    && header[0] == '%'
+                    && header[1] == 'P'
+                    && header[2] == 'D'
+                    && header[3] == 'F') {
+                return;
+            }
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("No se pudo validar la cabecera binaria del PDF");
+        }
+        throw new IllegalArgumentException("El contenido binario del PDF no es valido");
     }
 }

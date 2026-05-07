@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -74,6 +75,22 @@ public class ResendEmailService {
         payload.put("html", buildNotificationFallbackHtml(workerName, title, message));
         payload.put("text", buildNotificationFallbackText(workerName, title, message));
         return sendEmail(payload, "No se pudo enviar el email de notificacion");
+    }
+
+    public boolean sendBudgetNotification(String clientName,
+                                          String clientEmail,
+                                          String budgetTitle,
+                                          String vesselName,
+                                          BigDecimal amount,
+                                          String currency,
+                                          String pdfUrl) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from", fromAddress);
+        payload.put("to", List.of(clientEmail));
+        payload.put("subject", sanitizeSubject("Nuevo presupuesto disponible"));
+        payload.put("html", buildBudgetNotificationHtml(clientName, budgetTitle, vesselName, amount, currency, pdfUrl));
+        payload.put("text", buildBudgetNotificationText(clientName, budgetTitle, vesselName, amount, currency, pdfUrl));
+        return sendEmail(payload, "No se pudo enviar el email de presupuesto");
     }
 
     private boolean sendEmail(Map<String, Object> payload, String failureMessage) {
@@ -202,6 +219,61 @@ public class ResendEmailService {
                 """.formatted(workerName, title, message, normalizeFrontendBaseUrl());
     }
 
+    private String buildBudgetNotificationHtml(String clientName,
+                                               String budgetTitle,
+                                               String vesselName,
+                                               BigDecimal amount,
+                                               String currency,
+                                               String pdfUrl) {
+        String formattedAmount = formatAmount(amount, currency);
+        return """
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
+                  <h2 style="margin-bottom:12px;">Nuevo presupuesto disponible</h2>
+                  <p>Hola, %s:</p>
+                  <p>Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion <strong>%s</strong>.</p>
+                  <p><strong>%s</strong></p>
+                  <p>Importe: <strong>%s</strong></p>
+                  <p style="margin:24px 0;">
+                    <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
+                      Ver PDF del presupuesto
+                    </a>
+                  </p>
+                  <p>En breve podras aceptarlo o rechazarlo directamente desde tu area de cliente. Mientras tanto, ya tienes el documento disponible en el enlace anterior.</p>
+                  <p>Equipo Naval-GO</p>
+                </div>
+                """.formatted(
+                escapeHtml(clientName),
+                escapeHtml(vesselName),
+                escapeHtml(budgetTitle),
+                escapeHtml(formattedAmount),
+                escapeHtmlAttribute(pdfUrl)
+        );
+    }
+
+    private String buildBudgetNotificationText(String clientName,
+                                               String budgetTitle,
+                                               String vesselName,
+                                               BigDecimal amount,
+                                               String currency,
+                                               String pdfUrl) {
+        return """
+                Hola, %s:
+
+                Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion %s.
+                %s
+                Importe: %s
+
+                Ver PDF del presupuesto:
+                %s
+                """.formatted(
+                clientName,
+                vesselName,
+                budgetTitle,
+                formatAmount(amount, currency),
+                pdfUrl
+        );
+    }
+
     private String normalizeFrontendBaseUrl() {
         if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
             return "https://naval-go.com";
@@ -214,6 +286,14 @@ public class ResendEmailService {
             return "Notificacion";
         }
         return title.replaceAll("\\s+", " ").trim();
+    }
+
+    private String formatAmount(BigDecimal amount, String currency) {
+        if (amount == null) {
+            return "Pendiente de definir";
+        }
+        String normalizedCurrency = (currency == null || currency.isBlank()) ? "EUR" : currency.trim().toUpperCase();
+        return amount.stripTrailingZeros().toPlainString() + " " + normalizedCurrency;
     }
 
     private String escapeHtml(String value) {

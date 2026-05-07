@@ -14,6 +14,7 @@ import '../admin/flota_screen.dart';
 import '../admin/admin_shell_screen.dart';
 import '../common/login_screen.dart';
 import '../common/privacy_policy_screen.dart';
+import 'commercial_budgets_screen.dart';
 import '../worker/fichaje_screen.dart';
 import '../worker/vacaciones_screen.dart';
 import '../worker/worker_dashboard_screen.dart';
@@ -33,6 +34,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
 
   final List<Widget> _screens = const [
     WorkerDashboardScreen(),
+    CommercialBudgetsScreen(),
     FlotaScreen(),
     FichajeScreen(),
     AusenciasScreen(),
@@ -40,6 +42,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
 
   final List<String> _titles = const [
     'Inicio',
+    'Presupuestos',
     'Flota',
     'Fichaje',
     'Ausencias',
@@ -47,6 +50,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
 
   final List<IconData> _sectionIcons = const [
     Icons.dashboard_outlined,
+    Icons.request_quote_outlined,
     Icons.directions_boat_outlined,
     Icons.access_time_outlined,
     Icons.event_note_outlined,
@@ -135,10 +139,12 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
 
   int _mapActionRouteToTab(String actionRoute) {
     switch (actionRoute) {
+      case 'PRESUPUESTOS':
+        return 1;
       case 'FICHAJES':
-        return 2;
-      case 'AUSENCIAS':
         return 3;
+      case 'AUSENCIAS':
+        return 4;
       default:
         return 0;
     }
@@ -680,6 +686,11 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
                         label: Text('Inicio'),
                       ),
                       NavigationRailDestination(
+                        icon: Icon(Icons.request_quote_outlined),
+                        selectedIcon: Icon(Icons.request_quote),
+                        label: Text('Presupuestos'),
+                      ),
+                      NavigationRailDestination(
                         icon: Icon(Icons.directions_boat_outlined),
                         selectedIcon: Icon(Icons.directions_boat),
                         label: Text('Flota'),
@@ -753,6 +764,11 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
                 icon: Icon(Icons.dashboard_outlined),
                 selectedIcon: Icon(Icons.dashboard),
                 label: 'Inicio',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.request_quote_outlined),
+                selectedIcon: Icon(Icons.request_quote),
+                label: 'Presupuestos',
               ),
               NavigationDestination(
                 icon: Icon(Icons.directions_boat_outlined),

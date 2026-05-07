@@ -8,6 +8,7 @@ import 'package:navalgo/app/app_globals.dart';
 import 'package:navalgo/firebase_options.dart';
 import 'package:navalgo/services/network/api_client.dart';
 import 'package:navalgo/services/auth_service.dart';
+import 'package:navalgo/services/budget_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
 import 'package:navalgo/services/leave_service.dart';
 import 'package:navalgo/services/material_checklist_template_service.dart';
@@ -75,6 +76,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider<SessionViewModel>.value(value: sessionViewModel),
         Provider<AuthService>.value(value: authService),
+        Provider<BudgetService>(create: (_) => BudgetService()),
         Provider<WorkerService>(create: (_) => WorkerService()),
         Provider<FleetService>(create: (_) => FleetService()),
         Provider<LeaveService>(create: (_) => LeaveService()),
