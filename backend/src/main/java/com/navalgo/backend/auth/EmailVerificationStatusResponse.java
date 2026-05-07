@@ -5,6 +5,7 @@ import java.time.Instant;
 public record EmailVerificationStatusResponse(
         String fullName,
         String email,
-        Instant expiresAt
+        Instant expiresAt,
+        boolean alreadyVerified
 ) {
 }

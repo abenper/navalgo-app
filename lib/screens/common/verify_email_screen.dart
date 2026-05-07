@@ -28,7 +28,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
   EmailVerificationInfo? _info;
   bool _loading = true;
   bool _verifying = false;
-  bool _done = false;
   String? _error;
 
   @override
@@ -76,10 +75,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       if (!mounted) {
         return;
       }
-      setState(() {
-        _done = true;
-        _verifying = false;
-      });
+      await _loadStatus();
     } catch (error) {
       if (!mounted) {
         return;
@@ -103,6 +99,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_loading && _info?.alreadyVerified == true) {
+      return EmailVerificationSuccessScreen(email: _info?.email ?? '');
+    }
+
     return Scaffold(
       backgroundColor: NavalgoColors.foam,
       body: SafeArea(
@@ -126,7 +126,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        _done ? 'Correo confirmado' : 'Confirmar cuenta',
+                        'Confirmar cuenta',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
@@ -135,11 +135,6 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                         const Center(child: CircularProgressIndicator())
                       else if (_error != null)
                         Text(_error!, textAlign: TextAlign.center)
-                      else if (_done)
-                        Text(
-                          'Tu cuenta para ${_info?.email ?? ''} ya esta activa. Ya puedes iniciar sesion.',
-                          textAlign: TextAlign.center,
-                        )
                       else ...[
                         Text(
                           _info?.fullName ?? '',
@@ -168,6 +163,71 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       ],
                       const SizedBox(height: 10),
                       TextButton(
+                        onPressed: () {
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => const LoginScreen(),
+                            ),
+                            (_) => false,
+                          );
+                        },
+                        child: const Text('Ir al login'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class EmailVerificationSuccessScreen extends StatelessWidget {
+  const EmailVerificationSuccessScreen({super.key, required this.email});
+
+  final String email;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: NavalgoColors.foam,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Center(
+                        child: NavalgoLogo(
+                          variant: NavalgoLogoVariant.colorBadge,
+                          width: 96,
+                          height: 96,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Cuenta confirmada correctamente',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        email.isEmpty
+                            ? 'Tu cuenta ya está activa. Ya puedes iniciar sesión.'
+                            : 'La cuenta $email ya está activa. Ya puedes iniciar sesión.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
                         onPressed: () {
                           Navigator.of(context).pushAndRemoveUntil(
                             MaterialPageRoute(

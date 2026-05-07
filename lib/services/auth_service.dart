@@ -66,6 +66,7 @@ class AuthService {
       fullName: (map['fullName'] as String?) ?? '',
       email: (map['email'] as String?) ?? '',
       expiresAt: DateTime.parse(map['expiresAt'] as String),
+      alreadyVerified: (map['alreadyVerified'] as bool?) ?? false,
     );
   }
 
@@ -228,16 +229,25 @@ class AuthService {
   String _mapLoginError(ApiException exception) {
     final serverMessage = _extractServerMessage(exception.details);
 
-    if (exception.statusCode == 400) {
+    if (exception.statusCode == 401) {
       if (serverMessage == 'Credenciales invalidas') {
-        return 'Correo o contrasena incorrectos.';
-      }
-      if (serverMessage == 'Usuario inactivo') {
-        return 'Tu cuenta esta desactivada. Contacta con el administrador.';
+        return 'Correo o contraseña incorrectos.';
       }
     }
 
-    return serverMessage ?? 'No se pudo iniciar sesion en este momento.';
+    if (exception.statusCode == 400) {
+      if (serverMessage == 'Credenciales invalidas') {
+        return 'Correo o contraseña incorrectos.';
+      }
+      if (serverMessage == 'Usuario inactivo') {
+        return 'Tu cuenta está desactivada. Contacta con el administrador.';
+      }
+      if (serverMessage == 'Debes confirmar tu correo electronico antes de iniciar sesion') {
+        return 'Debes confirmar tu correo electrónico antes de iniciar sesión.';
+      }
+    }
+
+    return serverMessage ?? 'No se pudo iniciar sesión en este momento.';
   }
 
   String? _extractServerMessage(String? rawDetails) {
@@ -278,11 +288,13 @@ class EmailVerificationInfo {
     required this.fullName,
     required this.email,
     required this.expiresAt,
+    required this.alreadyVerified,
   });
 
   final String fullName;
   final String email;
   final DateTime expiresAt;
+  final bool alreadyVerified;
 }
 
 class PasswordResetInfo {

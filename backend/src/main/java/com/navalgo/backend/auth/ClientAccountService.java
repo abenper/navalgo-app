@@ -92,26 +92,35 @@ public class ClientAccountService {
     }
 
     public EmailVerificationStatusResponse getVerificationStatus(String rawToken) {
-        EmailVerificationToken token = requireValidVerificationToken(rawToken);
+        EmailVerificationToken token = requireVerificationToken(rawToken);
         Worker worker = token.getWorker();
+        if (token.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("El enlace de verificacion no es valido o ha caducado");
+        }
         return new EmailVerificationStatusResponse(
                 worker.getFullName(),
                 worker.getEmail(),
-                token.getExpiresAt()
+                token.getExpiresAt(),
+                token.getConsumedAt() != null || worker.isEmailVerified()
         );
     }
 
     @Transactional
     public void verifyEmail(String rawToken) {
-        EmailVerificationToken token = requireValidVerificationToken(rawToken);
+        EmailVerificationToken token = requireVerificationToken(rawToken);
         Worker worker = token.getWorker();
+        if (token.getExpiresAt().isBefore(Instant.now())) {
+            throw new IllegalArgumentException("El enlace de verificacion no es valido o ha caducado");
+        }
+        if (token.getConsumedAt() != null || worker.isEmailVerified()) {
+            return;
+        }
         worker.setEmailVerified(true);
         worker.setActive(true);
         workerRepository.save(worker);
 
         token.setConsumedAt(Instant.now());
         emailVerificationTokenRepository.save(token);
-        emailVerificationTokenRepository.deleteByWorker_Id(worker.getId());
     }
 
     @Transactional
@@ -135,18 +144,21 @@ public class ClientAccountService {
     }
 
     private EmailVerificationToken requireValidVerificationToken(String rawToken) {
-        if (rawToken == null || rawToken.isBlank()) {
-            throw new IllegalArgumentException("El enlace de verificacion no es valido o ha caducado");
-        }
-
-        EmailVerificationToken token = emailVerificationTokenRepository
-                .findByTokenHash(secureTokenSupport.sha256Hex(rawToken))
-                .orElseThrow(() -> new IllegalArgumentException("El enlace de verificacion no es valido o ha caducado"));
-
+        EmailVerificationToken token = requireVerificationToken(rawToken);
         if (token.getConsumedAt() != null || token.getExpiresAt().isBefore(Instant.now())) {
             throw new IllegalArgumentException("El enlace de verificacion no es valido o ha caducado");
         }
         return token;
+    }
+
+    private EmailVerificationToken requireVerificationToken(String rawToken) {
+        if (rawToken == null || rawToken.isBlank()) {
+            throw new IllegalArgumentException("El enlace de verificacion no es valido o ha caducado");
+        }
+
+        return emailVerificationTokenRepository
+                .findByTokenHash(secureTokenSupport.sha256Hex(rawToken))
+                .orElseThrow(() -> new IllegalArgumentException("El enlace de verificacion no es valido o ha caducado"));
     }
 
     private Owner createOwner(String fullName, String email, String phone) {
