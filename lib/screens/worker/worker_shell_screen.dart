@@ -648,60 +648,63 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(color: NavalgoColors.border),
                       ),
-                      child: NavigationRail(
-                        selectedIndex: _selectedIndex,
-                        onDestinationSelected: _onDestinationSelected,
-                        labelType: NavigationRailLabelType.all,
-                        minWidth: 84,
-                        leading: Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 18),
-                          child: Container(
-                            width: 52,
-                            height: 52,
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: NavalgoColors.border),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: NavalgoColors.deepSea.withValues(
-                                    alpha: 0.08,
+                      child: SizedBox(
+                        width: 128,
+                        child: NavigationRail(
+                          selectedIndex: _selectedIndex,
+                          onDestinationSelected: _onDestinationSelected,
+                          labelType: NavigationRailLabelType.all,
+                          minWidth: 128,
+                          leading: Padding(
+                            padding: const EdgeInsets.only(top: 12, bottom: 18),
+                            child: Container(
+                              width: 52,
+                              height: 52,
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: NavalgoColors.border),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: NavalgoColors.deepSea.withValues(
+                                      alpha: 0.08,
+                                    ),
+                                    blurRadius: 18,
+                                    offset: const Offset(0, 8),
                                   ),
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: const NavalgoLogo(
-                              variant: NavalgoLogoVariant.colorBadge,
-                              width: 40,
-                              height: 40,
+                                ],
+                              ),
+                              child: const NavalgoLogo(
+                                variant: NavalgoLogoVariant.colorBadge,
+                                width: 40,
+                                height: 40,
+                              ),
                             ),
                           ),
+                          destinations: const [
+                            NavigationRailDestination(
+                              icon: Icon(Icons.dashboard_outlined),
+                              selectedIcon: Icon(Icons.dashboard),
+                              label: Text('Inicio'),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.assignment_outlined),
+                              selectedIcon: Icon(Icons.assignment),
+                              label: Text('Partes'),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.access_time_outlined),
+                              selectedIcon: Icon(Icons.access_time_filled),
+                              label: Text('Fichaje'),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.event_note_outlined),
+                              selectedIcon: Icon(Icons.event_note),
+                              label: Text('Ausencias'),
+                            ),
+                          ],
                         ),
-                        destinations: const [
-                          NavigationRailDestination(
-                            icon: Icon(Icons.dashboard_outlined),
-                            selectedIcon: Icon(Icons.dashboard),
-                            label: Text('Inicio'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.assignment_outlined),
-                            selectedIcon: Icon(Icons.assignment),
-                            label: Text('Partes'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.access_time_outlined),
-                            selectedIcon: Icon(Icons.access_time_filled),
-                            label: Text('Fichaje'),
-                          ),
-                          NavigationRailDestination(
-                            icon: Icon(Icons.event_note_outlined),
-                            selectedIcon: Icon(Icons.event_note),
-                            label: Text('Ausencias'),
-                          ),
-                        ],
                       ),
                     ),
                   ),

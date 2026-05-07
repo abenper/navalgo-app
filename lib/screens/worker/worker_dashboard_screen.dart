@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/budget.dart';
 import '../../models/leave_request.dart';
+import '../../services/budget_service.dart';
 import '../../services/leave_service.dart';
 import '../../services/time_tracking_service.dart';
 import '../../theme/navalgo_theme.dart';
@@ -23,6 +25,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   int _myTasks = 0;
   int _urgentTasks = 0;
   String _hoursToday = '0h 00m';
+  int _recentBudgetsCount = 0;
+  List<String> _recentBudgetLabels = <String>[];
 
   @override
   void initState() {
@@ -36,6 +40,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     final workerId = session.user?.id;
     final role = session.user?.role;
     final canSeeParts = role == 'ADMIN' || role == 'WORKER';
+    final isCommercial = role == 'COMERCIAL';
 
     if (token == null || workerId == null) {
       setState(() {
@@ -54,6 +59,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       final leaveService = context.read<LeaveService>();
       final timeService = context.read<TimeTrackingService>();
       final workOrdersVm = context.read<WorkOrdersViewModel>();
+      final budgetService = context.read<BudgetService>();
 
       final balance = await leaveService.getLeaveBalance(
         token,
@@ -81,6 +87,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             .length;
       }
 
+      var recentBudgetLabels = <String>[];
+      var recentBudgetsCount = 0;
+      if (isCommercial) {
+        final budgets = await budgetService.getBudgets(token);
+        recentBudgetsCount = budgets.length;
+        recentBudgetLabels = budgets
+            .take(4)
+            .map(_formatBudgetLabel)
+            .toList(growable: false);
+      }
+
       final entries = await timeService.getByWorker(token, workerId: workerId);
       final now = DateTime.now();
       final todayEntries = entries.where((entry) {
@@ -103,6 +120,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         _myTasks = myTasks;
         _urgentTasks = urgentTasks;
         _hoursToday = _formatDuration(totalToday);
+        _recentBudgetsCount = recentBudgetsCount;
+        _recentBudgetLabels = recentBudgetLabels;
       });
     } catch (e) {
       if (!mounted) return;
@@ -117,6 +136,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     final workerName = context.watch<SessionViewModel>().user?.name ?? '';
     final role = context.watch<SessionViewModel>().user?.role;
     final canSeeParts = role == 'ADMIN' || role == 'WORKER';
+    final isCommercial = role == 'COMERCIAL';
     final firstName = workerName.split(' ').first;
     final textTheme = Theme.of(context).textTheme;
 
@@ -153,12 +173,48 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 sliver: SliverToBoxAdapter(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
+                      final cards = <Widget>[
+                        if (canSeeParts)
+                          _buildStatCard(
+                            'Mis partes',
+                            '$_myTasks',
+                            const Icon(Icons.assignment_ind),
+                            NavalgoColors.tide,
+                          ),
+                        if (canSeeParts)
+                          _buildStatCard(
+                            'Urgentes',
+                            '$_urgentTasks',
+                            const Icon(Icons.warning_amber_rounded),
+                            NavalgoColors.coral,
+                          ),
+                        if (isCommercial)
+                          _buildStatCard(
+                            'Ultimos presupuestos',
+                            '$_recentBudgetsCount',
+                            const Icon(Icons.request_quote_outlined),
+                            NavalgoColors.sand,
+                            note: _recentBudgetLabels.isEmpty
+                                ? 'Aun no hay presupuestos creados.'
+                                : _recentBudgetLabels.join('\n'),
+                          ),
+                        _buildStatCard(
+                          'Horas de hoy',
+                          _hoursToday,
+                          const Icon(Icons.timer_outlined),
+                          NavalgoColors.kelp,
+                        ),
+                        _buildVacCard(_balance),
+                      ];
+                      final wideColumns = isCommercial ? 3 : 4;
                       final crossAxisCount = constraints.maxWidth >= 980
-                          ? 4
+                          ? wideColumns
                           : (constraints.maxWidth >= 560 ? 2 : 1);
                       final childAspectRatio = crossAxisCount == 4
                           ? 1.58
-                          : (crossAxisCount == 2 ? 1.95 : 2.5);
+                          : (crossAxisCount == 3
+                                ? 1.72
+                                : (crossAxisCount == 2 ? 1.95 : 2.5));
                       return GridView(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -168,29 +224,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                           mainAxisSpacing: 12,
                           childAspectRatio: childAspectRatio,
                         ),
-                        children: [
-                          if (canSeeParts)
-                            _buildStatCard(
-                              'Mis partes',
-                              '$_myTasks',
-                              const Icon(Icons.assignment_ind),
-                              NavalgoColors.tide,
-                            ),
-                          if (canSeeParts)
-                            _buildStatCard(
-                              'Urgentes',
-                              '$_urgentTasks',
-                              const Icon(Icons.warning_amber_rounded),
-                              NavalgoColors.coral,
-                            ),
-                          _buildStatCard(
-                            'Horas de hoy',
-                            _hoursToday,
-                            const Icon(Icons.timer_outlined),
-                            NavalgoColors.kelp,
-                          ),
-                          _buildVacCard(_balance),
-                        ],
+                        children: cards,
                       );
                     },
                   ),
@@ -238,5 +272,16 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     final hours = duration.inHours;
     final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
     return '${hours}h ${minutes}m';
+  }
+
+  String _formatBudgetLabel(Budget budget) {
+    final status = switch (budget.status) {
+      'SENT' => 'Enviado',
+      'ACCEPTED' => 'Aceptado',
+      'REJECTED' => 'Rechazado',
+      'CANCELLED' => 'Cancelado',
+      _ => 'Borrador',
+    };
+    return '${budget.vesselName} · $status';
   }
 }
