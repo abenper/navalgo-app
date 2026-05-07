@@ -26,7 +26,7 @@ public class MediaProxyController {
     }
 
     @GetMapping("/proxy")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<InputStreamResource> proxy(
             @RequestParam("url") String fileUrl,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {

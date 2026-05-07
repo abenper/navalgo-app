@@ -30,13 +30,13 @@ public class WorkerController {
     }
 
     @GetMapping("/me")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<WorkerDto> me(Authentication authentication) {
         return ResponseEntity.ok(workerService.findOwnProfile(authentication.getName()));
     }
 
     @PutMapping("/me")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<OwnProfileResponse> updateOwnProfile(@RequestBody @Valid UpdateOwnProfileRequest request,
                                                                Authentication authentication) {
         WorkerDto updated = workerService.updateOwnProfile(authentication.getName(), request);
@@ -103,7 +103,7 @@ public class WorkerController {
     }
 
     @PostMapping(value = "/{id}/photo", consumes = "multipart/form-data")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<WorkerDto> uploadPhoto(@PathVariable Long id,
                                                  @RequestParam("file") MultipartFile file,
                                                  Authentication authentication) {

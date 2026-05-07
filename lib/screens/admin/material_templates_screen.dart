@@ -31,6 +31,14 @@ class _MaterialTemplatesScreenState extends State<MaterialTemplatesScreen> {
   void initState() {
     super.initState();
     _searchCtrl = TextEditingController();
+    _searchCtrl.addListener(() {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _searchQuery = _searchCtrl.text;
+      });
+    });
     Future<void>.microtask(_loadTemplates);
   }
 
@@ -209,26 +217,11 @@ class _MaterialTemplatesScreenState extends State<MaterialTemplatesScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: NavalgoColors.border),
-                  ),
-                  child: TextField(
-                    controller: _searchCtrl,
-                    onChanged: (value) => setState(() => _searchQuery = value),
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
-                      icon: Icon(Icons.search_rounded),
-                      hintText:
-                          'Buscar por nombre, tipo, revisi?n base, material o referencia',
-                    ),
-                  ),
+                NavalgoSearchField(
+                  controller: _searchCtrl,
+                  label: 'Buscar plantilla',
+                  hint:
+                      'Buscar por nombre, tipo, revisión base, material o referencia',
                 ),
                 const SizedBox(height: 12),
                 Wrap(

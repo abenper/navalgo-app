@@ -54,6 +54,11 @@ class _PartesScreenState extends State<PartesScreen> {
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final session = context.read<SessionViewModel>();
       final fleetViewModel = context.read<FleetViewModel>();
@@ -302,35 +307,11 @@ class _PartesScreenState extends State<PartesScreen> {
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                             const SizedBox(height: 14),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 14,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: NavalgoColors.border),
-                              ),
-                              child: TextField(
-                                controller: _searchCtrl,
-                                onChanged: (_) => setState(() {}),
-                                decoration: InputDecoration(
-                                  border: InputBorder.none,
-                                  icon: const Icon(Icons.search_rounded),
-                                  hintText:
-                                      'Buscar por parte, propietario, embarcación o mecánico',
-                                  suffixIcon: _searchCtrl.text.isEmpty
-                                      ? null
-                                      : IconButton(
-                                          onPressed: () {
-                                            _searchCtrl.clear();
-                                            setState(() {});
-                                          },
-                                          icon: const Icon(Icons.close_rounded),
-                                        ),
-                                ),
-                              ),
+                            NavalgoSearchField(
+                              controller: _searchCtrl,
+                              label: 'Buscar parte',
+                              hint:
+                                  'Buscar por parte, propietario, embarcación o mecánico',
                             ),
                             const SizedBox(height: 12),
                             Wrap(
@@ -363,9 +344,11 @@ class _PartesScreenState extends State<PartesScreen> {
                             ),
                             const SizedBox(height: 16),
                             if (workOrders.isEmpty)
-                              const NavalgoPanel(
+                              NavalgoPanel(
                                 child: Text(
-                                  'No hay partes para mostrar. Crea un nuevo parte para comenzar.',
+                                  isAdmin
+                                      ? 'No hay partes para mostrar. Crea un nuevo parte para comenzar.'
+                                      : 'Aún no tienes partes. Espera a que un administrador te asigne uno.',
                                   style: TextStyle(
                                     color: Color(0xFF48626D),
                                     fontWeight: FontWeight.w600,

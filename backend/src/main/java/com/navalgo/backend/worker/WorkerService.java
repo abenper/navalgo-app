@@ -1,6 +1,8 @@
 package com.navalgo.backend.worker;
 
 import com.navalgo.backend.auth.RefreshTokenService;
+import com.navalgo.backend.auth.RegistrationInvitation;
+import com.navalgo.backend.auth.RegistrationInvitationRepository;
 import com.navalgo.backend.auth.RegistrationInvitationService;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.common.Role;
@@ -12,7 +14,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDate;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -25,6 +29,7 @@ public class WorkerService {
     private final WorkOrderRepository workOrderRepository;
     private final InputSanitizer inputSanitizer;
     private final RegistrationInvitationService registrationInvitationService;
+    private final RegistrationInvitationRepository registrationInvitationRepository;
     private final SecureRandom secureRandom = new SecureRandom();
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
 
@@ -33,23 +38,29 @@ public class WorkerService {
                          RefreshTokenService refreshTokenService,
                          WorkOrderRepository workOrderRepository,
                          InputSanitizer inputSanitizer,
-                         RegistrationInvitationService registrationInvitationService) {
+                         RegistrationInvitationService registrationInvitationService,
+                         RegistrationInvitationRepository registrationInvitationRepository) {
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
         this.workOrderRepository = workOrderRepository;
         this.inputSanitizer = inputSanitizer;
         this.registrationInvitationService = registrationInvitationService;
+        this.registrationInvitationRepository = registrationInvitationRepository;
     }
 
     public List<WorkerDto> findAll() {
-        return workerRepository.findAll().stream().map(WorkerDto::from).toList();
+        List<Worker> workers = workerRepository.findAll();
+        Set<Long> pendingRegistrationWorkerIds = findPendingRegistrationWorkerIds(workers);
+        return workers.stream()
+                .map(worker -> WorkerDto.from(worker, !pendingRegistrationWorkerIds.contains(worker.getId())))
+                .toList();
     }
 
     public WorkerDto findOwnProfile(String email) {
         Worker worker = workerRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
-        return WorkerDto.from(worker);
+        return WorkerDto.from(worker, isRegistrationCompleted(worker.getId()));
     }
 
     @Transactional
@@ -67,12 +78,12 @@ public class WorkerService {
         worker.setRole(request.role());
         worker.setActive(true);
         worker.setMustChangePassword(false);
-        worker.setCanEditWorkOrders(request.canEditWorkOrders());
+        worker.setCanEditWorkOrders(request.role() == Role.WORKER && request.canEditWorkOrders());
         worker.setContractStartDate(request.contractStartDate() != null ? request.contractStartDate() : LocalDate.now());
 
         Worker saved = workerRepository.save(worker);
         boolean invitationEmailSent = registrationInvitationService.issueInvitation(saved);
-        return new CreateWorkerResponse(WorkerDto.from(saved), invitationEmailSent);
+        return new CreateWorkerResponse(WorkerDto.from(saved, false), invitationEmailSent);
     }
 
     @Transactional
@@ -92,9 +103,10 @@ public class WorkerService {
         worker.setEmail(inputSanitizer.email(request.email()));
         worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
         worker.setRole(request.role());
-        worker.setCanEditWorkOrders(request.canEditWorkOrders());
+        worker.setCanEditWorkOrders(request.role() == Role.WORKER && request.canEditWorkOrders());
         worker.setContractStartDate(request.contractStartDate());
-        return WorkerDto.from(workerRepository.save(worker));
+        Worker saved = workerRepository.save(worker);
+        return WorkerDto.from(saved, isRegistrationCompleted(saved.getId()));
     }
 
     @Transactional
@@ -111,7 +123,8 @@ public class WorkerService {
         worker.setFullName(inputSanitizer.requiredText(request.fullName(), "El nombre", 255));
         worker.setEmail(inputSanitizer.email(request.email()));
         worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
-        return WorkerDto.from(workerRepository.save(worker));
+        Worker saved = workerRepository.save(worker);
+        return WorkerDto.from(saved, isRegistrationCompleted(saved.getId()));
     }
 
     @Transactional
@@ -146,7 +159,8 @@ public class WorkerService {
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
         ensureCanManageTarget(worker, requesterEmail);
         worker.setCanEditWorkOrders(canEditWorkOrders);
-        return WorkerDto.from(workerRepository.save(worker));
+        Worker saved = workerRepository.save(worker);
+        return WorkerDto.from(saved, isRegistrationCompleted(saved.getId()));
     }
 
     @Transactional
@@ -177,7 +191,8 @@ public class WorkerService {
         if (!active) {
             refreshTokenService.revokeAllForWorker(workerId);
         }
-        return WorkerDto.from(workerRepository.save(worker));
+        Worker saved = workerRepository.save(worker);
+        return WorkerDto.from(saved, isRegistrationCompleted(saved.getId()));
     }
 
     @Transactional
@@ -188,7 +203,27 @@ public class WorkerService {
             throw new org.springframework.security.access.AccessDeniedException("Solo puedes actualizar tu propia foto");
         }
         worker.setPhotoUrl(photoUrl);
-        return WorkerDto.from(workerRepository.save(worker));
+        Worker saved = workerRepository.save(worker);
+        return WorkerDto.from(saved, isRegistrationCompleted(saved.getId()));
+    }
+
+    private boolean isRegistrationCompleted(Long workerId) {
+        return !registrationInvitationRepository.existsByWorker_Id(workerId);
+    }
+
+    private Set<Long> findPendingRegistrationWorkerIds(List<Worker> workers) {
+        List<Long> workerIds = workers.stream()
+                .map(Worker::getId)
+                .toList();
+        if (workerIds.isEmpty()) {
+            return Set.of();
+        }
+
+        Set<Long> pendingRegistrationWorkerIds = new HashSet<>();
+        for (RegistrationInvitation invitation : registrationInvitationRepository.findByWorker_IdIn(workerIds)) {
+            pendingRegistrationWorkerIds.add(invitation.getWorker().getId());
+        }
+        return pendingRegistrationWorkerIds;
     }
 
     private void ensureCanManageAdminRole(Role requestedRole, String requesterEmail) {

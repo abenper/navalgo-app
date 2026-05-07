@@ -158,7 +158,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         NavalgoColors.tide,
                         note: _workersClockedTodayNames.isEmpty
                             ? null
-                            : _workersClockedTodayNames.join(', '),
+                            : _workersClockedTodayNames.join('\n'),
                       ),
                       _buildStatCard(
                         'Ausencias pendientes',

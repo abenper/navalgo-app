@@ -99,10 +99,6 @@ class _FichajeScreenState extends State<FichajeScreen> {
       try {
         if (isAdmin) {
           todaySummary = await timeTrackingService.getTodaySummary(token);
-          adjustmentRequests = await timeTrackingService.getAdjustmentRequests(
-            token,
-            status: 'PENDING',
-          );
         } else {
           adjustmentRequests = await timeTrackingService.getAdjustmentRequests(
             token,
@@ -240,55 +236,44 @@ class _FichajeScreenState extends State<FichajeScreen> {
             ),
           ],
           const SizedBox(height: 18),
-          NavalgoSectionHeader(
-            title: isAdmin
-                ? 'Solicitudes pendientes de ajuste'
-                : 'Mis solicitudes de ajuste',
-            subtitle: isAdmin
-                ? 'Aprueba o rechaza los cambios solicitados por el equipo.'
-                : 'Consulta el estado de tus solicitudes recientes.',
-          ),
-          const SizedBox(height: 12),
-          if (_adjustmentRequests.isEmpty)
-            NavalgoPanel(
-              child: Text(
-                isAdmin
-                    ? 'No hay solicitudes pendientes de revisión.'
-                    : 'Todavía no has enviado solicitudes de ajuste.',
-              ),
-            )
-          else
-            ..._adjustmentRequests.map((request) {
-              final requestedClockIn = request.requestedClockIn;
-              final requestedClockOut = request.requestedClockOut;
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _TimeAdjustmentRequestCard(
-                  request: request,
-                  workDateLabel: _fmtDate(request.workDate),
-                  requestedHoursLabel:
-                      '${requestedClockIn == null ? '--:--' : _fmtHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _fmtHour(requestedClockOut)}',
-                  workSiteLabel: _workSiteLabel(request.workSite),
-                  busy: _adjustmentBusy,
-                  canReview: isAdmin && request.isPending,
-                  canEdit: !isAdmin && request.isPending,
-                  canDelete: !isAdmin && request.isPending,
-                  onApprove: isAdmin && request.isPending
-                      ? () => _reviewAdjustmentRequest(request, approve: true)
-                      : null,
-                  onReject: isAdmin && request.isPending
-                      ? () => _reviewAdjustmentRequest(request, approve: false)
-                      : null,
-                  onEdit: !isAdmin && request.isPending
-                      ? () => _editAdjustmentRequest(request)
-                      : null,
-                  onDelete: !isAdmin && request.isPending
-                      ? () => _deleteAdjustmentRequest(request)
-                      : null,
+          if (!isAdmin) ...[
+            NavalgoSectionHeader(
+              title: 'Mis solicitudes de ajuste',
+              subtitle: 'Consulta el estado de tus solicitudes recientes.',
+            ),
+            const SizedBox(height: 12),
+            if (_adjustmentRequests.isEmpty)
+              const NavalgoPanel(
+                child: Text(
+                  'Todavía no has enviado solicitudes de ajuste.',
                 ),
-              );
-            }),
-          const SizedBox(height: 18),
+              )
+            else
+              ..._adjustmentRequests.map((request) {
+                final requestedClockIn = request.requestedClockIn;
+                final requestedClockOut = request.requestedClockOut;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _TimeAdjustmentRequestCard(
+                    request: request,
+                    workDateLabel: _fmtDate(request.workDate),
+                    requestedHoursLabel:
+                        '${requestedClockIn == null ? '--:--' : _fmtHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _fmtHour(requestedClockOut)}',
+                    workSiteLabel: _workSiteLabel(request.workSite),
+                    busy: _adjustmentBusy,
+                    canEdit: request.isPending,
+                    canDelete: request.isPending,
+                    onEdit: request.isPending
+                        ? () => _editAdjustmentRequest(request)
+                        : null,
+                    onDelete: request.isPending
+                        ? () => _deleteAdjustmentRequest(request)
+                        : null,
+                  ),
+                );
+              }),
+            const SizedBox(height: 18),
+          ],
           const NavalgoSectionHeader(title: 'Últimos registros'),
           const SizedBox(height: 12),
           ..._entries.take(6).map((item) {
@@ -724,83 +709,6 @@ class _FichajeScreenState extends State<FichajeScreen> {
     }
   }
 
-  Future<void> _reviewAdjustmentRequest(
-    TimeAdjustmentRequest request, {
-    required bool approve,
-  }) async {
-    final token = context.read<SessionViewModel>().token;
-    if (token == null) {
-      return;
-    }
-
-    final commentController = TextEditingController();
-    final comment = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(
-            approve
-                ? 'Aprobar ajuste de fichaje'
-                : 'Rechazar ajuste de fichaje',
-          ),
-          content: TextField(
-            controller: commentController,
-            minLines: 2,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: 'Comentario para el trabajador',
-              hintText: 'Opcional',
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancelar'),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.pop(dialogContext, commentController.text.trim()),
-              child: Text(approve ? 'Aprobar' : 'Rechazar'),
-            ),
-          ],
-        );
-      },
-    );
-    commentController.dispose();
-
-    if (!mounted || comment == null) {
-      return;
-    }
-
-    setState(() => _adjustmentBusy = true);
-    try {
-      await context.read<TimeTrackingService>().reviewAdjustmentRequest(
-        token,
-        requestId: request.id,
-        status: approve ? 'APPROVED' : 'REJECTED',
-        adminComment: comment.isEmpty ? null : comment,
-      );
-      await _loadEntries();
-      if (!mounted) {
-        return;
-      }
-      AppToast.success(
-        context,
-        approve
-            ? 'Ajuste aprobado y aplicado.'
-            : 'Solicitud rechazada correctamente.',
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      AppToast.error(context, 'No se pudo revisar la solicitud: $e');
-    } finally {
-      if (mounted) {
-        setState(() => _adjustmentBusy = false);
-      }
-    }
-  }
 }
 
 class _TimeAdjustmentRequestInput {
@@ -1146,11 +1054,8 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
     required this.requestedHoursLabel,
     required this.workSiteLabel,
     required this.busy,
-    required this.canReview,
     this.canEdit = false,
     this.canDelete = false,
-    this.onApprove,
-    this.onReject,
     this.onEdit,
     this.onDelete,
   });
@@ -1160,11 +1065,8 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
   final String requestedHoursLabel;
   final String workSiteLabel;
   final bool busy;
-  final bool canReview;
   final bool canEdit;
   final bool canDelete;
-  final VoidCallback? onApprove;
-  final VoidCallback? onReject;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
 
@@ -1213,28 +1115,7 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
-          if (canReview) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: busy ? null : onReject,
-                    icon: const Icon(Icons.close_outlined),
-                    label: const Text('Rechazar'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: busy ? null : onApprove,
-                    icon: const Icon(Icons.check_outlined),
-                    label: const Text('Aprobar'),
-                  ),
-                ),
-              ],
-            ),
-          ] else if (canEdit || canDelete) ...[
+          if (canEdit || canDelete) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,

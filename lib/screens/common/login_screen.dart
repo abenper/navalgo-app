@@ -11,6 +11,7 @@ import 'package:navalgo/viewmodels/session_view_model.dart';
 import 'package:navalgo/widgets/navalgo_logo.dart';
 
 import '../admin/admin_shell_screen.dart';
+import '../commercial/commercial_shell_screen.dart';
 import '../worker/worker_shell_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -232,6 +233,10 @@ class _LoginScreenState extends State<LoginScreen> {
     if (role == 'ADMIN') {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => const AdminShellScreen()),
+      );
+    } else if (role == 'COMERCIAL') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const CommercialShellScreen()),
       );
     } else {
       Navigator.of(context).pushReplacement(

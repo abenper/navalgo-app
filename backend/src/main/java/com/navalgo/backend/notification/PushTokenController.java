@@ -20,7 +20,7 @@ public class PushTokenController {
     }
 
     @PostMapping("/register")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<Void> register(Authentication authentication,
                                          @Valid @RequestBody PushTokenRegistrationRequest request) {
         pushNotificationService.registerToken(authentication.getName(), request);
@@ -28,7 +28,7 @@ public class PushTokenController {
     }
 
     @PostMapping("/unregister")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<Void> unregister(Authentication authentication,
                                            @Valid @RequestBody PushTokenUnregistrationRequest request) {
         pushNotificationService.unregisterToken(authentication.getName(), request);

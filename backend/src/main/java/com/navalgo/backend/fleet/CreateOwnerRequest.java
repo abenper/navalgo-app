@@ -10,7 +10,7 @@ public record CreateOwnerRequest(
         @NotBlank @Size(max = 255) String displayName,
         @NotBlank @Size(max = 255) String documentId,
         @Size(max = 255) String phone,
-        @Email @Size(max = 255) String email,
+        @NotBlank @Email @Size(max = 255) String email,
         Long companyId
 ) {
 }

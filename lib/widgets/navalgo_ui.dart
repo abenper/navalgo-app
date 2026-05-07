@@ -154,6 +154,13 @@ class NavalgoMetricCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final noteLines = note == null
+        ? const <String>[]
+        : note!
+              .split('\n')
+              .map((item) => item.trim())
+              .where((item) => item.isNotEmpty)
+              .toList(growable: false);
     return LayoutBuilder(
       builder: (context, constraints) {
         final compact = constraints.maxWidth < 240;
@@ -174,7 +181,6 @@ class NavalgoMetricCard extends StatelessWidget {
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,44 +233,53 @@ class NavalgoMetricCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              if (note != null)
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.symmetric(
-                    horizontal: compact ? 10 : 12,
-                    vertical: compact ? 8 : 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Text(
-                    note!,
-                    maxLines: compact ? 2 : 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: NavalgoColors.storm,
-                      height: 1.3,
-                    ),
-                  ),
-                )
-              else
-                Row(
-                  children: [
-                    Container(
-                      width: compact ? 28 : 34,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: accent,
-                        borderRadius: BorderRadius.circular(999),
+              Expanded(
+                child: noteLines.isEmpty
+                    ? const SizedBox.shrink()
+                    : Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(
+                          horizontal: compact ? 10 : 12,
+                          vertical: compact ? 8 : 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: ListView.separated(
+                          padding: EdgeInsets.zero,
+                          itemCount: noteLines.length,
+                          itemBuilder: (context, index) {
+                            return Text(
+                              noteLines[index],
+                              style: textTheme.bodySmall?.copyWith(
+                                color: NavalgoColors.storm,
+                                height: 1.3,
+                              ),
+                            );
+                          },
+                          separatorBuilder: (context, index) =>
+                              const SizedBox(height: 8),
+                        ),
                       ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Container(
+                    width: compact ? 28 : 34,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: accent,
+                      borderRadius: BorderRadius.circular(999),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Container(height: 1, color: NavalgoColors.border),
-                    ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(height: 1, color: NavalgoColors.border),
+                  ),
+                ],
+              ),
             ],
           ),
         );

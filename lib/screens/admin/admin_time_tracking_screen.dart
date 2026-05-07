@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../models/time_adjustment_request.dart';
 import '../../models/time_entry.dart';
 import '../../models/worker_profile.dart';
 import '../../services/time_tracking_service.dart';
@@ -25,9 +26,12 @@ class _WorkerJornadaAdjustmentScreenState
     extends State<WorkerJornadaAdjustmentScreen> {
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _adjustmentBusy = false;
   String? _error;
   WorkerTimeTrackingInsight? _insight;
   List<TimeEntry> _entries = <TimeEntry>[];
+  List<TimeAdjustmentRequest> _pendingAdjustmentRequests =
+      <TimeAdjustmentRequest>[];
 
   @override
   void initState() {
@@ -54,12 +58,19 @@ class _WorkerJornadaAdjustmentScreenState
       final service = context.read<TimeTrackingService>();
       final insight = await service.getWorkerInsight(token, workerId: widget.worker.id);
       final entries = await service.getByWorker(token, workerId: widget.worker.id);
+      final adjustmentRequests = await service.getAdjustmentRequests(
+        token,
+        status: 'PENDING',
+      );
       if (!mounted) {
         return;
       }
       setState(() {
         _insight = insight;
         _entries = entries;
+        _pendingAdjustmentRequests = adjustmentRequests
+            .where((request) => request.workerId == widget.worker.id)
+            .toList();
       });
     } catch (e) {
       if (!mounted) {
@@ -114,6 +125,84 @@ class _WorkerJornadaAdjustmentScreenState
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  Future<void> _reviewAdjustmentRequest(
+    TimeAdjustmentRequest request, {
+    required bool approve,
+  }) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    final commentController = TextEditingController();
+    final comment = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(
+            approve
+                ? 'Aprobar ajuste de fichaje'
+                : 'Rechazar ajuste de fichaje',
+          ),
+          content: TextField(
+            controller: commentController,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Comentario para el trabajador',
+              hintText: 'Opcional',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, commentController.text.trim()),
+              child: Text(approve ? 'Aprobar' : 'Rechazar'),
+            ),
+          ],
+        );
+      },
+    );
+    commentController.dispose();
+
+    if (!mounted || comment == null) {
+      return;
+    }
+
+    setState(() => _adjustmentBusy = true);
+    try {
+      await context.read<TimeTrackingService>().reviewAdjustmentRequest(
+        token,
+        requestId: request.id,
+        status: approve ? 'APPROVED' : 'REJECTED',
+        adminComment: comment.isEmpty ? null : comment,
+      );
+      await _load();
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(
+        context,
+        approve
+            ? 'Ajuste aprobado y aplicado.'
+            : 'Solicitud rechazada correctamente.',
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo revisar la solicitud: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _adjustmentBusy = false);
       }
     }
   }
@@ -197,6 +286,8 @@ class _WorkerJornadaAdjustmentScreenState
               _buildHero(context, insight),
               const SizedBox(height: 18),
               _buildQualityFactors(context, insight),
+              const SizedBox(height: 18),
+              _buildPendingAdjustmentRequests(context),
               const SizedBox(height: 18),
               _buildResolvedTable(context, insight),
               const SizedBox(height: 18),
@@ -401,6 +492,63 @@ class _WorkerJornadaAdjustmentScreenState
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildPendingAdjustmentRequests(BuildContext context) {
+    return NavalgoPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Solicitudes pendientes de ajuste',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              NavalgoStatusChip(
+                label: '${_pendingAdjustmentRequests.length} pendientes',
+                color: _pendingAdjustmentRequests.isEmpty
+                    ? NavalgoColors.storm
+                    : NavalgoColors.sand,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Revisa aquí las solicitudes de este trabajador para no dispersar el control horario.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          if (_pendingAdjustmentRequests.isEmpty)
+            const Text(
+              'Este trabajador no tiene solicitudes pendientes de revisión.',
+            )
+          else
+            ..._pendingAdjustmentRequests.map((request) {
+              final requestedClockIn = request.requestedClockIn;
+              final requestedClockOut = request.requestedClockOut;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _AdminAdjustmentRequestCard(
+                  request: request,
+                  workDateLabel: _formatAdjustmentDate(request.workDate),
+                  requestedHoursLabel:
+                      '${requestedClockIn == null ? '--:--' : _formatAdjustmentHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _formatAdjustmentHour(requestedClockOut)}',
+                  workSiteLabel: _workSiteLabel(request.workSite),
+                  busy: _adjustmentBusy,
+                  onApprove: () => _reviewAdjustmentRequest(request, approve: true),
+                  onReject: () => _reviewAdjustmentRequest(request, approve: false),
+                ),
+              );
+            }),
+        ],
+      ),
     );
   }
 
@@ -908,6 +1056,96 @@ class _EntryMetaChip extends StatelessWidget {
   }
 }
 
+class _AdminAdjustmentRequestCard extends StatelessWidget {
+  const _AdminAdjustmentRequestCard({
+    required this.request,
+    required this.workDateLabel,
+    required this.requestedHoursLabel,
+    required this.workSiteLabel,
+    required this.busy,
+    required this.onApprove,
+    required this.onReject,
+  });
+
+  final TimeAdjustmentRequest request;
+  final String workDateLabel;
+  final String requestedHoursLabel;
+  final String workSiteLabel;
+  final bool busy;
+  final VoidCallback onApprove;
+  final VoidCallback onReject;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = _timeAdjustmentStatusColor(request.status);
+    return NavalgoPanel(
+      tint: statusColor.withValues(alpha: 0.06),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      request.workerName,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$workDateLabel · $workSiteLabel · $requestedHoursLabel',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+              NavalgoStatusChip(
+                label: _timeAdjustmentStatusLabel(request.status),
+                color: statusColor,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(request.reason, style: Theme.of(context).textTheme.bodyLarge),
+          if (request.adminComment != null && request.adminComment!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Text(
+                'Comentario: ${request.adminComment}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: busy ? null : onReject,
+                  icon: const Icon(Icons.close_outlined),
+                  label: const Text('Rechazar'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: busy ? null : onApprove,
+                  icon: const Icon(Icons.check_outlined),
+                  label: const Text('Aprobar'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _EditTimeEntryInput {
   const _EditTimeEntryInput({
     required this.clockIn,
@@ -1350,10 +1588,42 @@ Color _scoreColor(double score) {
   return NavalgoColors.coral;
 }
 
+String _timeAdjustmentStatusLabel(String status) {
+  switch (status) {
+    case 'APPROVED':
+      return 'Aprobada';
+    case 'REJECTED':
+      return 'Rechazada';
+    default:
+      return 'Pendiente';
+  }
+}
+
+Color _timeAdjustmentStatusColor(String status) {
+  switch (status) {
+    case 'APPROVED':
+      return NavalgoColors.kelp;
+    case 'REJECTED':
+      return NavalgoColors.coral;
+    default:
+      return NavalgoColors.sand;
+  }
+}
+
 String _formatMinutes(int minutes) {
   final hours = minutes ~/ 60;
   final remainingMinutes = minutes % 60;
   return '${hours}h ${remainingMinutes.toString().padLeft(2, '0')}m';
+}
+
+String _formatAdjustmentDate(DateTime value) {
+  final local = value.toLocal();
+  return '${local.day.toString().padLeft(2, '0')}/${local.month.toString().padLeft(2, '0')}';
+}
+
+String _formatAdjustmentHour(DateTime value) {
+  final local = value.toLocal();
+  return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
 }
 
 String _formatDate(DateTime value) {
@@ -1405,6 +1675,65 @@ String? _entryDurationLabel(TimeEntry entry) {
   if (end == null) {
     return null;
   }
+  /*
+
+  Widget _buildPendingAdjustmentRequests(BuildContext context) {
+    return NavalgoPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Solicitudes pendientes de ajuste',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              NavalgoStatusChip(
+                label: '${_pendingAdjustmentRequests.length} pendientes',
+                color: _pendingAdjustmentRequests.isEmpty
+                    ? NavalgoColors.storm
+                    : NavalgoColors.sand,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Revisa aquí las solicitudes de este trabajador para no dispersar el control horario.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          if (_pendingAdjustmentRequests.isEmpty)
+            const Text(
+              'Este trabajador no tiene solicitudes pendientes de revisión.',
+            )
+          else
+            ..._pendingAdjustmentRequests.map((request) {
+              final requestedClockIn = request.requestedClockIn;
+              final requestedClockOut = request.requestedClockOut;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _AdminAdjustmentRequestCard(
+                  request: request,
+                  workDateLabel: _formatAdjustmentDate(request.workDate),
+                  requestedHoursLabel:
+                      '${requestedClockIn == null ? '--:--' : _formatAdjustmentHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _formatAdjustmentHour(requestedClockOut)}',
+                  workSiteLabel: _workSiteLabel(request.workSite),
+                  busy: _adjustmentBusy,
+                  onApprove: () => _reviewAdjustmentRequest(request, approve: true),
+                  onReject: () => _reviewAdjustmentRequest(request, approve: false),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+  */
   final difference = end.difference(entry.clockIn).inMinutes;
   if (difference <= 0) {
     return null;

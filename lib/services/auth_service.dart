@@ -134,6 +134,16 @@ class AuthService {
       );
     }
 
+    if (email.toLowerCase() == 'comercial@navalgo.com') {
+      return User(
+        id: 3,
+        name: 'Comercial Navalgo',
+        email: email,
+        role: 'COMERCIAL',
+        token: 'mock-commercial-jwt-token',
+      );
+    }
+
     throw Exception('Usuario no encontrado en modo mock.');
   }
 

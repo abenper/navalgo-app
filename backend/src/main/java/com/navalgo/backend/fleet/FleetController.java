@@ -47,20 +47,20 @@ public class FleetController {
     }
 
     @GetMapping("/owners")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<List<OwnerDto>> listOwners() {
         return ResponseEntity.ok(ownerRepository.findAll().stream().map(OwnerDto::from).toList());
     }
 
     @PostMapping("/owners")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<OwnerDto> createOwner(@RequestBody @Valid CreateOwnerRequest request) {
         return ResponseEntity.ok(OwnerDto.from(ownerRepository.save(buildOwnerFromRequest(new Owner(), request))));
     }
 
     @PutMapping("/owners/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<OwnerDto> updateOwner(@PathVariable Long id,
                                                 @RequestBody @Valid UpdateOwnerRequest request) {
@@ -71,7 +71,9 @@ public class FleetController {
         owner.setDisplayName(inputSanitizer.requiredText(request.displayName(), "El nombre del propietario", 255));
         owner.setDocumentId(inputSanitizer.requiredText(request.documentId(), "El documento", 255));
         owner.setPhone(inputSanitizer.optionalText(request.phone(), 255));
-        owner.setEmail(request.email() == null ? null : inputSanitizer.email(request.email()));
+        String normalizedEmail = inputSanitizer.email(request.email());
+        ensureOwnerEmailAvailable(normalizedEmail, owner.getId());
+        owner.setEmail(normalizedEmail);
 
         if (request.companyId() != null) {
             Company company = companyRepository.findById(request.companyId())
@@ -85,7 +87,7 @@ public class FleetController {
     }
 
     @DeleteMapping("/owners/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<Void> deleteOwner(@PathVariable Long id) {
         if (!ownerRepository.existsById(id)) {
@@ -103,7 +105,9 @@ public class FleetController {
         owner.setDisplayName(inputSanitizer.requiredText(request.displayName(), "El nombre del propietario", 255));
         owner.setDocumentId(inputSanitizer.requiredText(request.documentId(), "El documento", 255));
         owner.setPhone(inputSanitizer.optionalText(request.phone(), 255));
-        owner.setEmail(request.email() == null ? null : inputSanitizer.email(request.email()));
+        String normalizedEmail = inputSanitizer.email(request.email());
+        ensureOwnerEmailAvailable(normalizedEmail, owner.getId());
+        owner.setEmail(normalizedEmail);
 
         if (request.companyId() != null) {
             Company company = companyRepository.findById(request.companyId())
@@ -114,7 +118,7 @@ public class FleetController {
     }
 
     @GetMapping("/vessels")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<VesselDto>> listVessels(@RequestParam(required = false) Long ownerId) {
         List<Vessel> vessels = ownerId == null
                 ? vesselRepository.findAll()
@@ -123,14 +127,14 @@ public class FleetController {
     }
 
     @PostMapping("/vessels")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<VesselDto> createVessel(@RequestBody @Valid CreateVesselRequest request) {
         return ResponseEntity.ok(VesselDto.from(vesselRepository.save(buildVesselFromCreateRequest(new Vessel(), request))));
     }
 
     @PutMapping("/vessels/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<VesselDto> updateVessel(@PathVariable Long id,
                                                   @RequestBody @Valid UpdateVesselRequest request) {
@@ -177,7 +181,7 @@ public class FleetController {
     }
 
     @DeleteMapping("/vessels/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<Void> deleteVessel(@PathVariable Long id) {
         if (!vesselRepository.existsById(id)) {
@@ -191,7 +195,7 @@ public class FleetController {
     }
 
     @GetMapping("/vessels/{vesselId}/last-engine-hours")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<List<EngineHourSummaryDto>> lastEngineHours(@PathVariable Long vesselId) {
         if (!vesselRepository.existsById(vesselId)) {
             throw new EntityNotFoundException("Embarcacion no encontrada");
@@ -208,7 +212,7 @@ public class FleetController {
     }
 
     @GetMapping("/vessels/{vesselId}/stats")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<VesselStatsDto> vesselStats(@PathVariable Long vesselId) {
         if (!vesselRepository.existsById(vesselId)) {
             throw new EntityNotFoundException("Embarcacion no encontrada");
@@ -441,5 +445,14 @@ public class FleetController {
                 : label.replaceAll("\\s+\\d+$", "").trim();
         Set<String> eligibleLabels = new HashSet<>(Arrays.asList("Motor central", "Babor", "Estribor"));
         return eligibleLabels.contains(baseLabel);
+    }
+
+    private void ensureOwnerEmailAvailable(String email, Long ownerId) {
+        boolean exists = ownerId == null
+                ? ownerRepository.existsByEmailIgnoreCase(email)
+                : ownerRepository.existsByEmailIgnoreCaseAndIdNot(email, ownerId);
+        if (exists) {
+            throw new IllegalArgumentException("Ya existe un cliente con ese correo electronico");
+        }
     }
 }

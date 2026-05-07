@@ -813,14 +813,14 @@ class _OwnerInput {
     required this.displayName,
     required this.documentId,
     this.phone,
-    this.email,
+    required this.email,
   });
 
   final String type;
   final String displayName;
   final String documentId;
   final String? phone;
-  final String? email;
+  final String email;
 }
 
 class _OwnerDialog extends StatefulWidget {
@@ -892,9 +892,7 @@ class _OwnerDialogState extends State<_OwnerDialog> {
                 phone: _phoneCtrl.text.trim().isEmpty
                     ? null
                     : _phoneCtrl.text.trim(),
-                email: _emailCtrl.text.trim().isEmpty
-                    ? null
-                    : _emailCtrl.text.trim(),
+                email: _emailCtrl.text.trim(),
               ),
             );
           },
@@ -984,7 +982,7 @@ class _OwnerDialogState extends State<_OwnerDialog> {
                 validator: (value) {
                   final trimmed = value?.trim() ?? '';
                   if (trimmed.isEmpty) {
-                    return null;
+                    return 'Indica el correo del cliente.';
                   }
                   if (!trimmed.contains('@') || !trimmed.contains('.')) {
                     return 'Introduce un correo válido.';

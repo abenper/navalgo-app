@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/worker_profile.dart';
+import '../../services/time_tracking_service.dart';
 import '../../services/network/api_exception.dart';
 import '../../services/worker_service.dart';
 import '../../theme/navalgo_theme.dart';
@@ -13,6 +14,30 @@ import 'admin_time_tracking_screen.dart';
 
 const String _superAdminEmail = 'admin@naval-go.com';
 
+String _workerRoleLabel(String role) {
+  switch (role) {
+    case 'ADMIN':
+      return 'Administrador';
+    case 'COMERCIAL':
+      return 'Comercial';
+    default:
+      return 'Trabajador';
+  }
+}
+
+bool _isOperationalWorker(String role) => role == 'WORKER';
+
+IconData _workerRoleIcon(String role) {
+  switch (role) {
+    case 'ADMIN':
+      return Icons.admin_panel_settings_outlined;
+    case 'COMERCIAL':
+      return Icons.support_agent_outlined;
+    default:
+      return Icons.person_outline;
+  }
+}
+
 class EquipoScreen extends StatefulWidget {
   const EquipoScreen({super.key});
 
@@ -22,12 +47,13 @@ class EquipoScreen extends StatefulWidget {
 
 class _EquipoScreenState extends State<EquipoScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
+  Map<int, int> _pendingAdjustmentCountByWorker = <int, int>{};
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<WorkersViewModel>().loadWorkers();
+      _loadScreenData();
     });
   }
 
@@ -53,6 +79,49 @@ class _EquipoScreenState extends State<EquipoScreen> {
       return true;
     }
     return _isSuperAdmin(currentEmail);
+  }
+
+  Future<void> _loadScreenData() async {
+    final workersViewModel = context.read<WorkersViewModel>();
+    final sessionViewModel = context.read<SessionViewModel>();
+    final timeTrackingService = context.read<TimeTrackingService>();
+
+    await workersViewModel.loadWorkers();
+
+    final token = sessionViewModel.token;
+    if (token == null) {
+      if (mounted) {
+        setState(() {
+          _pendingAdjustmentCountByWorker = <int, int>{};
+        });
+      }
+      return;
+    }
+
+    try {
+      final pendingRequests = await timeTrackingService.getAdjustmentRequests(
+        token,
+        status: 'PENDING',
+      );
+      if (!mounted) {
+        return;
+      }
+
+      final counts = <int, int>{};
+      for (final request in pendingRequests) {
+        counts.update(request.workerId, (value) => value + 1, ifAbsent: () => 1);
+      }
+      setState(() {
+        _pendingAdjustmentCountByWorker = counts;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _pendingAdjustmentCountByWorker = <int, int>{};
+      });
+    }
   }
 
   Future<void> _openCreateWorkerDialog() async {
@@ -361,7 +430,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
           : vm.error != null
           ? Center(child: Text(vm.error!))
           : RefreshIndicator(
-              onRefresh: vm.loadWorkers,
+              onRefresh: _loadScreenData,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
@@ -403,6 +472,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
                             child: _WorkerCard(
                               worker: worker,
                               formattedDate: _fmtDate(worker.contractStartDate),
+                              pendingAdjustmentCount:
+                                  _pendingAdjustmentCountByWorker[worker.id] ?? 0,
                               canManageAdminAccount:
                                   worker.role != 'ADMIN' || canManageAdmins,
                               onEdit: () => _openEditWorkerDialog(worker),
@@ -430,7 +501,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
             child: FilledButton.icon(
               onPressed: _openCreateWorkerDialog,
               icon: const Icon(Icons.person_add),
-              label: const Text('Crear trabajador'),
+              label: const Text('Crear usuario'),
             ),
           ),
         ),
@@ -450,6 +521,7 @@ class _WorkerCard extends StatelessWidget {
   const _WorkerCard({
     required this.worker,
     required this.formattedDate,
+    required this.pendingAdjustmentCount,
     required this.canManageAdminAccount,
     required this.onEdit,
     required this.onToggleActive,
@@ -460,6 +532,7 @@ class _WorkerCard extends StatelessWidget {
 
   final WorkerProfile worker;
   final String formattedDate;
+  final int pendingAdjustmentCount;
   final bool canManageAdminAccount;
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
@@ -472,6 +545,9 @@ class _WorkerCard extends StatelessWidget {
     final statusColor = worker.active
         ? NavalgoColors.kelp
         : NavalgoColors.coral;
+    final registrationColor = worker.registrationCompleted
+        ? NavalgoColors.harbor
+        : NavalgoColors.sand;
     return NavalgoPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -483,9 +559,7 @@ class _WorkerCard extends StatelessWidget {
                 radius: 24,
                 backgroundColor: NavalgoColors.mist,
                 child: Icon(
-                  worker.role == 'ADMIN'
-                      ? Icons.admin_panel_settings_outlined
-                      : Icons.person_outline,
+                  _workerRoleIcon(worker.role),
                   color: NavalgoColors.tide,
                 ),
               ),
@@ -516,19 +590,32 @@ class _WorkerCard extends StatelessWidget {
                           color: statusColor,
                         ),
                         NavalgoStatusChip(
-                          label: worker.role == 'ADMIN'
-                              ? 'Administrador'
-                              : 'Trabajador',
+                          label: _workerRoleLabel(worker.role),
                           color: NavalgoColors.tide,
                         ),
                         NavalgoStatusChip(
-                          label: worker.canEditWorkOrders
+                          label: worker.registrationCompleted
+                              ? 'Registro completado'
+                              : 'Registro pendiente',
+                          color: registrationColor,
+                        ),
+                        NavalgoStatusChip(
+                          label: worker.role == 'COMERCIAL'
+                              ? 'Sin acceso a partes'
+                              : worker.canEditWorkOrders
                               ? 'Puede editar partes'
                               : 'Sin edición de partes',
                           color: worker.canEditWorkOrders
                               ? NavalgoColors.harbor
                               : NavalgoColors.storm,
                         ),
+                        if (_isOperationalWorker(worker.role) &&
+                            pendingAdjustmentCount > 0)
+                          NavalgoStatusChip(
+                            label:
+                                '$pendingAdjustmentCount ajuste${pendingAdjustmentCount == 1 ? '' : 's'} pendiente${pendingAdjustmentCount == 1 ? '' : 's'}',
+                            color: NavalgoColors.sand,
+                          ),
                       ],
                     ),
                   ],
@@ -591,7 +678,7 @@ class _WorkerCard extends StatelessWidget {
                   label: const Text('Contraseña temporal'),
                 ),
               ],
-              if (worker.role != 'ADMIN')
+              if (_isOperationalWorker(worker.role))
                 FilledButton.icon(
                   onPressed: onAdjustSchedule,
                   icon: const Icon(Icons.query_stats_outlined),
@@ -791,7 +878,7 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
       eyebrow: 'EQUIPO',
-      title: 'Crear trabajador',
+      title: 'Crear usuario',
       subtitle:
           'Se creará la cuenta y se enviará un correo para que el trabajador defina su contraseña.',
       actions: [
@@ -800,7 +887,7 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
           onPressed: () => Navigator.pop(context),
         ),
         NavalgoGradientButton(
-          label: 'Crear trabajador',
+          label: 'Crear usuario',
           icon: Icons.person_add_alt_1_outlined,
           onPressed: _submit,
         ),
@@ -884,6 +971,10 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
                     value: 'WORKER',
                     child: Text('Trabajador'),
                   ),
+                  const DropdownMenuItem(
+                    value: 'COMERCIAL',
+                    child: Text('Comercial'),
+                  ),
                   if (widget.canManageAdmins)
                     const DropdownMenuItem(
                       value: 'ADMIN',
@@ -893,6 +984,9 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
                 onChanged: (value) {
                   setState(() {
                     _role = value ?? 'WORKER';
+                    if (_role != 'WORKER') {
+                      _canEditWorkOrders = false;
+                    }
                   });
                 },
               ),
@@ -902,10 +996,14 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
               label: 'Permisos',
               child: NavalgoCheckboxCard(
                 value: _canEditWorkOrders,
-                title: 'Permitir editar partes',
+                title: _role == 'COMERCIAL'
+                    ? 'Sin acceso a partes'
+                    : 'Permitir editar partes',
                 subtitle:
                     'Activa este permiso si podrá completar o modificar partes.',
-                onChanged: (value) {
+                onChanged: _role == 'COMERCIAL'
+                    ? null
+                    : (value) {
                   setState(() {
                     _canEditWorkOrders = value ?? false;
                   });
@@ -1017,7 +1115,7 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
       eyebrow: 'EQUIPO',
-      title: 'Editar trabajador',
+      title: 'Editar usuario',
       subtitle:
           'Ajusta los datos visibles del perfil sin salir del panel de administración.',
       actions: [
@@ -1111,6 +1209,10 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
                     value: 'WORKER',
                     child: Text('Trabajador'),
                   ),
+                  const DropdownMenuItem(
+                    value: 'COMERCIAL',
+                    child: Text('Comercial'),
+                  ),
                   if (widget.canManageAdmins)
                     const DropdownMenuItem(
                       value: 'ADMIN',
@@ -1120,6 +1222,9 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
                 onChanged: (value) {
                   setState(() {
                     _role = value ?? 'WORKER';
+                    if (_role != 'WORKER') {
+                      _canEditWorkOrders = false;
+                    }
                   });
                 },
               ),
@@ -1129,10 +1234,14 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
               label: 'Permisos',
               child: NavalgoCheckboxCard(
                 value: _canEditWorkOrders,
-                title: 'Permitir editar partes',
+                title: _role == 'COMERCIAL'
+                    ? 'Sin acceso a partes'
+                    : 'Permitir editar partes',
                 subtitle:
                     'Activa este permiso si podrá completar o modificar partes.',
-                onChanged: (value) {
+                onChanged: _role == 'COMERCIAL'
+                    ? null
+                    : (value) {
                   setState(() {
                     _canEditWorkOrders = value ?? false;
                   });

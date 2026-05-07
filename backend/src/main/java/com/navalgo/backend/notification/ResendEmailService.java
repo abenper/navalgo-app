@@ -34,7 +34,7 @@ public class ResendEmailService {
             @Value("${app.email.enabled:false}") boolean enabled,
             @Value("${app.email.resend.api-key:}") String apiKey,
             @Value("${app.email.resend.api-url:https://api.resend.com/emails}") String apiUrl,
-            @Value("${app.email.from:Naval-GO <no-reply@naval-go.com>}") String fromAddress,
+            @Value("${app.email.from:Naval-GO <notificaciones@naval-go.com>}") String fromAddress,
             @Value("${app.email.reply-to:}") String replyToAddress,
             @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl
     ) {
@@ -70,7 +70,7 @@ public class ResendEmailService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("from", fromAddress);
         payload.put("to", List.of(workerEmail));
-        payload.put("subject", "Naval-GO: " + sanitizeSubject(title));
+        payload.put("subject", sanitizeSubject(title));
         payload.put("html", buildNotificationFallbackHtml(workerName, title, message));
         payload.put("text", buildNotificationFallbackText(workerName, title, message));
         return sendEmail(payload, "No se pudo enviar el email de notificacion");
@@ -167,9 +167,8 @@ public class ResendEmailService {
         String appUrl = normalizeFrontendBaseUrl();
         return """
                 <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
-                  <h2 style="margin-bottom:12px;">Nueva notificaci\u00f3n de Naval-GO</h2>
+                  <h2 style="margin-bottom:12px;">Nueva notificaci\u00f3n</h2>
                   <p>Hola, %s:</p>
-                  <p>No hemos podido entregar esta notificaci\u00f3n por push en tu dispositivo, as\u00ed que te la enviamos por correo:</p>
                   <p><strong>%s</strong></p>
                   <p>%s</p>
                   <p style="margin:24px 0;">
@@ -191,8 +190,6 @@ public class ResendEmailService {
     private String buildNotificationFallbackText(String workerName, String title, String message) {
         return """
                 Hola, %s:
-
-                No hemos podido entregar esta notificaci\u00f3n por push en tu dispositivo, as\u00ed que te la enviamos por correo.
 
                 %s
                 %s

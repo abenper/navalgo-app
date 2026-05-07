@@ -7,6 +7,7 @@ class WorkerProfile {
     required this.role,
     required this.active,
     required this.mustChangePassword,
+    required this.registrationCompleted,
     required this.canEditWorkOrders,
     required this.contractStartDate,
     this.photoUrl,
@@ -19,6 +20,7 @@ class WorkerProfile {
   final String role;
   final bool active;
   final bool mustChangePassword;
+  final bool registrationCompleted;
   final bool canEditWorkOrders;
   final DateTime contractStartDate;
   final String? photoUrl;
@@ -32,6 +34,7 @@ class WorkerProfile {
       role: json['role'] as String,
       active: json['active'] as bool,
       mustChangePassword: json['mustChangePassword'] as bool? ?? false,
+      registrationCompleted: json['registrationCompleted'] as bool? ?? true,
       canEditWorkOrders: json['canEditWorkOrders'] as bool? ?? false,
       contractStartDate: DateTime.parse(
         (json['contractStartDate'] as String?) ?? DateTime.now().toIso8601String(),

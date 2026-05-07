@@ -15,6 +15,17 @@ import '../viewmodels/session_view_model.dart';
 import 'profile_photo_crop_dialog.dart';
 import 'navalgo_ui.dart';
 
+String _roleLabel(String role) {
+  switch (role) {
+    case 'ADMIN':
+      return 'Administrador';
+    case 'COMERCIAL':
+      return 'Comercial';
+    default:
+      return 'Trabajador';
+  }
+}
+
 Future<void> showProfileEditorDialog(BuildContext context) async {
   final session = context.read<SessionViewModel>();
   final token = session.token;
@@ -455,7 +466,7 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          _profile.role == 'ADMIN' ? 'Administrador' : 'Trabajador',
+          _roleLabel(_profile.role),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -465,7 +476,9 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
         ),
         const SizedBox(height: 6),
         Text(
-          _profile.canEditWorkOrders
+          _profile.role == 'COMERCIAL'
+              ? 'Sin acceso a partes de trabajo'
+              : _profile.canEditWorkOrders
               ? 'Con permiso de edición sobre partes'
               : 'Sin permiso de edición sobre partes',
           maxLines: 3,
@@ -689,6 +702,7 @@ WorkerProfile _fallbackProfile(User user) {
     role: user.role,
     active: true,
     mustChangePassword: user.mustChangePassword,
+    registrationCompleted: true,
     canEditWorkOrders: user.canEditWorkOrders,
     contractStartDate: DateTime.now(),
     photoUrl: user.photoUrl,

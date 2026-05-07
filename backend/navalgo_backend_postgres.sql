@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS workers (
     must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
     can_edit_work_orders BOOLEAN NOT NULL DEFAULT FALSE,
     contract_start_date DATE NOT NULL DEFAULT CURRENT_DATE,
-    CONSTRAINT ck_workers_role CHECK (role IN ('ADMIN', 'WORKER'))
+    CONSTRAINT ck_workers_role CHECK (role IN ('ADMIN', 'COMERCIAL', 'WORKER'))
 );
 
 CREATE TABLE IF NOT EXISTS companies (
@@ -275,6 +275,7 @@ CREATE TABLE IF NOT EXISTS worker_push_tokens (
 -- =========================================================
 
 CREATE INDEX IF NOT EXISTS idx_workers_email ON workers(email);
+CREATE INDEX IF NOT EXISTS idx_owners_email_lower ON owners(LOWER(email));
 CREATE INDEX IF NOT EXISTS idx_vessels_owner_id ON vessels(owner_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_owner_id ON work_orders(owner_id);
@@ -355,6 +356,20 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_signed_by_worker_id ON work_orders(si
 
 ALTER TABLE workers
     ADD COLUMN IF NOT EXISTS contract_start_date DATE NOT NULL DEFAULT CURRENT_DATE;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'ck_workers_role'
+    ) THEN
+        ALTER TABLE workers DROP CONSTRAINT ck_workers_role;
+    END IF;
+END $$;
+
+ALTER TABLE workers
+    ADD CONSTRAINT ck_workers_role CHECK (role IN ('ADMIN', 'COMERCIAL', 'WORKER'));
 
 ALTER TABLE work_order_attachments
     ADD COLUMN IF NOT EXISTS original_file_name VARCHAR(255);

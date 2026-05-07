@@ -10,13 +10,14 @@ public record WorkerDto(
         String email,
         String speciality,
         Role role,
-    boolean active,
-    boolean mustChangePassword,
-    boolean canEditWorkOrders,
-    LocalDate contractStartDate,
-    String photoUrl
+        boolean active,
+        boolean mustChangePassword,
+        boolean registrationCompleted,
+        boolean canEditWorkOrders,
+        LocalDate contractStartDate,
+        String photoUrl
 ) {
-    public static WorkerDto from(Worker worker) {
+    public static WorkerDto from(Worker worker, boolean registrationCompleted) {
         return new WorkerDto(
                 worker.getId(),
                 worker.getFullName(),
@@ -25,6 +26,7 @@ public record WorkerDto(
                 worker.getRole(),
                 worker.isActive(),
                 worker.isMustChangePassword(),
+                registrationCompleted,
                 worker.isCanEditWorkOrders(),
                 worker.getContractStartDate(),
                 worker.getPhotoUrl()
