@@ -1,6 +1,7 @@
 package com.navalgo.backend.workorder;
 
 import com.navalgo.backend.common.InputSanitizer;
+import com.navalgo.backend.common.Role;
 import com.navalgo.backend.fleet.Owner;
 import com.navalgo.backend.fleet.OwnerRepository;
 import com.navalgo.backend.fleet.Vessel;
@@ -140,7 +141,7 @@ public class WorkOrderService {
         }
 
         if (request.workerIds() != null && !request.workerIds().isEmpty()) {
-            Set<Worker> workers = new HashSet<>(workerRepository.findAllById(request.workerIds()));
+            Set<Worker> workers = resolveAssignableWorkers(request.workerIds());
             workOrder.setAssignedWorkers(workers);
         }
 
@@ -296,7 +297,7 @@ public class WorkOrderService {
         }
 
         if (request.workerIds() != null) {
-            Set<Worker> workers = new HashSet<>(workerRepository.findAllById(request.workerIds()));
+            Set<Worker> workers = resolveAssignableWorkers(request.workerIds());
             workOrder.setAssignedWorkers(workers);
         }
 
@@ -566,6 +567,26 @@ public class WorkOrderService {
 
     private boolean isAdmin(Worker worker) {
         return worker.getRole() == com.navalgo.backend.common.Role.ADMIN;
+    }
+
+    private Set<Worker> resolveAssignableWorkers(List<Long> workerIds) {
+        Set<Long> requestedWorkerIds = new HashSet<>(workerIds);
+        Set<Worker> workers = new HashSet<>(workerRepository.findAllById(requestedWorkerIds));
+        if (workers.size() != requestedWorkerIds.size()) {
+            throw new EntityNotFoundException("Uno o varios trabajadores asignados no existen");
+        }
+
+        boolean invalidRole = workers.stream().anyMatch(worker -> worker.getRole() != Role.WORKER);
+        if (invalidRole) {
+            throw new IllegalArgumentException("Solo se pueden asignar usuarios con rol trabajador");
+        }
+
+        boolean inactiveWorker = workers.stream().anyMatch(worker -> !worker.isActive());
+        if (inactiveWorker) {
+            throw new IllegalArgumentException("No se pueden asignar trabajadores inactivos");
+        }
+
+        return workers;
     }
 
     private boolean canEditWorkOrder(Worker worker, WorkOrder workOrder) {

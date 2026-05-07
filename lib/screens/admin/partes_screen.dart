@@ -48,6 +48,12 @@ Future<bool?> openWorkOrderDetailsScreen(
   );
 }
 
+List<WorkerProfile> _assignableWorkers(List<WorkerProfile> workers) {
+  return workers
+      .where((worker) => worker.active && worker.role == 'WORKER')
+      .toList();
+}
+
 class _PartesScreenState extends State<PartesScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
 
@@ -117,7 +123,7 @@ class _PartesScreenState extends State<PartesScreen> {
       builder: (_) => _CreatePartDialog(
         owners: fleetVm.owners,
         vessels: fleetVm.vessels,
-        workers: workersVm.workers,
+        workers: _assignableWorkers(workersVm.workers),
       ),
     );
 
@@ -2619,7 +2625,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         workOrder: _workOrder,
         owners: fleetVm.owners,
         vessels: fleetVm.vessels,
-        workers: workersVm.workers,
+        workers: _assignableWorkers(workersVm.workers),
       ),
     );
 
