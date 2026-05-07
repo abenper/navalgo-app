@@ -34,6 +34,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     final session = context.read<SessionViewModel>();
     final token = session.token;
     final workerId = session.user?.id;
+    final role = session.user?.role;
+    final canSeeParts = role == 'ADMIN' || role == 'WORKER';
 
     if (token == null || workerId == null) {
       setState(() {
@@ -50,15 +52,34 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
 
     try {
       final leaveService = context.read<LeaveService>();
-      final workOrdersVm = context.read<WorkOrdersViewModel>();
       final timeService = context.read<TimeTrackingService>();
+      final workOrdersVm = context.read<WorkOrdersViewModel>();
 
       final balance = await leaveService.getLeaveBalance(
         token,
         workerId: workerId,
       );
-      await workOrdersVm.loadWorkOrders(workerId: workerId);
-      final myWorkOrders = workOrdersVm.workOrders;
+      var myTasks = 0;
+      var urgentTasks = 0;
+
+      if (canSeeParts) {
+        await workOrdersVm.loadWorkOrders(workerId: workerId);
+        final myWorkOrders = workOrdersVm.workOrders;
+        myTasks = myWorkOrders
+            .where(
+              (item) =>
+                  (item.status == 'NEW' || item.status == 'IN_PROGRESS') &&
+                  (item.signatureUrl == null || item.signatureUrl!.isEmpty),
+            )
+            .length;
+        urgentTasks = myWorkOrders
+            .where(
+              (item) =>
+                  item.priority == 'URGENT' &&
+                  (item.signatureUrl == null || item.signatureUrl!.isEmpty),
+            )
+            .length;
+      }
 
       final entries = await timeService.getByWorker(token, workerId: workerId);
       final now = DateTime.now();
@@ -79,20 +100,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
 
       setState(() {
         _balance = balance;
-        _myTasks = myWorkOrders
-            .where(
-              (item) =>
-                  (item.status == 'NEW' || item.status == 'IN_PROGRESS') &&
-                  (item.signatureUrl == null || item.signatureUrl!.isEmpty),
-            )
-            .length;
-        _urgentTasks = myWorkOrders
-            .where(
-              (item) =>
-                  item.priority == 'URGENT' &&
-                  (item.signatureUrl == null || item.signatureUrl!.isEmpty),
-            )
-            .length;
+        _myTasks = myTasks;
+        _urgentTasks = urgentTasks;
         _hoursToday = _formatDuration(totalToday);
       });
     } catch (e) {
@@ -106,6 +115,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final workerName = context.watch<SessionViewModel>().user?.name ?? '';
+    final role = context.watch<SessionViewModel>().user?.role;
+    final canSeeParts = role == 'ADMIN' || role == 'WORKER';
     final firstName = workerName.split(' ').first;
     final textTheme = Theme.of(context).textTheme;
 
@@ -158,18 +169,20 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                           childAspectRatio: childAspectRatio,
                         ),
                         children: [
-                          _buildStatCard(
-                            'Mis partes',
-                            '$_myTasks',
-                            const Icon(Icons.assignment_ind),
-                            NavalgoColors.tide,
-                          ),
-                          _buildStatCard(
-                            'Urgentes',
-                            '$_urgentTasks',
-                            const Icon(Icons.warning_amber_rounded),
-                            NavalgoColors.coral,
-                          ),
+                          if (canSeeParts)
+                            _buildStatCard(
+                              'Mis partes',
+                              '$_myTasks',
+                              const Icon(Icons.assignment_ind),
+                              NavalgoColors.tide,
+                            ),
+                          if (canSeeParts)
+                            _buildStatCard(
+                              'Urgentes',
+                              '$_urgentTasks',
+                              const Icon(Icons.warning_amber_rounded),
+                              NavalgoColors.coral,
+                            ),
                           _buildStatCard(
                             'Horas de hoy',
                             _hoursToday,

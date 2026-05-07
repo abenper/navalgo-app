@@ -10,10 +10,12 @@ import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
+import '../commercial/commercial_shell_screen.dart';
 import '../common/privacy_policy_screen.dart';
 import '../common/login_screen.dart';
 import '../worker/fichaje_screen.dart';
 import '../worker/vacaciones_screen.dart';
+import '../worker/worker_shell_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'equipo_screen.dart';
 import 'flota_screen.dart';
@@ -85,6 +87,27 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     });
   }
 
+  void _redirectForRole(String role) {
+    if (!mounted) {
+      return;
+    }
+
+    if (role == 'COMERCIAL') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const CommercialShellScreen()),
+        (route) => false,
+      );
+      return;
+    }
+
+    if (role == 'WORKER') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const WorkerShellScreen()),
+        (route) => false,
+      );
+    }
+  }
+
   Future<void> _refreshCurrentUserProfile() async {
     final session = context.read<SessionViewModel>();
     final currentUser = session.user;
@@ -108,6 +131,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           photoUrl: profile.photoUrl,
         ),
       );
+      _redirectForRole(profile.role);
     } catch (_) {}
   }
 
@@ -610,6 +634,18 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentRole = context.select<SessionViewModel, String?>(
+      (session) => session.user?.role,
+    );
+    if (currentRole == 'WORKER' || currentRole == 'COMERCIAL') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (currentRole != null) {
+          _redirectForRole(currentRole);
+        }
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= 600) {

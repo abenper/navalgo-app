@@ -11,6 +11,8 @@ import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../admin/partes_screen.dart';
+import '../admin/admin_shell_screen.dart';
+import '../commercial/commercial_shell_screen.dart';
 import '../common/login_screen.dart';
 import '../common/privacy_policy_screen.dart';
 import 'fichaje_screen.dart';
@@ -73,6 +75,27 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     });
   }
 
+  void _redirectForRole(String role) {
+    if (!mounted) {
+      return;
+    }
+
+    if (role == 'COMERCIAL') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const CommercialShellScreen()),
+        (route) => false,
+      );
+      return;
+    }
+
+    if (role == 'ADMIN') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AdminShellScreen()),
+        (route) => false,
+      );
+    }
+  }
+
   Future<void> _refreshCurrentUserProfile() async {
     final session = context.read<SessionViewModel>();
     final currentUser = session.user;
@@ -96,6 +119,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
           photoUrl: profile.photoUrl,
         ),
       );
+      _redirectForRole(profile.role);
     } catch (_) {}
   }
 
@@ -593,6 +617,18 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentRole = context.select<SessionViewModel, String?>(
+      (session) => session.user?.role,
+    );
+    if (currentRole == 'ADMIN' || currentRole == 'COMERCIAL') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (currentRole != null) {
+          _redirectForRole(currentRole);
+        }
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth >= 600) {

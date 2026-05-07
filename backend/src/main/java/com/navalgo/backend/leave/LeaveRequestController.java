@@ -24,7 +24,7 @@ public class LeaveRequestController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<LeaveRequestDto>> list(@RequestParam(required = false) Long workerId,
                                                       Authentication authentication) {
         Long scopedWorkerId = resolveScopedWorkerId(workerId, authentication);
@@ -32,7 +32,7 @@ public class LeaveRequestController {
     }
 
     @GetMapping("/balance")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<LeaveBalanceDto> balance(@RequestParam(required = false) Long workerId,
                                                    Authentication authentication) {
         Long scopedWorkerId = resolveScopedWorkerId(workerId, authentication);
@@ -40,7 +40,7 @@ public class LeaveRequestController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<LeaveRequestDto> create(@RequestBody @Valid CreateLeaveRequest request,
                                                   Authentication authentication) {
         boolean isAdmin = authentication.getAuthorities().stream()
@@ -64,7 +64,7 @@ public class LeaveRequestController {
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<LeaveRequestDto> updateRequest(@PathVariable Long id,
                                                          @RequestBody @Valid UpdateLeaveRequest request,
                                                          Authentication authentication) {
@@ -75,7 +75,7 @@ public class LeaveRequestController {
     }
 
     @PatchMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<LeaveRequestDto> cancelRequest(@PathVariable Long id,
                                                          Authentication authentication) {
         boolean isAdmin = authentication.getAuthorities().stream()
@@ -85,7 +85,7 @@ public class LeaveRequestController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<Void> deleteRequest(@PathVariable Long id,
                                               Authentication authentication) {
         boolean isAdmin = authentication.getAuthorities().stream()

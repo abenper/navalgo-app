@@ -31,7 +31,7 @@ public class TimeAdjustmentRequestController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<TimeAdjustmentRequestDto>> list(Authentication authentication,
                                                                @RequestParam(required = false) TimeAdjustmentRequestStatus status) {
         boolean isAdmin = authentication.getAuthorities().stream()
@@ -41,7 +41,7 @@ public class TimeAdjustmentRequestController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<TimeAdjustmentRequestDto> create(Authentication authentication,
                                                            @Valid @RequestBody CreateTimeAdjustmentRequest request) {
         Long currentWorkerId = currentUserWorkerResolver.findWorkerIdByEmail(authentication.getName());
@@ -49,7 +49,7 @@ public class TimeAdjustmentRequestController {
     }
 
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<TimeAdjustmentRequestDto> update(@PathVariable Long id,
                                                            Authentication authentication,
                                                            @Valid @RequestBody CreateTimeAdjustmentRequest request) {
@@ -66,7 +66,7 @@ public class TimeAdjustmentRequestController {
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<Void> delete(@PathVariable Long id,
                                        Authentication authentication) {
         boolean isAdmin = authentication.getAuthorities().stream()

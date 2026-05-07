@@ -1955,6 +1955,9 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
   bool _loadingStats = false;
   bool _openingWorkOrder = false;
 
+  bool get _canOpenWorkOrders =>
+      context.read<SessionViewModel>().user?.role != 'COMERCIAL';
+
   @override
   void initState() {
     super.initState();
@@ -2221,33 +2224,37 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
                       )
                     : _VesselStatsChart(
                         stats: stats,
-                        onPointTap: _openWorkOrderFromPoint,
+                        onPointTap: _canOpenWorkOrders
+                            ? _openWorkOrderFromPoint
+                            : (_) {},
                       ),
               ),
-              const SizedBox(height: 16),
-              _VesselAnalyticsSection(
-                title: 'Partes asociados',
-                child: stats == null || stats.workOrderMilestones.isEmpty
-                    ? const _VesselDetailValue(
-                        icon: Icons.assignment_outlined,
-                        value: 'Sin partes asociados',
-                      )
-                    : Column(
-                        children: stats.workOrderMilestones
-                            .map(
-                              (milestone) => Padding(
-                                padding: const EdgeInsets.only(bottom: 10),
-                                child: _VesselWorkOrderMilestoneCard(
-                                  milestone: milestone,
-                                  onTap: () => _openWorkOrderById(
-                                    milestone.workOrderId,
+              if (_canOpenWorkOrders) ...[
+                const SizedBox(height: 16),
+                _VesselAnalyticsSection(
+                  title: 'Partes asociados',
+                  child: stats == null || stats.workOrderMilestones.isEmpty
+                      ? const _VesselDetailValue(
+                          icon: Icons.assignment_outlined,
+                          value: 'Sin partes asociados',
+                        )
+                      : Column(
+                          children: stats.workOrderMilestones
+                              .map(
+                                (milestone) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 10),
+                                  child: _VesselWorkOrderMilestoneCard(
+                                    milestone: milestone,
+                                    onTap: () => _openWorkOrderById(
+                                      milestone.workOrderId,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            )
-                            .toList(),
-                      ),
-              ),
+                              )
+                              .toList(),
+                        ),
+                ),
+              ],
             ],
           ),
         ),

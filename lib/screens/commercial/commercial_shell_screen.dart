@@ -11,8 +11,13 @@ import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../admin/flota_screen.dart';
+import '../admin/admin_shell_screen.dart';
 import '../common/login_screen.dart';
 import '../common/privacy_policy_screen.dart';
+import '../worker/fichaje_screen.dart';
+import '../worker/vacaciones_screen.dart';
+import '../worker/worker_dashboard_screen.dart';
+import '../worker/worker_shell_screen.dart';
 
 class CommercialShellScreen extends StatefulWidget {
   const CommercialShellScreen({super.key});
@@ -22,7 +27,30 @@ class CommercialShellScreen extends StatefulWidget {
 }
 
 class _CommercialShellScreenState extends State<CommercialShellScreen> {
+  int _selectedIndex = 0;
   bool _shownUnreadToast = false;
+  final Set<int> _loadedIndices = <int>{0};
+
+  final List<Widget> _screens = const [
+    WorkerDashboardScreen(),
+    FlotaScreen(),
+    FichajeScreen(),
+    AusenciasScreen(),
+  ];
+
+  final List<String> _titles = const [
+    'Inicio',
+    'Flota',
+    'Fichaje',
+    'Ausencias',
+  ];
+
+  final List<IconData> _sectionIcons = const [
+    Icons.dashboard_outlined,
+    Icons.directions_boat_outlined,
+    Icons.access_time_outlined,
+    Icons.event_note_outlined,
+  ];
 
   @override
   void initState() {
@@ -45,6 +73,27 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
         );
       }
     });
+  }
+
+  void _redirectForRole(String role) {
+    if (!mounted) {
+      return;
+    }
+
+    if (role == 'ADMIN') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const AdminShellScreen()),
+        (route) => false,
+      );
+      return;
+    }
+
+    if (role == 'WORKER') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const WorkerShellScreen()),
+        (route) => false,
+      );
+    }
   }
 
   Future<void> _refreshCurrentUserProfile() async {
@@ -70,7 +119,29 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
           photoUrl: profile.photoUrl,
         ),
       );
+      _redirectForRole(profile.role);
     } catch (_) {}
+  }
+
+  void _onDestinationSelected(int index) {
+    if (_selectedIndex == index) {
+      return;
+    }
+    setState(() {
+      _selectedIndex = index;
+      _loadedIndices.add(index);
+    });
+  }
+
+  int _mapActionRouteToTab(String actionRoute) {
+    switch (actionRoute) {
+      case 'FICHAJES':
+        return 2;
+      case 'AUSENCIAS':
+        return 3;
+      default:
+        return 0;
+    }
   }
 
   Future<void> _openNotifications() async {
@@ -152,6 +223,12 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
                                         return;
                                       }
                                       Navigator.of(this.context).pop();
+                                      setState(() {
+                                        _selectedIndex = _mapActionRouteToTab(
+                                          item.actionRoute,
+                                        );
+                                        _loadedIndices.add(_selectedIndex);
+                                      });
                                     },
                                   ),
                                 );
@@ -316,15 +393,15 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
               color: NavalgoColors.mist,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(
-              Icons.people_alt_outlined,
+            child: Icon(
+              _sectionIcons[_selectedIndex],
               color: NavalgoColors.tide,
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Clientes y flota',
+              _titles[_selectedIndex],
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.titleLarge,
@@ -521,77 +598,179 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
     );
   }
 
+  List<Widget> _buildLoadedScreens() {
+    return List<Widget>.generate(_screens.length, (index) {
+      if (_loadedIndices.contains(index)) {
+        return _screens[index];
+      }
+      return const SizedBox.shrink();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentRole = context.select<SessionViewModel, String?>(
+      (session) => session.user?.role,
+    );
+    if (currentRole == 'ADMIN' || currentRole == 'WORKER') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (currentRole != null) {
+          _redirectForRole(currentRole);
+        }
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     final wideLayout = MediaQuery.of(context).size.width >= 600;
 
-    return Scaffold(
-      appBar: _buildAppBar(context),
-      body: Container(
-        decoration: const BoxDecoration(gradient: NavalgoColors.pageGradient),
-        child: Row(
-          children: [
-            if (wideLayout)
+    if (wideLayout) {
+      return Scaffold(
+        appBar: _buildAppBar(context),
+        body: Container(
+          decoration: const BoxDecoration(
+            gradient: NavalgoColors.pageGradient,
+          ),
+          child: Row(
+            children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
                 child: Container(
-                  width: 84,
                   decoration: BoxDecoration(
                     gradient: NavalgoColors.railGradient,
                     borderRadius: BorderRadius.circular(28),
                     border: Border.all(color: NavalgoColors.border),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 12),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(color: NavalgoColors.border),
-                            boxShadow: [
-                              BoxShadow(
-                                color: NavalgoColors.deepSea.withValues(
-                                  alpha: 0.08,
-                                ),
-                                blurRadius: 18,
-                                offset: const Offset(0, 8),
+                  child: NavigationRail(
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: _onDestinationSelected,
+                    labelType: NavigationRailLabelType.all,
+                    minWidth: 84,
+                    scrollable: true,
+                    leading: Padding(
+                      padding: const EdgeInsets.only(top: 12, bottom: 18),
+                      child: Container(
+                        width: 52,
+                        height: 52,
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: NavalgoColors.border),
+                          boxShadow: [
+                            BoxShadow(
+                              color: NavalgoColors.deepSea.withValues(
+                                alpha: 0.08,
                               ),
-                            ],
-                          ),
-                          child: const NavalgoLogo(
-                            variant: NavalgoLogoVariant.colorBadge,
-                            width: 40,
-                            height: 40,
-                          ),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 24),
-                        const Icon(
-                          Icons.directions_boat_outlined,
-                          color: NavalgoColors.tide,
+                        child: const NavalgoLogo(
+                          variant: NavalgoLogoVariant.colorBadge,
+                          width: 40,
+                          height: 40,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Flota',
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ],
+                      ),
                     ),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.dashboard_outlined),
+                        selectedIcon: Icon(Icons.dashboard),
+                        label: Text('Inicio'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.directions_boat_outlined),
+                        selectedIcon: Icon(Icons.directions_boat),
+                        label: Text('Flota'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.access_time_outlined),
+                        selectedIcon: Icon(Icons.access_time_filled),
+                        label: Text('Fichaje'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.event_note_outlined),
+                        selectedIcon: Icon(Icons.event_note),
+                        label: Text('Ausencias'),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.fromLTRB(0, 16, wideLayout ? 16 : 0, 16),
-                child: const FlotaScreen(),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
+                  child: IndexedStack(
+                    index: _selectedIndex,
+                    children: _buildLoadedScreens(),
+                  ),
+                ),
               ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Scaffold(
+      appBar: _buildAppBar(context),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: NavalgoColors.pageGradient,
+        ),
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: _buildLoadedScreens(),
+        ),
+      ),
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(24),
             ),
-          ],
+            border: const Border(
+              top: BorderSide(color: NavalgoColors.border),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: NavalgoColors.deepSea.withValues(alpha: 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: NavigationBar(
+            height: 72,
+            selectedIndex: _selectedIndex,
+            onDestinationSelected: _onDestinationSelected,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
+            destinations: const [
+              NavigationDestination(
+                icon: Icon(Icons.dashboard_outlined),
+                selectedIcon: Icon(Icons.dashboard),
+                label: 'Inicio',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.directions_boat_outlined),
+                selectedIcon: Icon(Icons.directions_boat),
+                label: 'Flota',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.access_time_outlined),
+                selectedIcon: Icon(Icons.access_time_filled),
+                label: 'Fichaje',
+              ),
+              NavigationDestination(
+                icon: Icon(Icons.event_note_outlined),
+                selectedIcon: Icon(Icons.event_note),
+                label: 'Ausencias',
+              ),
+            ],
+          ),
         ),
       ),
     );

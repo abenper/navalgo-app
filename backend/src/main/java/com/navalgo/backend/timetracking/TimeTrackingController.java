@@ -24,7 +24,7 @@ public class TimeTrackingController {
     }
 
     @PostMapping("/clock-in")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<TimeEntryDto> clockIn(@RequestBody @Valid ClockRequest request,
                                                 Authentication authentication) {
         validateWorkerScope(request.workerId(), authentication);
@@ -38,7 +38,7 @@ public class TimeTrackingController {
     }
 
     @PostMapping("/clock-out")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<TimeEntryDto> clockOut(@RequestBody @Valid ClockRequest request,
                                                  Authentication authentication) {
         validateWorkerScope(request.workerId(), authentication);
@@ -46,7 +46,7 @@ public class TimeTrackingController {
     }
 
     @GetMapping("/worker/{workerId}")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<TimeEntryDto>> byWorker(@PathVariable Long workerId,
                                                        Authentication authentication) {
         validateWorkerScope(workerId, authentication);
