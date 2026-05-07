@@ -39,6 +39,73 @@ class AuthService {
     );
   }
 
+  Future<void> signupClient({
+    required String fullName,
+    required String email,
+    required String password,
+    String? phone,
+  }) async {
+    await _apiClient.post(
+      '/auth/clients/signup',
+      body: {
+        'fullName': fullName,
+        'email': email,
+        'password': password,
+        'phone': phone,
+      },
+    );
+  }
+
+  Future<EmailVerificationInfo> getEmailVerificationStatus(String token) async {
+    final data = await _apiClient.get(
+      '/auth/email-verification/status',
+      queryParameters: {'token': token},
+    );
+    final map = data as Map<String, dynamic>;
+    return EmailVerificationInfo(
+      fullName: (map['fullName'] as String?) ?? '',
+      email: (map['email'] as String?) ?? '',
+      expiresAt: DateTime.parse(map['expiresAt'] as String),
+    );
+  }
+
+  Future<void> confirmEmailVerification({required String token}) async {
+    await _apiClient.post(
+      '/auth/email-verification/confirm',
+      body: {'token': token},
+    );
+  }
+
+  Future<void> requestPasswordReset({required String email}) async {
+    await _apiClient.post(
+      '/auth/password-reset/request',
+      body: {'email': email},
+    );
+  }
+
+  Future<PasswordResetInfo> getPasswordResetStatus(String token) async {
+    final data = await _apiClient.get(
+      '/auth/password-reset/status',
+      queryParameters: {'token': token},
+    );
+    final map = data as Map<String, dynamic>;
+    return PasswordResetInfo(
+      fullName: (map['fullName'] as String?) ?? '',
+      email: (map['email'] as String?) ?? '',
+      expiresAt: DateTime.parse(map['expiresAt'] as String),
+    );
+  }
+
+  Future<void> completePasswordReset({
+    required String token,
+    required String password,
+  }) async {
+    await _apiClient.post(
+      '/auth/password-reset/complete',
+      body: {'token': token, 'password': password},
+    );
+  }
+
   Future<User> login(String email, String password) async {
     if (ApiConfig.useMockApi && kDebugMode) {
       return _mockLogin(email, password);
@@ -144,6 +211,17 @@ class AuthService {
       );
     }
 
+    if (email.toLowerCase() == 'cliente@navalgo.com') {
+      return User(
+        id: 4,
+        name: 'Cliente Navalgo',
+        email: email,
+        role: 'CLIENT',
+        ownerId: 1,
+        token: 'mock-client-jwt-token',
+      );
+    }
+
     throw Exception('Usuario no encontrado en modo mock.');
   }
 
@@ -185,6 +263,30 @@ class AuthService {
 
 class RegistrationInvitationInfo {
   const RegistrationInvitationInfo({
+    required this.fullName,
+    required this.email,
+    required this.expiresAt,
+  });
+
+  final String fullName;
+  final String email;
+  final DateTime expiresAt;
+}
+
+class EmailVerificationInfo {
+  const EmailVerificationInfo({
+    required this.fullName,
+    required this.email,
+    required this.expiresAt,
+  });
+
+  final String fullName;
+  final String email;
+  final DateTime expiresAt;
+}
+
+class PasswordResetInfo {
+  const PasswordResetInfo({
     required this.fullName,
     required this.email,
     required this.expiresAt,

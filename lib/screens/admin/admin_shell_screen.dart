@@ -10,6 +10,7 @@ import '../../viewmodels/notifications_view_model.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
+import '../client/client_shell_screen.dart';
 import '../commercial/commercial_shell_screen.dart';
 import '../common/privacy_policy_screen.dart';
 import '../common/login_screen.dart';
@@ -103,6 +104,14 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     if (role == 'WORKER') {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const WorkerShellScreen()),
+        (route) => false,
+      );
+      return;
+    }
+
+    if (role == 'CLIENT') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const ClientShellScreen()),
         (route) => false,
       );
     }
@@ -637,7 +646,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     final currentRole = context.select<SessionViewModel, String?>(
       (session) => session.user?.role,
     );
-    if (currentRole == 'WORKER' || currentRole == 'COMERCIAL') {
+    if (currentRole == 'WORKER' || currentRole == 'COMERCIAL' || currentRole == 'CLIENT') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (currentRole != null) {
           _redirectForRole(currentRole);

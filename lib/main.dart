@@ -32,6 +32,8 @@ import 'package:provider/provider.dart';
 import 'screens/common/complete_registration_screen.dart';
 import 'screens/common/login_screen.dart';
 import 'screens/common/privacy_policy_screen.dart';
+import 'screens/common/reset_password_screen.dart';
+import 'screens/common/verify_email_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -236,6 +238,14 @@ class _RootScreen extends StatelessWidget {
 
     if (isPrivacyPolicyEntryUri(Uri.base)) {
       return const PrivacyPolicyScreen(isPublicEntry: true);
+    }
+
+    if (isVerifyEmailEntryUri(Uri.base)) {
+      return VerifyEmailScreen(token: Uri.base.queryParameters['token'] ?? '');
+    }
+
+    if (isResetPasswordEntryUri(Uri.base)) {
+      return ResetPasswordScreen(token: Uri.base.queryParameters['token'] ?? '');
     }
 
     final session = context.watch<SessionViewModel>();

@@ -11,8 +11,11 @@ import 'package:navalgo/viewmodels/session_view_model.dart';
 import 'package:navalgo/widgets/navalgo_logo.dart';
 
 import '../admin/admin_shell_screen.dart';
+import '../client/client_shell_screen.dart';
 import '../commercial/commercial_shell_screen.dart';
 import '../worker/worker_shell_screen.dart';
+import 'create_account_screen.dart';
+import 'request_password_reset_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,14 +27,14 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _recuerdame = false;
+  bool _rememberMe = false;
   bool _obscurePassword = true;
 
   @override
   void initState() {
     super.initState();
     final session = context.read<SessionViewModel>();
-    _recuerdame = session.rememberMeEnabled;
+    _rememberMe = session.rememberMeEnabled;
     if (session.rememberedEmail.isNotEmpty) {
       _emailController.text = session.rememberedEmail;
     }
@@ -67,7 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }) async {
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
-
     bool isSaving = false;
     String? errorMessage;
 
@@ -121,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 }
 
                 return AlertDialog(
-                  title: const Text('Cambia tu contraseña'),
+                  title: const Text('Cambia tu contrasena'),
                   content: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -136,9 +138,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           enableSuggestions: false,
                           autocorrect: false,
                           decoration: const InputDecoration(
-                            labelText: 'Nueva contraseña',
+                            labelText: 'Nueva contrasena',
                             helperText:
-                                'Mín. 12 caracteres con mayúsculas, minúsculas, números y un símbolo.',
+                                'Min. 12 caracteres con mayusculas, minusculas, numeros y un simbolo.',
                             helperMaxLines: 2,
                             prefixIcon: Icon(Icons.lock_outline_rounded),
                           ),
@@ -154,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           autocorrect: false,
                           onSubmitted: (_) => isSaving ? null : submit(),
                           decoration: const InputDecoration(
-                            labelText: 'Confirmar contraseña',
+                            labelText: 'Confirmar contrasena',
                             prefixIcon: Icon(Icons.verified_user_outlined),
                           ),
                         ),
@@ -203,51 +205,55 @@ class _LoginScreenState extends State<LoginScreen> {
     String confirmPassword,
   ) {
     if (newPassword.length < 12) {
-      return 'La contraseña debe tener al menos 12 caracteres.';
+      return 'La contrasena debe tener al menos 12 caracteres.';
     }
     if (!RegExp(r'[A-Z]').hasMatch(newPassword) ||
         !RegExp(r'[a-z]').hasMatch(newPassword) ||
         !RegExp(r'[0-9]').hasMatch(newPassword) ||
         !RegExp(r'[^A-Za-z0-9]').hasMatch(newPassword)) {
-      return 'Debe incluir mayúsculas, minúsculas, números y un símbolo.';
+      return 'Debe incluir mayusculas, minusculas, numeros y un simbolo.';
     }
     if (newPassword != confirmPassword) {
-      return 'Las contraseñas no coinciden.';
+      return 'Las contrasenas no coinciden.';
     }
     return null;
   }
 
   String _describePasswordChangeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? 'No se pudo cambiar la contraseña.';
+      return error.serverMessage ?? 'No se pudo cambiar la contrasena.';
     }
-
     final message = error.toString();
     if (message.startsWith('Exception: ')) {
       return message.substring('Exception: '.length);
     }
-    return 'No se pudo cambiar la contraseña.';
+    return 'No se pudo cambiar la contrasena.';
   }
 
   void _openShellForRole(String role) {
     if (role == 'ADMIN') {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const AdminShellScreen()),
+        MaterialPageRoute(builder: (_) => const AdminShellScreen()),
       );
     } else if (role == 'COMERCIAL') {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const CommercialShellScreen()),
+        MaterialPageRoute(builder: (_) => const CommercialShellScreen()),
+      );
+    } else if (role == 'CLIENT') {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const ClientShellScreen()),
       );
     } else {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const WorkerShellScreen()),
+        MaterialPageRoute(builder: (_) => const WorkerShellScreen()),
       );
     }
   }
 
   void _showLoginFeedback(String message) {
-    final isCredentialsError =
-        message.contains('incorrectos') || message.contains('desactivada');
+    final isCredentialsError = message.contains('incorrectos') ||
+        message.contains('desactivada') ||
+        message.contains('confirmar');
     if (isCredentialsError) {
       AppToast.error(context, message);
       return;
@@ -260,21 +266,23 @@ class _LoginScreenState extends State<LoginScreen> {
     final password = _passwordController.text;
 
     if (email.isEmpty || password.isEmpty) {
-      AppToast.warning(context, 'Completa correo y contraseña.');
+      AppToast.warning(context, 'Completa correo y contrasena.');
       return;
     }
 
     final success = await loginViewModel.login(
       email,
       password,
-      rememberMe: _recuerdame,
+      rememberMe: _rememberMe,
     );
 
-    if (!mounted) return;
+    if (!mounted) {
+      return;
+    }
 
     if (!success) {
       _showLoginFeedback(
-        loginViewModel.errorMessage ?? 'No se pudo iniciar sesión.',
+        loginViewModel.errorMessage ?? 'No se pudo iniciar sesion.',
       );
       return;
     }
@@ -290,13 +298,16 @@ class _LoginScreenState extends State<LoginScreen> {
         token: currentUser.token ?? '',
         currentPassword: _passwordController.text,
       );
-      if (!mounted || !changed) return;
+      if (!mounted || !changed) {
+        return;
+      }
 
       await context.read<SessionViewModel>().updateUser(
         currentUser.copyWith(mustChangePassword: false),
       );
-
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
     }
 
     _openShellForRole(currentUser.role);
@@ -318,7 +329,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _BrandMark(),
+                  const _BrandMark(),
                   const SizedBox(height: 32),
                   Text(
                     'Acceso a NavalGO',
@@ -335,7 +346,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       AutofillHints.email,
                     ],
                     decoration: const InputDecoration(
-                      labelText: 'Correo electrónico',
+                      labelText: 'Correo electronico',
                       prefixIcon: Icon(Icons.alternate_email_rounded),
                     ),
                   ),
@@ -347,11 +358,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     autofillHints: const [AutofillHints.password],
                     enableSuggestions: false,
                     autocorrect: false,
-                    onSubmitted: (_) => loginViewModel.isLoading
-                        ? null
-                        : _submit(loginViewModel),
+                    onSubmitted: (_) =>
+                        loginViewModel.isLoading ? null : _submit(loginViewModel),
                     decoration: InputDecoration(
-                      labelText: 'Contraseña',
+                      labelText: 'Contrasena',
                       prefixIcon: const Icon(Icons.lock_outline_rounded),
                       suffixIcon: IconButton(
                         onPressed: () => setState(
@@ -363,27 +373,27 @@ class _LoginScreenState extends State<LoginScreen> {
                               : Icons.visibility_off_outlined,
                         ),
                         tooltip: _obscurePassword
-                            ? 'Mostrar contraseña'
-                            : 'Ocultar contraseña',
+                            ? 'Mostrar contrasena'
+                            : 'Ocultar contrasena',
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   InkWell(
-                    onTap: () => setState(() => _recuerdame = !_recuerdame),
+                    onTap: () => setState(() => _rememberMe = !_rememberMe),
                     borderRadius: BorderRadius.circular(12),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Row(
                         children: [
                           Checkbox(
-                            value: _recuerdame,
-                            onChanged: (v) =>
-                                setState(() => _recuerdame = v ?? false),
+                            value: _rememberMe,
+                            onChanged: (value) =>
+                                setState(() => _rememberMe = value ?? false),
                           ),
                           Expanded(
                             child: Text(
-                              'Mantener sesión iniciada',
+                              'Mantener sesion iniciada',
                               style: textTheme.bodyLarge,
                             ),
                           ),
@@ -405,7 +415,28 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text('Iniciar sesión'),
+                        : const Text('Iniciar sesion'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const RequestPasswordResetScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('He olvidado mi contrasena'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CreateAccountScreen(),
+                        ),
+                      );
+                    },
+                    child: const Text('Crear cuenta de cliente'),
                   ),
                 ],
               ),
@@ -418,6 +449,8 @@ class _LoginScreenState extends State<LoginScreen> {
 }
 
 class _BrandMark extends StatelessWidget {
+  const _BrandMark();
+
   @override
   Widget build(BuildContext context) {
     return Center(

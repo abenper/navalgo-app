@@ -6,6 +6,8 @@ class User {
   final String? token;
   final bool mustChangePassword;
   final bool canEditWorkOrders;
+  final bool emailVerified;
+  final int? ownerId;
   final String? photoUrl;
 
   User({
@@ -16,6 +18,8 @@ class User {
     this.token,
     this.mustChangePassword = false,
     this.canEditWorkOrders = false,
+    this.emailVerified = true,
+    this.ownerId,
     this.photoUrl,
   });
 
@@ -28,6 +32,8 @@ class User {
       token: json['token'],
       mustChangePassword: json['mustChangePassword'] ?? false,
       canEditWorkOrders: json['canEditWorkOrders'] ?? false,
+      emailVerified: json['emailVerified'] ?? true,
+      ownerId: json['ownerId'] as int?,
       photoUrl: json['photoUrl'] as String?,
     );
   }
@@ -41,6 +47,8 @@ class User {
       'token': token,
       'mustChangePassword': mustChangePassword,
       'canEditWorkOrders': canEditWorkOrders,
+      'emailVerified': emailVerified,
+      'ownerId': ownerId,
       'photoUrl': photoUrl,
     };
   }
@@ -53,6 +61,8 @@ class User {
     String? token,
     bool? mustChangePassword,
     bool? canEditWorkOrders,
+    bool? emailVerified,
+    int? ownerId,
     String? photoUrl,
   }) {
     return User(
@@ -63,6 +73,8 @@ class User {
       token: token ?? this.token,
       mustChangePassword: mustChangePassword ?? this.mustChangePassword,
       canEditWorkOrders: canEditWorkOrders ?? this.canEditWorkOrders,
+      emailVerified: emailVerified ?? this.emailVerified,
+      ownerId: ownerId ?? this.ownerId,
       photoUrl: photoUrl ?? this.photoUrl,
     );
   }

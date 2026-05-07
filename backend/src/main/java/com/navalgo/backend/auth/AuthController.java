@@ -16,9 +16,15 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final ClientAccountService clientAccountService;
+    private final PasswordResetService passwordResetService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService,
+                          ClientAccountService clientAccountService,
+                          PasswordResetService passwordResetService) {
         this.authService = authService;
+        this.clientAccountService = clientAccountService;
+        this.passwordResetService = passwordResetService;
     }
 
     @PostMapping("/login")
@@ -55,7 +61,7 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER','CLIENT')")
     public ResponseEntity<Void> changePassword(@RequestBody @Valid ChangePasswordRequest request,
                                                Authentication authentication) {
         authService.changePassword(authentication.getName(), request);
@@ -72,6 +78,40 @@ public class AuthController {
     @PostMapping("/registration-invitations/complete")
     public ResponseEntity<Void> completeRegistration(@RequestBody @Valid CompleteRegistrationRequest request) {
         authService.completeRegistration(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/clients/signup")
+    public ResponseEntity<Void> signupClient(@RequestBody @Valid ClientSignupRequest request) {
+        clientAccountService.signup(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/email-verification/status")
+    public ResponseEntity<EmailVerificationStatusResponse> emailVerificationStatus(@RequestParam("token") String token) {
+        return ResponseEntity.ok(clientAccountService.getVerificationStatus(token));
+    }
+
+    @PostMapping("/email-verification/confirm")
+    public ResponseEntity<Void> confirmEmailVerification(@RequestBody @Valid VerifyEmailRequest request) {
+        clientAccountService.verifyEmail(request.token());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<Void> requestPasswordReset(@RequestBody @Valid RequestPasswordResetRequest request) {
+        passwordResetService.requestReset(request.email());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/password-reset/status")
+    public ResponseEntity<PasswordResetStatusResponse> passwordResetStatus(@RequestParam("token") String token) {
+        return ResponseEntity.ok(passwordResetService.getResetStatus(token));
+    }
+
+    @PostMapping("/password-reset/complete")
+    public ResponseEntity<Void> completePasswordReset(@RequestBody @Valid CompletePasswordResetRequest request) {
+        passwordResetService.completeReset(request);
         return ResponseEntity.noContent().build();
     }
 

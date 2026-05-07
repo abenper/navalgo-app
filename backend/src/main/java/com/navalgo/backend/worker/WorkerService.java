@@ -79,6 +79,7 @@ public class WorkerService {
         worker.setActive(true);
         worker.setMustChangePassword(false);
         worker.setCanEditWorkOrders(request.role() == Role.WORKER && request.canEditWorkOrders());
+        worker.setEmailVerified(request.role() != Role.CLIENT);
         worker.setContractStartDate(request.contractStartDate() != null ? request.contractStartDate() : LocalDate.now());
 
         Worker saved = workerRepository.save(worker);

@@ -50,9 +50,17 @@ public class AuthService {
         Worker worker = workerRepository.findByEmailIgnoreCase(request.email())
                 .orElseThrow(InvalidCredentialsException::new);
 
-        if (!worker.isActive() || !passwordEncoder.matches(request.password(), worker.getPasswordHash())) {
+        if (!passwordEncoder.matches(request.password(), worker.getPasswordHash())) {
             loginAttemptService.recordFailure(request.email(), clientIp);
             throw new InvalidCredentialsException();
+        }
+
+        if (!worker.isActive()) {
+            loginAttemptService.recordFailure(request.email(), clientIp);
+            if (worker.getRole() == com.navalgo.backend.common.Role.CLIENT && !worker.isEmailVerified()) {
+                throw new IllegalArgumentException("Debes confirmar tu correo electronico antes de iniciar sesion");
+            }
+            throw new IllegalArgumentException("Tu cuenta esta desactivada. Contacta con el administrador.");
         }
 
         loginAttemptService.recordSuccess(request.email(), clientIp);
@@ -122,8 +130,10 @@ public class AuthService {
                 worker.getEmail(),
                 worker.getRole(),
                 worker.isMustChangePassword(),
-            worker.isCanEditWorkOrders(),
-            worker.getPhotoUrl()
+                worker.isCanEditWorkOrders(),
+                worker.isEmailVerified(),
+                worker.getOwner() != null ? worker.getOwner().getId() : null,
+                worker.getPhotoUrl()
         );
 
         return new LoginResponse(userDto, accessToken, "Bearer", jwtService.calculateExpiryInstant());

@@ -9,6 +9,8 @@ public record AuthUserDto(
         Role role,
         boolean mustChangePassword,
         boolean canEditWorkOrders,
+        boolean emailVerified,
+        Long ownerId,
         String photoUrl
 ) {
 }

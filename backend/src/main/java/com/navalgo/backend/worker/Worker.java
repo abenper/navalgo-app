@@ -1,6 +1,7 @@
 package com.navalgo.backend.worker;
 
 import com.navalgo.backend.common.Role;
+import com.navalgo.backend.fleet.Owner;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -38,10 +39,17 @@ public class Worker {
     private boolean canEditWorkOrders = false;
 
     @Column(nullable = false)
+    private boolean emailVerified = true;
+
+    @Column(nullable = false)
     private LocalDate contractStartDate = LocalDate.now();
 
     @Column(length = 1000)
     private String photoUrl;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id", unique = true)
+    private Owner owner;
 
     private LocalDate lastMissingClockInReminderDate;
 
@@ -72,11 +80,17 @@ public class Worker {
     public boolean isCanEditWorkOrders() { return canEditWorkOrders; }
     public void setCanEditWorkOrders(boolean canEditWorkOrders) { this.canEditWorkOrders = canEditWorkOrders; }
 
+    public boolean isEmailVerified() { return emailVerified; }
+    public void setEmailVerified(boolean emailVerified) { this.emailVerified = emailVerified; }
+
     public LocalDate getContractStartDate() { return contractStartDate; }
     public void setContractStartDate(LocalDate contractStartDate) { this.contractStartDate = contractStartDate; }
 
     public String getPhotoUrl() { return photoUrl; }
     public void setPhotoUrl(String photoUrl) { this.photoUrl = photoUrl; }
+
+    public Owner getOwner() { return owner; }
+    public void setOwner(Owner owner) { this.owner = owner; }
 
     public LocalDate getLastMissingClockInReminderDate() { return lastMissingClockInReminderDate; }
     public void setLastMissingClockInReminderDate(LocalDate lastMissingClockInReminderDate) {

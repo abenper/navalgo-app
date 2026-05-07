@@ -8,6 +8,7 @@ import java.util.Optional;
 
 public interface WorkerRepository extends JpaRepository<Worker, Long> {
     Optional<Worker> findByEmailIgnoreCase(String email);
+    Optional<Worker> findByOwner_Id(Long ownerId);
     List<Worker> findByRoleAndActiveTrue(Role role);
     List<Worker> findByRoleAndActiveTrueOrderByFullNameAsc(Role role);
 }

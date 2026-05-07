@@ -12,6 +12,7 @@ import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../admin/flota_screen.dart';
 import '../admin/admin_shell_screen.dart';
+import '../client/client_shell_screen.dart';
 import '../common/login_screen.dart';
 import '../common/privacy_policy_screen.dart';
 import 'commercial_budgets_screen.dart';
@@ -95,6 +96,14 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
     if (role == 'WORKER') {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(builder: (_) => const WorkerShellScreen()),
+        (route) => false,
+      );
+      return;
+    }
+
+    if (role == 'CLIENT') {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (_) => const ClientShellScreen()),
         (route) => false,
       );
     }
@@ -618,7 +627,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
     final currentRole = context.select<SessionViewModel, String?>(
       (session) => session.user?.role,
     );
-    if (currentRole == 'ADMIN' || currentRole == 'WORKER') {
+    if (currentRole == 'ADMIN' || currentRole == 'WORKER' || currentRole == 'CLIENT') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (currentRole != null) {
           _redirectForRole(currentRole);

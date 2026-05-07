@@ -93,6 +93,31 @@ public class ResendEmailService {
         return sendEmail(payload, "No se pudo enviar el email de presupuesto");
     }
 
+    public boolean sendEmailVerification(String clientName,
+                                         String clientEmail,
+                                         String verificationLink,
+                                         String privacyPolicyLink) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from", fromAddress);
+        payload.put("to", List.of(clientEmail));
+        payload.put("subject", "Confirma tu cuenta");
+        payload.put("html", buildEmailVerificationHtml(clientName, verificationLink, privacyPolicyLink));
+        payload.put("text", buildEmailVerificationText(clientName, verificationLink, privacyPolicyLink));
+        return sendEmail(payload, "No se pudo enviar el email de verificacion");
+    }
+
+    public boolean sendPasswordReset(String accountName,
+                                     String accountEmail,
+                                     String resetLink) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from", fromAddress);
+        payload.put("to", List.of(accountEmail));
+        payload.put("subject", "Restablece tu contrasena");
+        payload.put("html", buildPasswordResetHtml(accountName, resetLink));
+        payload.put("text", buildPasswordResetText(accountName, resetLink));
+        return sendEmail(payload, "No se pudo enviar el email para restablecer la contrasena");
+    }
+
     private boolean sendEmail(Map<String, Object> payload, String failureMessage) {
         if (!enabled) {
             return false;
@@ -178,6 +203,47 @@ public class ResendEmailService {
 
                 Si no esperabas este correo, puedes ignorarlo.
                 """.formatted(workerName, activationLink, privacyPolicyLink);
+    }
+
+    private String buildEmailVerificationHtml(String clientName, String verificationLink, String privacyPolicyLink) {
+        return """
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
+                  <h2 style="margin-bottom:12px;">Confirma tu cuenta</h2>
+                  <p>Hola, %s:</p>
+                  <p>Hemos recibido tu solicitud de alta en Naval-GO. Para activar tu cuenta, confirma tu correo desde este enlace:</p>
+                  <p style="margin:24px 0;">
+                    <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
+                      Confirmar correo electronico
+                    </a>
+                  </p>
+                  <p>Si el boton no funciona, copia y pega esta URL en tu navegador:</p>
+                  <p><a href="%s">%s</a></p>
+                  <p>Puedes consultar la Politica de Privacidad aqui:</p>
+                  <p><a href="%s">%s</a></p>
+                  <p>Si no has creado esta cuenta, puedes ignorar este mensaje.</p>
+                  <p>Equipo Naval-GO</p>
+                </div>
+                """.formatted(
+                escapeHtml(clientName),
+                verificationLink,
+                verificationLink,
+                verificationLink,
+                privacyPolicyLink,
+                privacyPolicyLink
+        );
+    }
+
+    private String buildEmailVerificationText(String clientName, String verificationLink, String privacyPolicyLink) {
+        return """
+                Hola, %s:
+
+                Hemos recibido tu solicitud de alta en Naval-GO.
+                Confirma tu correo aqui:
+                %s
+
+                Politica de Privacidad:
+                %s
+                """.formatted(clientName, verificationLink, privacyPolicyLink);
     }
 
     private String buildNotificationFallbackHtml(String workerName, String title, String message) {
@@ -272,6 +338,42 @@ public class ResendEmailService {
                 formatAmount(amount, currency),
                 pdfUrl
         );
+    }
+
+    private String buildPasswordResetHtml(String accountName, String resetLink) {
+        return """
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
+                  <h2 style="margin-bottom:12px;">Restablece tu contrasena</h2>
+                  <p>Hola, %s:</p>
+                  <p>Hemos recibido una solicitud para cambiar la contrasena de tu cuenta en Naval-GO.</p>
+                  <p style="margin:24px 0;">
+                    <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
+                      Cambiar contrasena
+                    </a>
+                  </p>
+                  <p>Si el boton no funciona, copia y pega esta URL en tu navegador:</p>
+                  <p><a href="%s">%s</a></p>
+                  <p>Si no has solicitado este cambio, puedes ignorar este mensaje.</p>
+                  <p>Equipo Naval-GO</p>
+                </div>
+                """.formatted(
+                escapeHtml(accountName),
+                resetLink,
+                resetLink,
+                resetLink
+        );
+    }
+
+    private String buildPasswordResetText(String accountName, String resetLink) {
+        return """
+                Hola, %s:
+
+                Hemos recibido una solicitud para cambiar la contrasena de tu cuenta en Naval-GO.
+                Usa este enlace:
+                %s
+
+                Si no has solicitado este cambio, puedes ignorar este mensaje.
+                """.formatted(accountName, resetLink);
     }
 
     private String normalizeFrontendBaseUrl() {

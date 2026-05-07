@@ -14,6 +14,8 @@ public record WorkerDto(
         boolean mustChangePassword,
         boolean registrationCompleted,
         boolean canEditWorkOrders,
+        boolean emailVerified,
+        Long ownerId,
         LocalDate contractStartDate,
         String photoUrl
 ) {
@@ -28,6 +30,8 @@ public record WorkerDto(
                 worker.isMustChangePassword(),
                 registrationCompleted,
                 worker.isCanEditWorkOrders(),
+                worker.isEmailVerified(),
+                worker.getOwner() != null ? worker.getOwner().getId() : null,
                 worker.getContractStartDate(),
                 worker.getPhotoUrl()
         );

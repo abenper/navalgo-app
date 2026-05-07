@@ -9,12 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Instant;
-import java.util.Base64;
 
 @Service
 @Transactional(readOnly = true)
@@ -29,9 +24,9 @@ public class RegistrationInvitationService {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final ResendEmailService resendEmailService;
+    private final SecureTokenSupport secureTokenSupport;
     private final String frontendBaseUrl;
     private final long invitationTtlHours;
-    private final SecureRandom secureRandom = new SecureRandom();
 
     public RegistrationInvitationService(
             RegistrationInvitationRepository invitationRepository,
@@ -39,6 +34,7 @@ public class RegistrationInvitationService {
             PasswordEncoder passwordEncoder,
             RefreshTokenService refreshTokenService,
             ResendEmailService resendEmailService,
+            SecureTokenSupport secureTokenSupport,
             @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl,
             @Value("${app.auth.registration-invitation-ttl-hours:72}") long invitationTtlHours
     ) {
@@ -47,6 +43,7 @@ public class RegistrationInvitationService {
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
         this.resendEmailService = resendEmailService;
+        this.secureTokenSupport = secureTokenSupport;
         this.frontendBaseUrl = frontendBaseUrl;
         this.invitationTtlHours = invitationTtlHours;
     }
@@ -55,10 +52,10 @@ public class RegistrationInvitationService {
     public boolean issueInvitation(Worker worker) {
         invitationRepository.deleteByWorker_Id(worker.getId());
 
-        String rawToken = generateToken();
+        String rawToken = secureTokenSupport.generateUrlSafeToken(32);
         RegistrationInvitation invitation = new RegistrationInvitation();
         invitation.setWorker(worker);
-        invitation.setTokenHash(hashToken(rawToken));
+        invitation.setTokenHash(secureTokenSupport.sha256Hex(rawToken));
         invitation.setCreatedAt(Instant.now());
         invitation.setExpiresAt(Instant.now().plusSeconds(invitationTtlHours * 3600));
         invitationRepository.save(invitation);
@@ -92,6 +89,7 @@ public class RegistrationInvitationService {
         Worker worker = invitation.getWorker();
         worker.setPasswordHash(passwordEncoder.encode(password));
         worker.setMustChangePassword(false);
+        worker.setEmailVerified(true);
         workerRepository.save(worker);
 
         invitation.setConsumedAt(Instant.now());
@@ -105,7 +103,7 @@ public class RegistrationInvitationService {
             throw new IllegalArgumentException("El enlace de activacion no es valido o ha caducado");
         }
 
-        RegistrationInvitation invitation = invitationRepository.findByTokenHash(hashToken(rawToken))
+        RegistrationInvitation invitation = invitationRepository.findByTokenHash(secureTokenSupport.sha256Hex(rawToken))
                 .orElseThrow(() -> new IllegalArgumentException("El enlace de activacion no es valido o ha caducado"));
 
         if (invitation.getConsumedAt() != null || invitation.getExpiresAt().isBefore(Instant.now())) {
@@ -122,26 +120,6 @@ public class RegistrationInvitationService {
             builder.queryParam("token", token);
         }
         return builder.build(true).toUriString();
-    }
-
-    private String generateToken() {
-        byte[] bytes = new byte[32];
-        secureRandom.nextBytes(bytes);
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    }
-
-    private String hashToken(String rawToken) {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(rawToken.getBytes(StandardCharsets.UTF_8));
-            StringBuilder builder = new StringBuilder(digest.length * 2);
-            for (byte current : digest) {
-                builder.append(String.format("%02x", current));
-            }
-            return builder.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            throw new IllegalStateException("No se pudo calcular el hash del token", exception);
-        }
     }
 
     private boolean isStrongPassword(String password) {
