@@ -1564,7 +1564,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                   label: const Text('Vídeo'),
                 ),
               ],
-              if (_isAdmin && _attachments.isNotEmpty) ...[
+              if (_isAdmin && _attachments.isNotEmpty && _hasClientSignature) ...[
                 const SizedBox(width: 12),
                 OutlinedButton.icon(
                   onPressed: _busy ? null : _downloadEvidenceReport,

@@ -595,7 +595,7 @@ public class WorkOrderMediaService {
                 ? "GPS:N/D"
                 : "GPS:" + String.format(Locale.ROOT, "%.5f,%.5f", latitude, longitude);
 
-        return "NavalGO | " + workerName + " | " + ts + " | " + location;
+        return workerName + " | " + ts + " | " + location;
     }
 
     private String buildVideoWatermarkText(String workerName,
@@ -610,7 +610,7 @@ public class WorkOrderMediaService {
                 ? "GPS:N/D"
                 : "GPS:" + String.format(Locale.ROOT, "%.5f,%.5f", latitude, longitude);
 
-        return "NavalGO\n" + workerName + "\n" + ts + "\n" + location;
+        return workerName + "\n" + ts + "\n" + location;
     }
 
     private String buildVideoWatermarkFilter(String watermarkText) {

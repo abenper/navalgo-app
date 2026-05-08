@@ -681,7 +681,7 @@ class _WorkerCard extends StatelessWidget {
                   label: const Text('Contraseña temporal'),
                 ),
               ],
-              if (_isOperationalWorker(worker.role))
+              if (worker.role != 'ADMIN')
                 FilledButton.icon(
                   onPressed: onAdjustSchedule,
                   icon: const Icon(Icons.query_stats_outlined),

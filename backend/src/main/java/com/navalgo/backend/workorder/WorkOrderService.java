@@ -1102,6 +1102,9 @@ public class WorkOrderService {
         if (workOrder.getAttachments() == null || workOrder.getAttachments().isEmpty()) {
             throw new IllegalArgumentException("Este parte no tiene adjuntos para generar un informe probatorio");
         }
+        if (workOrder.getClientSignatureUrl() == null || workOrder.getClientSignatureUrl().isBlank()) {
+            throw new IllegalArgumentException("El informe probatorio solo se puede descargar cuando el parte está firmado");
+        }
         byte[] pdfBytes = workOrderEvidencePdfService.buildReport(workOrder);
         return new WorkOrderEvidenceReport(
                 "parte_" + workOrder.getId() + "_informe_probatorio.pdf",
