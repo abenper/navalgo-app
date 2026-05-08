@@ -34,9 +34,9 @@ public class BudgetController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
-    public ResponseEntity<List<BudgetDto>> list() {
-        return ResponseEntity.ok(budgetService.findAll());
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','CLIENT')")
+    public ResponseEntity<List<BudgetDto>> list(Authentication authentication) {
+        return ResponseEntity.ok(budgetService.findVisibleBudgets(authentication.getName()));
     }
 
     @PostMapping
@@ -47,7 +47,7 @@ public class BudgetController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','CLIENT')")
     public ResponseEntity<BudgetDto> updateStatus(@PathVariable Long id,
                                                   @RequestBody @Valid UpdateBudgetStatusRequest request,
                                                   Authentication authentication) {

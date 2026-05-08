@@ -8,6 +8,8 @@ import '../admin/admin_shell_screen.dart';
 import '../commercial/commercial_shell_screen.dart';
 import '../common/login_screen.dart';
 import '../worker/worker_shell_screen.dart';
+import 'client_budgets_screen.dart';
+import 'client_dashboard_screen.dart';
 
 class ClientShellScreen extends StatefulWidget {
   const ClientShellScreen({super.key});
@@ -82,11 +84,15 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
     }
 
     final screens = [
-      const _ClientPlaceholderScreen(
-        title: 'Bienvenido a tu portal',
-        body:
-            'Desde aqui podras revisar el estado de tus embarcaciones, presupuestos y documentacion cuando terminemos de conectar el area de cliente.',
-        icon: Icons.dashboard_customize_outlined,
+      ClientDashboardScreen(
+        onOpenBudgets: () {
+          if (!mounted) {
+            return;
+          }
+          setState(() {
+            _selectedIndex = 2;
+          });
+        },
       ),
       const _ClientPlaceholderScreen(
         title: 'Flota del cliente',
@@ -94,12 +100,7 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
             'Aqui apareceran las embarcaciones asociadas a tu cuenta para poder consultar sus trabajos y documentacion.',
         icon: Icons.directions_boat_filled_outlined,
       ),
-      const _ClientPlaceholderScreen(
-        title: 'Presupuestos',
-        body:
-            'En esta seccion podras aceptar o rechazar presupuestos y dejar observaciones al astillero.',
-        icon: Icons.request_quote,
-      ),
+      const ClientBudgetsScreen(),
     ];
 
     return Scaffold(

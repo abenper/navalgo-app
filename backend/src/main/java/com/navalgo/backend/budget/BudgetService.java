@@ -49,6 +49,22 @@ public class BudgetService {
                 .toList();
     }
 
+    public List<BudgetDto> findVisibleBudgets(String currentUserEmail) {
+        Worker current = requireActiveWorker(currentUserEmail);
+        if (current.getRole() == Role.ADMIN || current.getRole() == Role.COMERCIAL) {
+            return findAll();
+        }
+        if (current.getRole() != Role.CLIENT) {
+            throw new AccessDeniedException("No tienes permiso para ver presupuestos");
+        }
+        if (current.getOwner() == null || current.getOwner().getId() == null) {
+            return List.of();
+        }
+        return budgetRepository.findByOwnerIdOrderByCreatedAtDesc(current.getOwner().getId()).stream()
+                .map(this::toDto)
+                .toList();
+    }
+
     @Transactional
     public BudgetDto create(CreateBudgetRequest request, String currentUserEmail) {
         Worker current = requireCommercialOrAdmin(currentUserEmail);
@@ -88,12 +104,27 @@ public class BudgetService {
     public BudgetDto updateStatus(Long budgetId,
                                   UpdateBudgetStatusRequest request,
                                   String currentUserEmail) {
-        requireCommercialOrAdmin(currentUserEmail);
+        Worker current = requireActiveWorker(currentUserEmail);
         Budget budget = budgetRepository.findById(budgetId)
                 .orElseThrow(() -> new EntityNotFoundException("Presupuesto no encontrado"));
 
         BudgetStatus previousStatus = budget.getStatus();
         BudgetStatus nextStatus = request.status();
+
+        if (current.getRole() == Role.ADMIN || current.getRole() == Role.COMERCIAL) {
+            // Admin/commercial can moderate the workflow, including marking as sent.
+        } else if (current.getRole() == Role.CLIENT) {
+            ensureClientOwnsBudget(current, budget);
+            if (nextStatus != BudgetStatus.ACCEPTED && nextStatus != BudgetStatus.REJECTED) {
+                throw new AccessDeniedException("El cliente solo puede aceptar o rechazar presupuestos");
+            }
+            if (previousStatus != BudgetStatus.SENT) {
+                throw new IllegalArgumentException("Solo puedes responder presupuestos enviados y pendientes");
+            }
+        } else {
+            throw new AccessDeniedException("No tienes permiso para gestionar presupuestos");
+        }
+
         budget.setStatus(nextStatus);
         budget.setClientObservations(inputSanitizer.optionalText(request.clientObservations(), 2000));
         budget.setUpdatedAt(Instant.now());
@@ -132,15 +163,29 @@ public class BudgetService {
     }
 
     private Worker requireCommercialOrAdmin(String email) {
+        Worker worker = requireActiveWorker(email);
+        if (worker.getRole() != Role.ADMIN && worker.getRole() != Role.COMERCIAL) {
+            throw new AccessDeniedException("No tienes permiso para gestionar presupuestos");
+        }
+        return worker;
+    }
+
+    private Worker requireActiveWorker(String email) {
         Worker worker = workerRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
         if (!worker.isActive()) {
             throw new AccessDeniedException("Usuario inactivo");
         }
-        if (worker.getRole() != Role.ADMIN && worker.getRole() != Role.COMERCIAL) {
-            throw new AccessDeniedException("No tienes permiso para gestionar presupuestos");
-        }
         return worker;
+    }
+
+    private void ensureClientOwnsBudget(Worker client, Budget budget) {
+        if (client.getOwner() == null || client.getOwner().getId() == null) {
+            throw new AccessDeniedException("Tu cuenta no esta asociada a un cliente valido");
+        }
+        if (!client.getOwner().getId().equals(budget.getOwner().getId())) {
+            throw new AccessDeniedException("No puedes responder a presupuestos de otro cliente");
+        }
     }
 
     private String normalizeCurrency(String currency) {
