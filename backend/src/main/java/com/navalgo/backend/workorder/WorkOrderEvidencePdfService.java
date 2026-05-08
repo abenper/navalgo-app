@@ -4,12 +4,17 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
-import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
+import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
 import org.springframework.stereotype.Service;
 
+import javax.imageio.ImageIO;
+import java.awt.Color;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -23,15 +28,23 @@ public class WorkOrderEvidencePdfService {
 
     private static final float MARGIN = 46f;
     private static final float FONT_SIZE = 10.5f;
+    private static final float HEADER_FONT_SIZE = 18f;
+    private static final float SECTION_FONT_SIZE = 12f;
     private static final float LEADING = 14f;
+    private static final float LOGO_MAX_WIDTH = 120f;
+    private static final float LOGO_MAX_HEIGHT = 40f;
+    private static final Color HEADER_COLOR = new Color(0, 82, 155);
+    private static final Color SUBTITLE_COLOR = new Color(90, 90, 90);
     private static final PDType1Font BODY_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
+    private static final PDType1Font HEADER_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+    private static final PDType1Font SECTION_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")
             .withZone(ZoneId.systemDefault());
 
     public byte[] buildReport(WorkOrder workOrder) {
         try (PDDocument document = new PDDocument()) {
             List<String> lines = buildLines(workOrder);
-            writeLines(document, lines);
+            writeLines(document, lines, workOrder);
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             document.save(output);
             return output.toByteArray();
@@ -104,19 +117,23 @@ public class WorkOrderEvidencePdfService {
         return lines;
     }
 
-    private void writeLines(PDDocument document, List<String> lines) throws IOException {
+    private void writeLines(PDDocument document, List<String> lines, WorkOrder workOrder) throws IOException {
         PDPage page = new PDPage(PDRectangle.A4);
         document.addPage(page);
         PDPageContentStream contentStream = new PDPageContentStream(document, page);
         float width = page.getMediaBox().getWidth() - (MARGIN * 2);
-        float y = page.getMediaBox().getHeight() - MARGIN;
+        float y = renderPageHeader(document, page, contentStream, workOrder);
 
         contentStream.setFont(BODY_FONT, FONT_SIZE);
+        contentStream.setNonStrokingColor(Color.BLACK);
         contentStream.beginText();
         contentStream.newLineAtOffset(MARGIN, y);
 
         for (String line : lines) {
-            List<String> wrappedLines = wrapLine(line, width);
+            boolean heading = isSectionHeading(line);
+            PDType1Font font = heading ? SECTION_FONT : BODY_FONT;
+            float fontSize = heading ? SECTION_FONT_SIZE : FONT_SIZE;
+            List<String> wrappedLines = wrapLine(line, font, fontSize, width);
             for (String wrapped : wrappedLines) {
                 if (y <= MARGIN) {
                     contentStream.endText();
@@ -124,11 +141,13 @@ public class WorkOrderEvidencePdfService {
                     page = new PDPage(PDRectangle.A4);
                     document.addPage(page);
                     contentStream = new PDPageContentStream(document, page);
+                    y = renderPageHeader(document, page, contentStream, workOrder);
                     contentStream.setFont(BODY_FONT, FONT_SIZE);
-                    y = page.getMediaBox().getHeight() - MARGIN;
+                    contentStream.setNonStrokingColor(Color.BLACK);
                     contentStream.beginText();
                     contentStream.newLineAtOffset(MARGIN, y);
                 }
+                contentStream.setFont(font, fontSize);
                 contentStream.showText(wrapped);
                 contentStream.newLineAtOffset(0, -LEADING);
                 y -= LEADING;
@@ -139,7 +158,7 @@ public class WorkOrderEvidencePdfService {
         contentStream.close();
     }
 
-    private List<String> wrapLine(String line, float maxWidth) throws IOException {
+    private List<String> wrapLine(String line, PDType1Font font, float fontSize, float maxWidth) throws IOException {
         if (line == null || line.isBlank()) {
             return List.of(" ");
         }
@@ -149,7 +168,7 @@ public class WorkOrderEvidencePdfService {
         StringBuilder current = new StringBuilder();
         for (String word : words) {
             String candidate = current.isEmpty() ? word : current + " " + word;
-            float candidateWidth = BODY_FONT.getStringWidth(candidate) / 1000 * FONT_SIZE;
+            float candidateWidth = font.getStringWidth(candidate) / 1000 * fontSize;
             if (current.isEmpty() || candidateWidth <= maxWidth) {
                 current = new StringBuilder(candidate);
             } else {
@@ -161,6 +180,63 @@ public class WorkOrderEvidencePdfService {
             result.add(current.toString());
         }
         return result.isEmpty() ? List.of(" ") : result;
+    }
+
+    private float renderPageHeader(PDDocument document, PDPage page, PDPageContentStream contentStream, WorkOrder workOrder) throws IOException {
+        float pageWidth = page.getMediaBox().getWidth();
+        float pageHeight = page.getMediaBox().getHeight();
+        float y = pageHeight - MARGIN;
+
+        PDImageXObject logo = loadHeaderLogo(document);
+        float logoWidth = 0f;
+        float logoHeight = 0f;
+        if (logo != null) {
+            float imageWidth = logo.getWidth();
+            float imageHeight = logo.getHeight();
+            float scale = Math.min(LOGO_MAX_WIDTH / imageWidth, LOGO_MAX_HEIGHT / imageHeight);
+            logoWidth = imageWidth * scale;
+            logoHeight = imageHeight * scale;
+            contentStream.drawImage(logo, MARGIN, y - logoHeight, logoWidth, logoHeight);
+        }
+
+        float titleX = MARGIN + logoWidth + (logoWidth > 0 ? 12f : 0f);
+        float titleY = y - 10f;
+        contentStream.beginText();
+        contentStream.setFont(HEADER_FONT, HEADER_FONT_SIZE);
+        contentStream.setNonStrokingColor(HEADER_COLOR);
+        contentStream.newLineAtOffset(titleX, titleY);
+        contentStream.showText("Informe probatorio");
+        contentStream.newLineAtOffset(0, -HEADER_FONT_SIZE - 4f);
+        contentStream.setFont(BODY_FONT, FONT_SIZE);
+        contentStream.setNonStrokingColor(SUBTITLE_COLOR);
+        contentStream.showText("Documento oficial de evidencia del parte firmado");
+        contentStream.endText();
+
+        float lineY = y - Math.max(logoHeight, HEADER_FONT_SIZE + 18f) - 12f;
+        contentStream.setStrokingColor(HEADER_COLOR);
+        contentStream.setLineWidth(1f);
+        contentStream.moveTo(MARGIN, lineY);
+        contentStream.lineTo(pageWidth - MARGIN, lineY);
+        contentStream.stroke();
+
+        return lineY - 18f;
+    }
+
+    private PDImageXObject loadHeaderLogo(PDDocument document) throws IOException {
+        try (InputStream stream = getClass().getResourceAsStream("/logo_navalgo_horizontal.png")) {
+            if (stream == null) {
+                return null;
+            }
+            BufferedImage image = ImageIO.read(stream);
+            if (image == null) {
+                return null;
+            }
+            return LosslessFactory.createFromImage(document, image);
+        }
+    }
+
+    private boolean isSectionHeading(String line) {
+        return line != null && (line.equals("Datos del parte") || line.equals("Advertencia de integridad") || line.equals("Adjuntos") || line.startsWith("Adjunto "));
     }
 
     private String formatInstant(Instant instant) {
