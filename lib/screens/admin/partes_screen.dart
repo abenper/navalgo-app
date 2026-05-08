@@ -2258,9 +2258,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       final updated = await mediaService.attachToWorkOrder(
         token,
         workOrderId: _workOrder.id,
-        fileName: picked.name.isEmpty
-            ? 'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.jpg'
-            : picked.name,
+        fileName: _normalizeCapturedMediaFileName(
+          picked.name,
+          fallback:
+              'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.jpg',
+        ),
         bytes: bytes,
         mimeType: mime,
         latitude: position.latitude,
@@ -2335,9 +2337,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       final updated = await mediaService.attachToWorkOrder(
         token,
         workOrderId: _workOrder.id,
-        fileName: picked.name.isEmpty
-            ? 'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.mp4'
-            : picked.name,
+        fileName: _normalizeCapturedMediaFileName(
+          picked.name,
+          fallback:
+              'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.mp4',
+        ),
         bytes: bytes,
         mimeType: mime,
         latitude: position.latitude,
@@ -2984,6 +2988,21 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       default:
         return 'video/mp4';
     }
+  }
+
+  String _normalizeCapturedMediaFileName(String rawName, {required String fallback}) {
+    final trimmed = rawName.trim();
+    if (trimmed.isEmpty) {
+      return fallback;
+    }
+
+    var normalized = trimmed;
+    if (normalized.toLowerCase().startsWith('scaled_')) {
+      normalized = normalized.substring(7);
+    }
+
+    normalized = normalized.trim();
+    return normalized.isEmpty ? fallback : normalized;
   }
 }
 
