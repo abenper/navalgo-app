@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -32,6 +34,12 @@ class _WorkerJornadaAdjustmentScreenState
   List<TimeEntry> _entries = <TimeEntry>[];
   List<TimeAdjustmentRequest> _pendingAdjustmentRequests =
       <TimeAdjustmentRequest>[];
+
+  bool get _isCommercial => widget.worker.role == 'COMERCIAL';
+
+  bool get _isOperationalWorker => widget.worker.role == 'WORKER';
+
+  String get _roleLabel => _isCommercial ? 'comercial' : 'trabajador';
 
   @override
   void initState() {
@@ -269,7 +277,11 @@ class _WorkerJornadaAdjustmentScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ajuste de jornada'),
+        title: Text(
+          _isCommercial
+              ? 'Ajuste de jornada comercial'
+              : 'Ajuste de jornada técnica',
+        ),
         actions: [
           IconButton(
             onPressed: _isLoading ? null : _load,
@@ -287,9 +299,9 @@ class _WorkerJornadaAdjustmentScreenState
               const SizedBox(height: 18),
               _buildQualityFactors(context, insight),
               const SizedBox(height: 18),
-              _buildPendingAdjustmentRequests(context),
+              _buildRoleSummary(context, insight),
               const SizedBox(height: 18),
-              _buildResolvedTable(context, insight),
+              _buildPendingAdjustmentRequests(context),
               const SizedBox(height: 18),
               _buildEntries(context),
             ],
@@ -318,6 +330,7 @@ class _WorkerJornadaAdjustmentScreenState
             score: insight.qualityScore,
             color: scoreColor,
             currentlyClockedIn: insight.currentlyClockedIn,
+            isCommercial: _isCommercial,
           );
 
           return Column(
@@ -356,6 +369,10 @@ class _WorkerJornadaAdjustmentScreenState
       runSpacing: 10,
       children: [
         NavalgoStatusChip(
+          label: _isCommercial ? 'Rol comercial' : 'Rol técnico',
+          color: _isCommercial ? NavalgoColors.harbor : NavalgoColors.tide,
+        ),
+        NavalgoStatusChip(
           label: insight.currentlyClockedIn ? 'Jornada abierta' : 'Jornada cerrada',
           color: insight.currentlyClockedIn
               ? NavalgoColors.kelp
@@ -375,7 +392,12 @@ class _WorkerJornadaAdjustmentScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-const NavalgoSectionHeader(title: 'Calidad operativa'),
+        NavalgoSectionHeader(
+          title: _isCommercial ? 'Seguimiento horario' : 'Calidad operativa',
+          subtitle: _isCommercial
+              ? 'Constancia, presencia y ausencias del perfil comercial.'
+              : 'Lectura rápida del rendimiento horario del perfil técnico.',
+        ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -384,7 +406,7 @@ const NavalgoSectionHeader(title: 'Calidad operativa'),
                 : constraints.maxWidth >= 760
                 ? 2
                 : 1;
-            final childAspectRatio = crossAxisCount == 1 ? 2.9 : 1.8;
+            final childAspectRatio = crossAxisCount == 1 ? 2.2 : 1.55;
 
             return GridView(
               shrinkWrap: true,
@@ -401,24 +423,30 @@ const NavalgoSectionHeader(title: 'Calidad operativa'),
                   value: _formatMinutes(insight.workedMinutesToday),
                   icon: const Icon(Icons.today_outlined),
                   accent: NavalgoColors.tide,
+                  note: _isCommercial
+                      ? 'Actividad registrada en la jornada actual.'
+                      : 'Tiempo fichado en el día en curso.',
                 ),
                 NavalgoMetricCard(
                   label: 'Horas este mes',
                   value: _formatMinutes(insight.workedMinutesThisMonth),
                   icon: const Icon(Icons.calendar_view_month_rounded),
                   accent: NavalgoColors.harbor,
+                  note: 'Acumulado del mes natural actual.',
                 ),
                 NavalgoMetricCard(
                   label: 'Horas este año',
                   value: _formatMinutes(insight.workedMinutesThisYear),
                   icon: const Icon(Icons.calendar_month_rounded),
                   accent: NavalgoColors.kelp,
+                  note: 'Tiempo total registrado en el año.',
                 ),
                 NavalgoMetricCard(
                   label: 'Ausencias no vacacionales',
                   value: '${insight.approvedNonVacationAbsenceDaysThisYear}',
                   icon: const Icon(Icons.event_busy_outlined),
                   accent: NavalgoColors.coral,
+                  note: _absenceComparisonLabel(insight.absenceVsAveragePercent),
                 ),
               ],
             );
@@ -473,42 +501,102 @@ const NavalgoSectionHeader(title: 'Calidad operativa'),
     );
   }
 
-  Widget _buildResolvedTable(BuildContext context, WorkerTimeTrackingInsight insight) {
+  Widget _buildRoleSummary(BuildContext context, WorkerTimeTrackingInsight insight) {
+    return _isOperationalWorker
+        ? _buildOperationalSummary(context, insight)
+        : _buildCommercialSummary(context, insight);
+  }
+
+  Widget _buildOperationalSummary(
+    BuildContext context,
+    WorkerTimeTrackingInsight insight,
+  ) {
+    final rows = insight.resolvedWorkOrderStats;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const NavalgoSectionHeader(title: 'Partes y horas'),
+        const NavalgoSectionHeader(
+          title: 'Partes y horas',
+          subtitle: 'Resumen visual de cierres, horas fichadas e imputación.',
+        ),
         const SizedBox(height: 12),
-        NavalgoPanel(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Periodo')),
-                DataColumn(label: Text('Partes cerrados')),
-                DataColumn(label: Text('Horas fichadas')),
-                DataColumn(label: Text('Horas imputadas')),
-                DataColumn(label: Text('Media h/parte')),
-              ],
-              rows: insight.resolvedWorkOrderStats
-                  .map(
-                    (row) => DataRow(
-                      cells: [
-                        DataCell(Text(row.label)),
-                        DataCell(Text('${row.completedWorkOrders}')),
-                        DataCell(Text(_formatMinutes(row.workedMinutes))),
-                        DataCell(Text(row.loggedLaborHours.toStringAsFixed(1))),
-                        DataCell(
-                          Text(row.averageWorkedHoursPerOrder.toStringAsFixed(1)),
-                        ),
-                      ],
-                    ),
-                  )
-                  .toList(),
+        if (rows.isEmpty)
+          const NavalgoPanel(
+            child: Text('Aún no hay histórico suficiente de partes cerrados.'),
+          )
+        else
+          ...rows.map(
+            (row) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _ResolvedPeriodCard(row: row),
             ),
           ),
-        ),
       ],
+    );
+  }
+
+  Widget _buildCommercialSummary(
+    BuildContext context,
+    WorkerTimeTrackingInsight insight,
+  ) {
+    final todayTarget = 8 * 60.0;
+    final monthTarget = 160 * 60.0;
+    final yearTarget = 1760 * 60.0;
+    final absenceRatio =
+        (insight.absenceVsAveragePercent.abs() / 100).clamp(0, 1).toDouble();
+
+    return NavalgoPanel(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Actividad comercial',
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Vista pensada para revisar presencia, constancia horaria y nivel de incidencias sin mezclar datos de partes.',
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 18),
+          _ActivityProgressRow(
+            label: 'Ritmo diario',
+            valueLabel: _formatMinutes(insight.workedMinutesToday),
+            progress: (insight.workedMinutesToday / todayTarget).clamp(0, 1),
+            color: NavalgoColors.tide,
+            caption: 'Objetivo visual de 8 horas',
+          ),
+          const SizedBox(height: 14),
+          _ActivityProgressRow(
+            label: 'Ritmo mensual',
+            valueLabel: _formatMinutes(insight.workedMinutesThisMonth),
+            progress: (insight.workedMinutesThisMonth / monthTarget).clamp(0, 1),
+            color: NavalgoColors.harbor,
+            caption: 'Objetivo visual de 160 horas',
+          ),
+          const SizedBox(height: 14),
+          _ActivityProgressRow(
+            label: 'Ritmo anual',
+            valueLabel: _formatMinutes(insight.workedMinutesThisYear),
+            progress: (insight.workedMinutesThisYear / yearTarget).clamp(0, 1),
+            color: NavalgoColors.kelp,
+            caption: 'Objetivo visual de 1760 horas',
+          ),
+          const SizedBox(height: 14),
+          _ActivityProgressRow(
+            label: 'Ausencias frente a la media',
+            valueLabel: _absenceComparisonLabel(insight.absenceVsAveragePercent),
+            progress: absenceRatio,
+            color: insight.absenceVsAveragePercent > 0
+                ? NavalgoColors.coral
+                : NavalgoColors.kelp,
+            caption: 'Comparativa interna de incidencias no vacacionales',
+          ),
+        ],
+      ),
     );
   }
 
@@ -538,13 +626,13 @@ const NavalgoSectionHeader(title: 'Calidad operativa'),
           ),
           const SizedBox(height: 8),
           Text(
-            'Revisa aquí las solicitudes de este trabajador para no dispersar el control horario.',
+            'Revisa aquí las solicitudes de este $_roleLabel para no dispersar el control horario.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 16),
           if (_pendingAdjustmentRequests.isEmpty)
-            const Text(
-              'Este trabajador no tiene solicitudes pendientes de revisión.',
+            Text(
+              'Este $_roleLabel no tiene solicitudes pendientes de revisión.',
             )
           else
             ..._pendingAdjustmentRequests.map((request) {
@@ -586,7 +674,9 @@ const NavalgoSectionHeader(title: 'Calidad operativa'),
             children: [
               Expanded(
                 child: Text(
-                  'Jornadas del trabajador',
+                  _isCommercial
+                      ? 'Jornadas del comercial'
+                      : 'Jornadas del trabajador',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w900,
                   ),
@@ -622,14 +712,14 @@ const NavalgoSectionHeader(title: 'Calidad operativa'),
               ),
               _EntrySummaryChip(
                 icon: Icons.auto_fix_high_outlined,
-                label: '$autoClosedEntries cierres automaticos',
+                label: '$autoClosedEntries cierres automáticos',
                 color: NavalgoColors.sand,
               ),
             ],
           ),
           const SizedBox(height: 16),
           if (_entries.isEmpty)
-            const Text('Todavia no hay jornadas registradas.')
+            Text('Todavía no hay jornadas registradas para este $_roleLabel.')
           else
             ..._entries.take(45).map(
               (entry) => Padding(
@@ -815,11 +905,13 @@ class _HeroScoreCard extends StatelessWidget {
     required this.score,
     required this.color,
     required this.currentlyClockedIn,
+    required this.isCommercial,
   });
 
   final double score;
   final Color color;
   final bool currentlyClockedIn;
+  final bool isCommercial;
 
   @override
   Widget build(BuildContext context) {
@@ -843,8 +935,145 @@ class _HeroScoreCard extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
+          const SizedBox(height: 6),
+          Text(
+            isCommercial ? 'Seguimiento del perfil comercial' : 'Seguimiento del perfil técnico',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: NavalgoColors.storm,
+            ),
+          ),
         ],
       ),
+    );
+  }
+}
+
+class _ResolvedPeriodCard extends StatelessWidget {
+  const _ResolvedPeriodCard({required this.row});
+
+  final WorkerResolvedWorkOrderStatsRow row;
+
+  @override
+  Widget build(BuildContext context) {
+    final workedHours = row.workedMinutes / 60;
+    final reference = math.max(workedHours, row.loggedLaborHours);
+    final progress = reference <= 0
+        ? 0.0
+        : (workedHours / reference).clamp(0, 1).toDouble();
+
+    return NavalgoPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            row.label,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w900,
+              color: NavalgoColors.deepSea,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _EntrySummaryChip(
+                icon: Icons.task_alt_outlined,
+                label: '${row.completedWorkOrders} partes cerrados',
+                color: NavalgoColors.tide,
+              ),
+              _EntrySummaryChip(
+                icon: Icons.schedule_outlined,
+                label: _formatMinutes(row.workedMinutes),
+                color: NavalgoColors.harbor,
+              ),
+              _EntrySummaryChip(
+                icon: Icons.construction_outlined,
+                label: '${row.loggedLaborHours.toStringAsFixed(1)} h imputadas',
+                color: NavalgoColors.kelp,
+              ),
+              _EntrySummaryChip(
+                icon: Icons.insights_outlined,
+                label: '${row.averageWorkedHoursPerOrder.toStringAsFixed(1)} h/parte',
+                color: NavalgoColors.sand,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _ActivityProgressRow(
+            label: 'Horas fichadas frente a imputadas',
+            valueLabel:
+                '${workedHours.toStringAsFixed(1)} h / ${row.loggedLaborHours.toStringAsFixed(1)} h',
+            progress: progress,
+            color: NavalgoColors.tide,
+            caption: 'La barra toma como referencia el mayor de los dos valores.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityProgressRow extends StatelessWidget {
+  const _ActivityProgressRow({
+    required this.label,
+    required this.valueLabel,
+    required this.progress,
+    required this.color,
+    required this.caption,
+  });
+
+  final String label;
+  final String valueLabel;
+  final double progress;
+  final Color color;
+  final String caption;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: NavalgoColors.deepSea,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              valueLabel,
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            value: progress.clamp(0, 1),
+            minHeight: 10,
+            backgroundColor: NavalgoColors.border,
+            valueColor: AlwaysStoppedAnimation<Color>(color),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          caption,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: NavalgoColors.storm,
+          ),
+        ),
+      ],
     );
   }
 }

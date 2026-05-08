@@ -180,6 +180,7 @@ class NavalgoMetricCard extends StatelessWidget {
             ],
           ),
           child: Column(
+            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -232,37 +233,38 @@ class NavalgoMetricCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: noteLines.isEmpty
-                    ? const SizedBox.shrink()
-                    : Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.symmetric(
-                          horizontal: compact ? 10 : 12,
-                          vertical: compact ? 8 : 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: accent.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: ListView.separated(
-                          padding: EdgeInsets.zero,
-                          itemCount: noteLines.length,
-                          itemBuilder: (context, index) {
-                            return Text(
-                              noteLines[index],
-                              style: textTheme.bodySmall?.copyWith(
-                                color: NavalgoColors.storm,
-                                height: 1.3,
-                              ),
-                            );
-                          },
-                          separatorBuilder: (context, index) =>
-                              const SizedBox(height: 8),
-                        ),
-                      ),
-              ),
+              if (noteLines.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  height: compact ? 72 : 84,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 10 : 12,
+                      vertical: compact ? 8 : 10,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: ListView.separated(
+                      padding: EdgeInsets.zero,
+                      itemCount: noteLines.length,
+                      itemBuilder: (context, index) {
+                        return Text(
+                          noteLines[index],
+                          style: textTheme.bodySmall?.copyWith(
+                            color: NavalgoColors.storm,
+                            height: 1.3,
+                          ),
+                        );
+                      },
+                      separatorBuilder: (context, index) =>
+                          const SizedBox(height: 8),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 12),
               Row(
                 children: [
