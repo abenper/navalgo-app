@@ -3,10 +3,13 @@ package com.navalgo.backend.fleet;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.company.Company;
 import com.navalgo.backend.company.CompanyRepository;
+import com.navalgo.backend.budget.BudgetRepository;
 import com.navalgo.backend.workorder.EngineHourLog;
 import com.navalgo.backend.workorder.EngineHourSummaryDto;
 import com.navalgo.backend.workorder.WorkOrder;
 import com.navalgo.backend.workorder.WorkOrderRepository;
+import com.navalgo.backend.worker.Worker;
+import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -31,18 +34,24 @@ public class FleetController {
     private final OwnerRepository ownerRepository;
     private final VesselRepository vesselRepository;
     private final CompanyRepository companyRepository;
+    private final BudgetRepository budgetRepository;
     private final WorkOrderRepository workOrderRepository;
+    private final WorkerRepository workerRepository;
     private final InputSanitizer inputSanitizer;
 
     public FleetController(OwnerRepository ownerRepository,
                            VesselRepository vesselRepository,
                            CompanyRepository companyRepository,
+                           BudgetRepository budgetRepository,
                            WorkOrderRepository workOrderRepository,
+                           WorkerRepository workerRepository,
                            InputSanitizer inputSanitizer) {
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.companyRepository = companyRepository;
+        this.budgetRepository = budgetRepository;
         this.workOrderRepository = workOrderRepository;
+        this.workerRepository = workerRepository;
         this.inputSanitizer = inputSanitizer;
     }
 
@@ -90,13 +99,20 @@ public class FleetController {
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<Void> deleteOwner(@PathVariable Long id) {
-        if (!ownerRepository.existsById(id)) {
-            throw new EntityNotFoundException("Propietario no encontrado");
-        }
+        Owner owner = ownerRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
         if (!vesselRepository.findByOwnerId(id).isEmpty()) {
             throw new IllegalArgumentException("No se puede borrar un propietario con embarcaciones asociadas");
         }
-        ownerRepository.deleteById(id);
+        if (workOrderRepository.existsByOwnerId(id)) {
+            throw new IllegalArgumentException("No se puede borrar un propietario con partes asociados");
+        }
+        if (budgetRepository.existsByOwnerId(id)) {
+            throw new IllegalArgumentException("No se puede borrar un propietario con presupuestos asociados");
+        }
+
+        workerRepository.findByOwner_Id(id).ifPresent(workerRepository::delete);
+        ownerRepository.delete(owner);
         return ResponseEntity.noContent().build();
     }
 

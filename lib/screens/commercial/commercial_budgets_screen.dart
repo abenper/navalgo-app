@@ -230,96 +230,40 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               children: [
-                NavalgoPageIntro(
-                  eyebrow: 'COMERCIAL',
-                    title: 'Presupuestos',
-                    subtitle:
-                      'Crea propuestas ligadas a un cliente y una embarcaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n, sube el PDF y envÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­alo por correo desde aquÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­.',
-                  trailing: Container(
-                    width: 320,
-                    padding: const EdgeInsets.all(18),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.14),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 46,
-                          height: 46,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.14),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(
-                            Icons.request_quote_outlined,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Flujo actual',
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
-                              ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Ya puedes crear borradores, asignarlos a un cliente por bÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºsqueda y enviarlos por correo. Si el cliente aÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºn no tiene cuenta, le invitaremos a darse de alta.',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 18),
                 LayoutBuilder(
                   builder: (context, constraints) {
-                    final compact = constraints.maxWidth < 900;
-                    final cardWidth = compact
-                        ? constraints.maxWidth
-                        : (constraints.maxWidth - 24) / 3;
-                    return Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
+                    final crossAxisCount = constraints.maxWidth >= 900 ? 3 : 1;
+                    final childAspectRatio = crossAxisCount == 3 ? 1.75 : 2.6;
+                    return GridView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
+                        childAspectRatio: childAspectRatio,
+                      ),
                       children: [
-                        SizedBox(
-                          width: cardWidth,
-                          child: NavalgoMetricCard(
-                            label: 'Borradores',
-                            value: '$draftCount',
-                            icon: const Icon(Icons.edit_note_outlined),
-                            accent: NavalgoColors.tide,
-                            note: 'Listos para revisar antes de enviar.',
-                          ),
+                        NavalgoMetricCard(
+                          label: 'Borradores',
+                          value: '$draftCount',
+                          icon: const Icon(Icons.edit_note_outlined),
+                          accent: NavalgoColors.tide,
+                          note: 'Listos para revisar antes de enviar.',
                         ),
-                        SizedBox(
-                          width: cardWidth,
-                          child: NavalgoMetricCard(
-                            label: 'Enviados',
-                            value: '$sentCount',
-                            icon: const Icon(Icons.mark_email_read_outlined),
-                            accent: NavalgoColors.sand,
-                            note: 'Pendientes de respuesta del cliente.',
-                          ),
+                        NavalgoMetricCard(
+                          label: 'Enviados',
+                          value: '$sentCount',
+                          icon: const Icon(Icons.mark_email_read_outlined),
+                          accent: NavalgoColors.sand,
+                          note: 'Pendientes de respuesta del cliente.',
                         ),
-                        SizedBox(
-                          width: cardWidth,
-                          child: NavalgoMetricCard(
-                            label: 'Respondidos',
-                            value: '$answeredCount',
-                            icon: const Icon(Icons.rule_folder_outlined),
-                            accent: NavalgoColors.kelp,
-                            note: 'Aceptados o rechazados por el cliente.',
-                          ),
+                        NavalgoMetricCard(
+                          label: 'Respondidos',
+                          value: '$answeredCount',
+                          icon: const Icon(Icons.rule_folder_outlined),
+                          accent: NavalgoColors.kelp,
+                          note: 'Aceptados o rechazados por el cliente.',
                         ),
                       ],
                     );
@@ -522,16 +466,27 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     _ownerId = widget.owners.first.id;
     _contactEmailCtrl.text = widget.owners.first.email ?? '';
     _syncVesselSelection();
+    _searchCtrl.addListener(_handleSearchChanged);
   }
 
   @override
   void dispose() {
+    _searchCtrl.removeListener(_handleSearchChanged);
     _searchCtrl.dispose();
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
     _amountCtrl.dispose();
     _contactEmailCtrl.dispose();
     super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _syncOwnerSelectionForSearch();
+    });
   }
 
   List<Owner> get _filteredOwners {
@@ -568,6 +523,8 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   void _syncOwnerSelectionForSearch() {
     final filteredOwners = _filteredOwners;
     if (filteredOwners.isEmpty) {
+      _ownerId = null;
+      _vesselId = null;
       return;
     }
     if (!filteredOwners.any((owner) => owner.id == _ownerId)) {
@@ -644,9 +601,13 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
 
   @override
   Widget build(BuildContext context) {
-    _syncOwnerSelectionForSearch();
     final filteredOwners = _filteredOwners;
     final availableVessels = _availableVessels;
+    final selectedOwnerId = filteredOwners.any((owner) => owner.id == _ownerId)
+        ? _ownerId
+        : null;
+    final selectedVesselId =
+        availableVessels.any((vessel) => vessel.id == _vesselId) ? _vesselId : null;
 
     return AlertDialog(
       title: const Text('Nuevo presupuesto'),
@@ -666,15 +627,11 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                     hintText: 'Nombre, correo, telÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fono o documento',
                     prefixIcon: Icon(Icons.search_rounded),
                   ),
-                  onChanged: (_) {
-                    setState(() {
-                      _syncOwnerSelectionForSearch();
-                    });
-                  },
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  initialValue: filteredOwners.any((owner) => owner.id == _ownerId) ? _ownerId : null,
+                  key: ValueKey('owner-${selectedOwnerId ?? 'none'}-${filteredOwners.length}'),
+                  initialValue: selectedOwnerId,
                   decoration: const InputDecoration(labelText: 'Cliente'),
                   items: filteredOwners
                       .map(
@@ -691,10 +648,16 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                   onChanged: (value) {
                     setState(() {
                       _ownerId = value;
-                      final selectedOwner = widget.owners.firstWhere(
+                      if (value == null) {
+                        _contactEmailCtrl.clear();
+                        _vesselId = null;
+                        return;
+                      }
+                      final selectedOwner = widget.owners.where(
                         (owner) => owner.id == value,
                       );
-                      _contactEmailCtrl.text = selectedOwner.email ?? '';
+                      final owner = selectedOwner.isEmpty ? null : selectedOwner.first;
+                      _contactEmailCtrl.text = owner?.email ?? '';
                       _syncVesselSelection();
                     });
                   },
@@ -710,7 +673,8 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  initialValue: availableVessels.any((vessel) => vessel.id == _vesselId) ? _vesselId : null,
+                  key: ValueKey('vessel-${selectedVesselId ?? 'none'}-${availableVessels.length}'),
+                  initialValue: selectedVesselId,
                   decoration: const InputDecoration(labelText: 'Embarcaci\u00F3n'),
                   items: availableVessels
                       .map(
