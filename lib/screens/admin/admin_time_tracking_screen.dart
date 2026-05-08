@@ -727,6 +727,7 @@ class _WorkerJornadaAdjustmentScreenState
                 child: _TimeEntryAdminCard(
                   entry: entry,
                   onEdit: () => _editEntry(entry),
+                  role: widget.worker.role,
                 ),
               ),
             ),
@@ -1120,10 +1121,12 @@ class _TimeEntryAdminCard extends StatelessWidget {
   const _TimeEntryAdminCard({
     required this.entry,
     required this.onEdit,
+    required this.role,
   });
 
   final TimeEntry entry;
   final VoidCallback onEdit;
+  final String? role;
 
   @override
   Widget build(BuildContext context) {
@@ -1204,7 +1207,7 @@ class _TimeEntryAdminCard extends StatelessWidget {
             children: [
               _EntryMetaChip(
                 icon: Icons.category_outlined,
-                label: _workSiteLabel(entry.workSite, widget.worker.role),
+                label: _workSiteLabel(entry.workSite, role),
                 color: NavalgoColors.tide,
               ),
               if (duration != null)

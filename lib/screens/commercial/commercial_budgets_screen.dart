@@ -112,6 +112,8 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
         token,
         ownerId: draft.ownerId,
         vesselId: draft.vesselId,
+        ownerName: draft.newClientName,
+        vesselName: draft.newVesselName,
         fileName: draft.fileName,
         bytes: draft.fileBytes,
       );
@@ -120,6 +122,8 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
         ownerId: draft.ownerId,
         vesselId: draft.vesselId,
         contactEmail: draft.contactEmail,
+        newClientName: draft.newClientName,
+        newVesselName: draft.newVesselName,
         title: draft.title,
         description: draft.description,
         amount: draft.amount,
@@ -612,6 +616,10 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   final _titleCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
   final _contactEmailCtrl = TextEditingController();
+  final _newClientNameCtrl = TextEditingController();
+  final _newVesselNameCtrl = TextEditingController();
+  
+  bool _isNewClient = false;
   int? _ownerId;
   int? _vesselId;
   PlatformFile? _pickedFile;
@@ -633,11 +641,13 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
     _contactEmailCtrl.dispose();
+    _newClientNameCtrl.dispose();
+    _newVesselNameCtrl.dispose();
     super.dispose();
   }
 
   void _handleSearchChanged() {
-    if (!mounted) {
+    if (!mounted || _isNewClient) {
       return;
     }
     setState(() {
@@ -951,10 +961,10 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                       ),
                     ),
                   ),
-                  if (filteredOwners.isEmpty) ...[
+                  if (!_isNewClient && filteredOwners.isEmpty) ...[
                     const SizedBox(height: 12),
                     Text(
-                      'No hemos encontrado ese cliente. Primero crea el cliente y su embarcaci\u00f3n en Flota, o usa el correo del propietario de una ficha ya existente.',
+                      'No hemos encontrado ese cliente. Activa la opci\u00f3n de "Crear para cliente nuevo" o busca otro nombre.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: NavalgoColors.coral,
                       ),
@@ -982,9 +992,11 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
 
 class _BudgetDraft {
   const _BudgetDraft({
-    required this.ownerId,
-    required this.vesselId,
+    this.ownerId,
+    this.vesselId,
     required this.contactEmail,
+    this.newClientName,
+    this.newVesselName,
     required this.title,
     this.description,
     this.amount,
@@ -993,9 +1005,11 @@ class _BudgetDraft {
     required this.fileBytes,
   });
 
-  final int ownerId;
-  final int vesselId;
+  final int? ownerId;
+  final int? vesselId;
   final String contactEmail;
+  final String? newClientName;
+  final String? newVesselName;
   final String title;
   final String? description;
   final double? amount;

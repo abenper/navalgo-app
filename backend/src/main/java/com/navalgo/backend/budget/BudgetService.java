@@ -1,9 +1,11 @@
 package com.navalgo.backend.budget;
 
+import com.navalgo.backend.auth.RegistrationInvitationService;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.common.Role;
 import com.navalgo.backend.fleet.Owner;
 import com.navalgo.backend.fleet.OwnerRepository;
+import com.navalgo.backend.fleet.OwnerType;
 import com.navalgo.backend.fleet.Vessel;
 import com.navalgo.backend.fleet.VesselRepository;
 import com.navalgo.backend.notification.ResendEmailService;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
@@ -28,19 +31,22 @@ public class BudgetService {
     private final WorkerRepository workerRepository;
     private final InputSanitizer inputSanitizer;
     private final ResendEmailService resendEmailService;
+    private final RegistrationInvitationService registrationInvitationService;
 
     public BudgetService(BudgetRepository budgetRepository,
                          OwnerRepository ownerRepository,
                          VesselRepository vesselRepository,
                          WorkerRepository workerRepository,
                          InputSanitizer inputSanitizer,
-                         ResendEmailService resendEmailService) {
+                         ResendEmailService resendEmailService,
+                         RegistrationInvitationService registrationInvitationService) {
         this.budgetRepository = budgetRepository;
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.workerRepository = workerRepository;
         this.inputSanitizer = inputSanitizer;
         this.resendEmailService = resendEmailService;
+        this.registrationInvitationService = registrationInvitationService;
     }
 
     public List<BudgetDto> findAll() {
@@ -68,20 +74,80 @@ public class BudgetService {
     @Transactional
     public BudgetDto create(CreateBudgetRequest request, String currentUserEmail) {
         Worker current = requireCommercialOrAdmin(currentUserEmail);
-        Owner owner = ownerRepository.findById(request.ownerId())
-                .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
-        Vessel vessel = vesselRepository.findById(request.vesselId())
-                .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+        
+        Owner owner;
+        Vessel vessel;
 
-        if (!vessel.getOwner().getId().equals(owner.getId())) {
-            throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
+        if (request.ownerId() != null && request.vesselId() != null) {
+            owner = ownerRepository.findById(request.ownerId())
+                    .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
+            vessel = vesselRepository.findById(request.vesselId())
+                    .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+
+            if (!vessel.getOwner().getId().equals(owner.getId())) {
+                throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
+            }
+
+            String normalizedContactEmail = inputSanitizer.email(request.contactEmail());
+            if (normalizedContactEmail != null && !normalizedContactEmail.isBlank()) {
+                ensureOwnerEmailAvailable(normalizedContactEmail, owner.getId());
+                owner.setEmail(normalizedContactEmail);
+                owner = ownerRepository.save(owner);
+            }
+        } else {
+            String email = inputSanitizer.email(request.contactEmail());
+            if (email == null || email.isBlank()) {
+                throw new IllegalArgumentException("Debe proporcionar un correo o seleccionar un cliente existente");
+            }
+
+            owner = ownerRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+                String name = request.newClientName();
+                if (name == null || name.isBlank()) {
+                    name = email.split("@")[0];
+                }
+                Owner newOwner = new Owner();
+                newOwner.setType(OwnerType.INDIVIDUAL);
+                newOwner.setDisplayName(name);
+                newOwner.setDocumentId("PENDIENTE");
+                newOwner.setEmail(email);
+                return ownerRepository.save(newOwner);
+            });
+
+            String vName = request.newVesselName();
+            if (vName == null || vName.isBlank()) {
+                vName = "Embarcacion General";
+            }
+            final String finalVName = vName;
+            vessel = vesselRepository.findByOwnerId(owner.getId()).stream()
+                    .filter(v -> v.getName().equalsIgnoreCase(finalVName))
+                    .findFirst()
+                    .orElseGet(() -> {
+                        Vessel newVessel = new Vessel();
+                        newVessel.setOwner(owner);
+                        newVessel.setName(finalVName);
+                        newVessel.setActive(true);
+                        return vesselRepository.save(newVessel);
+                    });
         }
 
-        String normalizedContactEmail = inputSanitizer.email(request.contactEmail());
-        if (normalizedContactEmail != null && !normalizedContactEmail.isBlank()) {
-            ensureOwnerEmailAvailable(normalizedContactEmail, owner.getId());
-            owner.setEmail(normalizedContactEmail);
-            ownerRepository.save(owner);
+        // Send registration invitation if there is no client account for this owner
+        if (owner.getEmail() != null && !owner.getEmail().isBlank()) {
+            Optional<Worker> clientWorker = workerRepository.findByOwner_Id(owner.getId());
+            if (clientWorker.isEmpty()) {
+                Optional<Worker> emailWorker = workerRepository.findByEmailIgnoreCase(owner.getEmail());
+                if (emailWorker.isEmpty()) {
+                    Worker newClient = new Worker();
+                    newClient.setFullName(owner.getDisplayName());
+                    newClient.setEmail(owner.getEmail());
+                    newClient.setRole(Role.CLIENT);
+                    newClient.setActive(false);
+                    newClient.setCanEditWorkOrders(false);
+                    newClient.setEmailVerified(false);
+                    newClient.setOwner(owner);
+                    Worker savedClient = workerRepository.save(newClient);
+                    registrationInvitationService.issueInvitation(savedClient);
+                }
+            }
         }
 
         Budget budget = new Budget();

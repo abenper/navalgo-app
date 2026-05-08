@@ -31,9 +31,11 @@ class BudgetService {
 
   Future<Budget> createBudget(
     String token, {
-    required int ownerId,
-    required int vesselId,
+    int? ownerId,
+    int? vesselId,
     String? contactEmail,
+    String? newClientName,
+    String? newVesselName,
     required String title,
     String? description,
     double? amount,
@@ -47,6 +49,8 @@ class BudgetService {
         'ownerId': ownerId,
         'vesselId': vesselId,
         'contactEmail': contactEmail,
+        'newClientName': newClientName,
+        'newVesselName': newVesselName,
         'title': title,
         'description': description,
         'amount': amount,
@@ -94,8 +98,10 @@ class BudgetService {
 
   Future<UploadedBudgetDocument> uploadBudgetPdf(
     String token, {
-    required int ownerId,
-    required int vesselId,
+    int? ownerId,
+    int? vesselId,
+    String? ownerName,
+    String? vesselName,
     required String fileName,
     required List<int> bytes,
     String mimeType = 'application/pdf',
@@ -104,9 +110,12 @@ class BudgetService {
 
     final uri = Uri.parse('${ApiConfig.baseUrl}/budgets/uploads');
     final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token'
-      ..fields['ownerId'] = '$ownerId'
-      ..fields['vesselId'] = '$vesselId';
+      ..headers['Authorization'] = 'Bearer $token';
+      
+    if (ownerId != null) request.fields['ownerId'] = '$ownerId';
+    if (vesselId != null) request.fields['vesselId'] = '$vesselId';
+    if (ownerName != null) request.fields['ownerName'] = ownerName;
+    if (vesselName != null) request.fields['vesselName'] = vesselName;
 
     request.files.add(
       http.MultipartFile.fromBytes(

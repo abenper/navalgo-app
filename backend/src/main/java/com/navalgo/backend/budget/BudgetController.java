@@ -65,17 +65,27 @@ public class BudgetController {
     @PostMapping(value = "/uploads", consumes = "multipart/form-data")
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<UploadedBudgetDocumentDto> uploadPdf(@RequestParam("file") MultipartFile file,
-                                                               @RequestParam Long ownerId,
-                                                               @RequestParam Long vesselId) {
-        Owner owner = ownerRepository.findById(ownerId)
-                .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
-        Vessel vessel = vesselRepository.findById(vesselId)
-                .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
-        if (!vessel.getOwner().getId().equals(owner.getId())) {
-            throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
+                                                               @RequestParam(required = false) Long ownerId,
+                                                               @RequestParam(required = false) Long vesselId,
+                                                               @RequestParam(required = false) String ownerName,
+                                                               @RequestParam(required = false) String vesselName) {
+        String finalOwnerName = ownerName != null ? ownerName : "Cliente Pendiente";
+        String finalVesselName = vesselName != null ? vesselName : "Embarcacion General";
+
+        if (ownerId != null && vesselId != null) {
+            Owner owner = ownerRepository.findById(ownerId)
+                    .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
+            Vessel vessel = vesselRepository.findById(vesselId)
+                    .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+            if (!vessel.getOwner().getId().equals(owner.getId())) {
+                throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
+            }
+            finalOwnerName = owner.getDisplayName();
+            finalVesselName = vessel.getName();
         }
+
         return ResponseEntity.ok(
-                budgetMediaService.uploadBudgetPdf(file, owner.getDisplayName(), vessel.getName())
+                budgetMediaService.uploadBudgetPdf(file, finalOwnerName, finalVesselName)
         );
     }
 }
