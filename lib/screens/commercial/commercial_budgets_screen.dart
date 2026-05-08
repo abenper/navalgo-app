@@ -11,6 +11,14 @@ import '../../services/fleet_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import '../../widgets/pdf_preview.dart';
+import '../../models/owner.dart';
+import '../../models/vessel.dart';
+import '../../services/budget_service.dart';
+import '../../services/fleet_service.dart';
+import '../../theme/navalgo_theme.dart';
+import '../../viewmodels/session_view_model.dart';
+import '../../widgets/navalgo_ui.dart';
 
 class CommercialBudgetsScreen extends StatefulWidget {
   const CommercialBudgetsScreen({super.key});
@@ -191,12 +199,50 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     }
   }
 
-  Future<void> _openPdf(String pdfUrl) async {
-    final uri = Uri.tryParse(pdfUrl);
-    if (uri == null) {
+  Future<void> _showPdfPreview(String pdfUrl) async {
+    if (!mounted) {
       return;
     }
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Vista previa de PDF'),
+          content: SizedBox(
+            width: 900,
+            height: 640,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 4),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: PdfPreviewWidget(pdfUrl: pdfUrl),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await downloadPdfFile(pdfUrl);
+              },
+              child: const Text('Descargar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openPdf(String pdfUrl) async {
+    await _showPdfPreview(pdfUrl);
   }
 
   @override
@@ -459,18 +505,18 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   final _searchCtrl = TextEditingController();
   final _titleCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
-  final _amountCtrl = TextEditingController();
   final _contactEmailCtrl = TextEditingController();
   int? _ownerId;
   int? _vesselId;
   PlatformFile? _pickedFile;
+  List<int>? _pickedFileBytes;
 
   @override
   void initState() {
     super.initState();
-    _ownerId = widget.owners.first.id;
-    _contactEmailCtrl.text = widget.owners.first.email ?? '';
-    _syncVesselSelection();
+    _ownerId = null;
+    _vesselId = null;
+    _contactEmailCtrl.text = '';
     _searchCtrl.addListener(_handleSearchChanged);
   }
 
@@ -480,7 +526,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     _searchCtrl.dispose();
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
-    _amountCtrl.dispose();
     _contactEmailCtrl.dispose();
     super.dispose();
   }
@@ -490,6 +535,12 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       return;
     }
     setState(() {
+      final query = _searchCtrl.text.trim();
+      if (query.isEmpty) {
+        _ownerId = null;
+        _vesselId = null;
+        return;
+      }
       _syncOwnerSelectionForSearch();
     });
   }
@@ -516,7 +567,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
 
   void _syncVesselSelection() {
     final availableVessels = _availableVessels;
-    if (availableVessels.isEmpty) {
+    if (_ownerId == null || availableVessels.isEmpty) {
       _vesselId = null;
       return;
     }
@@ -532,7 +583,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       _vesselId = null;
       return;
     }
-    if (!filteredOwners.any((owner) => owner.id == _ownerId)) {
+    if (_ownerId == null || !filteredOwners.any((owner) => owner.id == _ownerId)) {
       _ownerId = filteredOwners.first.id;
       _contactEmailCtrl.text = filteredOwners.first.email ?? '';
       _syncVesselSelection();
@@ -543,13 +594,29 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['pdf'],
-      withData: true,
+      withReadStream: true,
     );
     if (!mounted || result == null || result.files.isEmpty) {
       return;
     }
+    final file = result.files.first;
+    if (file.readStream == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo leer el archivo PDF.')),
+      );
+      return;
+    }
+
+    // Leer los bytes del stream
+    final bytes = <int>[];
+    await for (final chunk in file.readStream!) {
+      bytes.addAll(chunk);
+    }
+
     setState(() {
-      _pickedFile = result.files.first;
+      _pickedFile = file;
+      // Guardar los bytes leídos en una propiedad adicional
+      _pickedFileBytes = bytes;
     });
   }
 
@@ -566,8 +633,8 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       );
       return;
     }
-    final fileBytes = _pickedFile?.bytes;
-    if (_pickedFile == null || fileBytes == null) {
+    final fileBytes = _pickedFileBytes;
+    if (_pickedFile == null || fileBytes == null || fileBytes.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Adjunta un PDF para el presupuesto.')),
       );
@@ -585,8 +652,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       return;
     }
 
-    final amount = double.tryParse(_amountCtrl.text.trim().replaceAll(',', '.'));
-
     Navigator.of(context).pop(
       _BudgetDraft(
         ownerId: _ownerId!,
@@ -596,7 +661,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
         description: _descriptionCtrl.text.trim().isEmpty
             ? null
             : _descriptionCtrl.text.trim(),
-        amount: amount,
+        amount: null,
         currency: 'EUR',
         fileName: _pickedFile!.name,
         fileBytes: fileBytes,
@@ -613,17 +678,20 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
         : null;
     final selectedVesselId =
         availableVessels.any((vessel) => vessel.id == _vesselId) ? _vesselId : null;
+    final screenSize = MediaQuery.of(context).size;
+    final maxDialogWidth = screenSize.width * 0.92;
+    final contentMaxHeight = screenSize.height - 140;
 
     return AlertDialog(
       title: const Text('Nuevo presupuesto'),
       content: SizedBox(
-        width: 560,
+        width: maxDialogWidth > 560 ? 560 : maxDialogWidth,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.68,
+                maxHeight: contentMaxHeight,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -642,7 +710,10 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                     key: ValueKey('owner-${selectedOwnerId ?? 'none'}-${filteredOwners.length}'),
                     initialValue: selectedOwnerId,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Cliente'),
+                    decoration: const InputDecoration(
+                      labelText: 'Cliente',
+                      hintText: 'Selecciona un cliente',
+                    ),
                     items: filteredOwners
                         .map(
                           (owner) => DropdownMenuItem<int>(
@@ -688,7 +759,10 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                     key: ValueKey('vessel-${selectedVesselId ?? 'none'}-${availableVessels.length}'),
                     initialValue: selectedVesselId,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Embarcaci\u00f3n'),
+                    decoration: const InputDecoration(
+                      labelText: 'Embarcaci\u00f3n',
+                      hintText: 'Selecciona una embarcaci\u00f3n',
+                    ),
                     items: availableVessels
                         .map(
                           (vessel) => DropdownMenuItem<int>(
@@ -707,6 +781,9 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                       });
                     },
                     validator: (_) {
+                      if (_ownerId == null) {
+                        return null;
+                      }
                       if (availableVessels.isEmpty) {
                         return 'Ese cliente no tiene embarcaciones.';
                       }
@@ -755,16 +832,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _amountCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Importe',
-                      suffixText: '€',
-                    ),
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                  ),
                   const SizedBox(height: 16),
                   OutlinedButton.icon(
                     onPressed: _pickPdf,
