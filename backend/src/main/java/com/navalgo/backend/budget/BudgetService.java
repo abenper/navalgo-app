@@ -1,6 +1,5 @@
 package com.navalgo.backend.budget;
 
-import com.navalgo.backend.auth.RegistrationInvitationService;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.common.Role;
 import com.navalgo.backend.fleet.Owner;
@@ -31,22 +30,19 @@ public class BudgetService {
     private final WorkerRepository workerRepository;
     private final InputSanitizer inputSanitizer;
     private final ResendEmailService resendEmailService;
-    private final RegistrationInvitationService registrationInvitationService;
 
     public BudgetService(BudgetRepository budgetRepository,
                          OwnerRepository ownerRepository,
                          VesselRepository vesselRepository,
                          WorkerRepository workerRepository,
                          InputSanitizer inputSanitizer,
-                         ResendEmailService resendEmailService,
-                         RegistrationInvitationService registrationInvitationService) {
+                         ResendEmailService resendEmailService) {
         this.budgetRepository = budgetRepository;
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.workerRepository = workerRepository;
         this.inputSanitizer = inputSanitizer;
         this.resendEmailService = resendEmailService;
-        this.registrationInvitationService = registrationInvitationService;
     }
 
     public List<BudgetDto> findAll() {
@@ -97,10 +93,10 @@ public class BudgetService {
         } else {
             String email = inputSanitizer.email(request.contactEmail());
             if (email == null || email.isBlank()) {
-                throw new IllegalArgumentException("Debe proporcionar un correo o seleccionar un cliente existente");
+                throw new IllegalArgumentException("Debe proporcionar un correo electronico valido");
             }
 
-            owner = ownerRepository.findByEmailIgnoreCase(email).orElseGet(() -> {
+            owner = resolveOwnerByEmail(email).orElseGet(() -> {
                 String name = request.newClientName();
                 if (name == null || name.isBlank()) {
                     name = email.split("@")[0];
@@ -132,26 +128,6 @@ public class BudgetService {
                         );
                         return vesselRepository.save(newVessel);
                     });
-        }
-
-        // Send registration invitation if there is no client account for this owner
-        if (owner.getEmail() != null && !owner.getEmail().isBlank()) {
-            Optional<Worker> clientWorker = workerRepository.findByOwner_Id(owner.getId());
-            if (clientWorker.isEmpty()) {
-                Optional<Worker> emailWorker = workerRepository.findByEmailIgnoreCase(owner.getEmail());
-                if (emailWorker.isEmpty()) {
-                    Worker newClient = new Worker();
-                    newClient.setFullName(owner.getDisplayName());
-                    newClient.setEmail(owner.getEmail());
-                    newClient.setRole(Role.CLIENT);
-                    newClient.setActive(false);
-                    newClient.setCanEditWorkOrders(false);
-                    newClient.setEmailVerified(false);
-                    newClient.setOwner(owner);
-                    Worker savedClient = workerRepository.save(newClient);
-                    registrationInvitationService.issueInvitation(savedClient);
-                }
-            }
         }
 
         Budget budget = new Budget();
@@ -298,6 +274,16 @@ public class BudgetService {
         if (exists) {
             throw new IllegalArgumentException("Ya existe un cliente con ese correo electronico");
         }
+    }
+
+    private Optional<Owner> resolveOwnerByEmail(String email) {
+        Optional<Owner> ownerByEmail = ownerRepository.findByEmailIgnoreCase(email);
+        if (ownerByEmail.isPresent()) {
+            return ownerByEmail;
+        }
+        return workerRepository.findByEmailIgnoreCase(email)
+                .map(Worker::getOwner)
+                .filter(owner -> owner != null && owner.getId() != null);
     }
 
     private BudgetDto toDto(Budget budget) {
