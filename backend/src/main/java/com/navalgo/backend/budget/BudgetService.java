@@ -142,6 +142,7 @@ public class BudgetService {
         return toDto(budgetRepository.save(budget));
     }
 
+    @Transactional
     public void delete(Long budgetId, String currentUserEmail) {
         requireCommercialOrAdmin(currentUserEmail);
         Budget budget = budgetRepository.findById(budgetId)
