@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import '../../models/vessel.dart';
 import '../../services/budget_service.dart';
 import '../../services/fleet_service.dart';
 import '../../theme/navalgo_theme.dart';
+import '../../utils/browser_file_download.dart' as browser_file;
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 import '../../widgets/pdf_preview.dart';
@@ -250,7 +252,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     }
   }
 
-  Future<void> _showPdfPreview(String pdfUrl) async {
+  Future<void> _showPdfPreview(String objectUrl, Uint8List bytes, String title) async {
     if (!mounted) {
       return;
     }
@@ -270,7 +272,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                 Expanded(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: PdfPreviewWidget(pdfUrl: pdfUrl),
+                    child: PdfPreviewWidget(pdfUrl: objectUrl),
                   ),
                 ),
               ],
@@ -283,7 +285,11 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
             ),
             FilledButton(
               onPressed: () async {
-                await downloadPdfFile(pdfUrl);
+                await browser_file.downloadFileBytes(
+                  bytes,
+                  fileName: '$title.pdf',
+                  mimeType: 'application/pdf',
+                );
               },
               child: const Text('Descargar'),
             ),
@@ -293,8 +299,44 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     );
   }
 
-  Future<void> _openPdf(String pdfUrl) async {
-    await _showPdfPreview(pdfUrl);
+  Future<void> _openPdf(Budget budget) async {
+    final session = context.read<SessionViewModel>();
+    final token = session.token;
+    if (token == null) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final bytes = await context.read<BudgetService>().downloadBudgetPdf(token, budget.pdfUrl);
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Close loading
+
+      final objectUrl = browser_file.createObjectUrlFromBytes(bytes, mimeType: 'application/pdf');
+      if (objectUrl == null) {
+         throw Exception('No se pudo generar la vista previa del PDF');
+      }
+
+      try {
+        await _showPdfPreview(objectUrl, bytes, budget.title);
+      } finally {
+        browser_file.revokeObjectUrl(objectUrl);
+      }
+    } catch (error) {
+      if (!mounted) return;
+      Navigator.of(context).pop(); // Close loading if error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cargar el PDF: $error')),
+      );
+    }
   }
 
   @override
@@ -396,7 +438,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _BudgetCard(
                         budget: budget,
-                        onOpenPdf: () => _openPdf(budget.pdfUrl),
+                        onOpenPdf: () => _openPdf(budget),
                         onSend: budget.status == 'DRAFT'
                             ? () => _sendBudget(budget)
                             : null,

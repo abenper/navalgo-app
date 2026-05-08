@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 
 import '../config/api_config.dart';
 import '../models/budget.dart';
+import '../utils/media_url.dart' as media;
 import 'network/api_client.dart';
 
 class BudgetService {
@@ -53,6 +55,14 @@ class BudgetService {
       },
     );
     return Budget.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Uint8List> downloadBudgetPdf(String token, String pdfUrl) async {
+    final resolvedUrl = media.resolveMediaUrl(pdfUrl);
+    return _apiClient.getBytesFromAbsoluteUrl(
+      resolvedUrl,
+      headers: {'Authorization': 'Bearer $token'},
+    );
   }
 
   Future<void> deleteBudget(

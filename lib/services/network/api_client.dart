@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -52,6 +53,64 @@ class ApiClient {
     }
 
     return _decodeResponse(response);
+  }
+
+  Future<Uint8List> getBytes(
+    String path, {
+    Map<String, String>? headers,
+    Map<String, dynamic>? queryParameters,
+  }) async {
+    await _ensureSessionIsValid(headers);
+
+    final uri = Uri.parse('$baseUrl$path').replace(
+      queryParameters: queryParameters?.map(
+        (key, value) => MapEntry(key, value.toString()),
+      ),
+    );
+
+    return _getBytesFromUri(uri, headers);
+  }
+
+  Future<Uint8List> getBytesFromAbsoluteUrl(
+    String absoluteUrl, {
+    Map<String, String>? headers,
+  }) async {
+    await _ensureSessionIsValid(headers);
+
+    final uri = Uri.parse(absoluteUrl);
+    return _getBytesFromUri(uri, headers);
+  }
+
+  Future<Uint8List> _getBytesFromUri(
+    Uri uri,
+    Map<String, String>? headers,
+  ) async {
+    late final http.Response response;
+    try {
+      response = await _httpClient
+          .get(uri, headers: _buildHeaders(headers))
+          .timeout(const Duration(seconds: 30));
+    } on Exception catch (e) {
+      throw ApiException('No se pudo conectar con el servidor', details: '$e');
+    }
+
+    final token = extractBearerToken(response.request?.headers);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == 401 && token != null) {
+        unawaited(_notifySessionExpired());
+        throw ApiException.sessionExpired();
+      }
+      if (response.statusCode == 403 && token != null && isJwtExpired(token)) {
+        unawaited(_notifySessionExpired());
+        throw ApiException.sessionExpired();
+      }
+      throw ApiException(
+        'Error en la respuesta del servidor',
+        statusCode: response.statusCode,
+        details: response.body,
+      );
+    }
+    return response.bodyBytes;
   }
 
   Future<dynamic> post(
