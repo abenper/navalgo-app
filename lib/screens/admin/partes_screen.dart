@@ -849,6 +849,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   bool get _canEditPart => _isAdmin || (_isWorker && _hasEditPermission);
   bool get _canUpdateWorkLog => _isAdmin || _isWorker;
   bool get _canReviewMaterial => _isAdmin || _isWorker;
+  bool get _isClosedWorkOrder =>
+      _workOrder.status == 'DONE' || _workOrder.status == 'CANCELLED';
   bool get _isSigned =>
       _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
   bool get _hasClientSignature =>
@@ -856,8 +858,12 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       _workOrder.clientSignatureUrl!.isNotEmpty;
   bool get _canSign => (_isWorker || _isAdmin) && !_isSigned;
   bool get _canManageClientSignature => _isWorker || _isAdmin;
+  bool get _canCaptureMedia => !_isClosedWorkOrder && !_isSigned;
 
   bool get _canDeleteMedia {
+    if (_isClosedWorkOrder || _isSigned) {
+      return false;
+    }
     if (_isAdmin || _canEditPart) {
       return true;
     }
@@ -1525,53 +1531,49 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Avances del trabajo',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Los adjuntos de avance se capturan desde la app y se guardan con ubicación y marca de agua.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
+              Text(
+                'Avances del trabajo',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              if (_canDeleteMedia && _canCaptureWorkProgressMedia(context)) ...[
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: _busy || _signing
-                      ? null
-                      : _captureWorkProgressPhoto,
-                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                  label: const Text('Foto'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: _busy || _signing
-                      ? null
-                      : _captureWorkProgressVideo,
-                  icon: const Icon(Icons.videocam_outlined, size: 18),
-                  label: const Text('Vídeo'),
-                ),
-              ],
-              if (_isAdmin && _attachments.isNotEmpty && _hasClientSignature) ...[
-                const SizedBox(width: 12),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _downloadEvidenceReport,
-                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                  label: const Text('Informe probatorio'),
-                ),
-              ],
+              const SizedBox(height: 4),
+              Text(
+                'Los adjuntos de avance se capturan desde la app y se guardan con ubicaci?n y marca de agua.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (_canCaptureMedia && _canCaptureWorkProgressMedia(context))
+                    OutlinedButton.icon(
+                      onPressed: _busy || _signing
+                          ? null
+                          : _captureWorkProgressPhoto,
+                      icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                      label: const Text('Foto'),
+                    ),
+                  if (_canCaptureMedia && _canCaptureWorkProgressMedia(context))
+                    OutlinedButton.icon(
+                      onPressed: _busy || _signing
+                          ? null
+                          : _captureWorkProgressVideo,
+                      icon: const Icon(Icons.videocam_outlined, size: 18),
+                      label: const Text('V?deo'),
+                    ),
+                  if (_isAdmin && _attachments.isNotEmpty && _hasClientSignature)
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : _downloadEvidenceReport,
+                      icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                      label: const Text('Informe probatorio'),
+                    ),
+                ],
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -1579,7 +1581,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                'Los adjuntos de avance solo pueden capturarse desde la app móvil para evitar archivos externos.',
+                'Los adjuntos de avance solo pueden capturarse desde la app m?vil para evitar archivos externos.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.storm),
@@ -1587,7 +1589,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             ),
           if (_attachments.isEmpty)
             Text(
-              'Todavía no hay avances adjuntos en este parte.',
+              'Todav?a no hay avances adjuntos en este parte.',
               style: Theme.of(context).textTheme.bodyMedium,
             )
           else
@@ -1614,7 +1616,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                           ),
                         ),
                         title: Text(item.originalFileName ?? 'Avance adjunto'),
-                        subtitle: Text(_formatAttachmentDetails(item)),
                         trailing: Wrap(
                           spacing: 4,
                           children: [
@@ -1798,25 +1799,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     if (!opened && mounted) {
       AppToast.error(context, 'No se pudo abrir el archivo.');
     }
-  }
-
-  String _formatAttachmentDetails(WorkOrderAttachmentItem item) {
-    final parts = <String>[];
-    if (item.capturedAt != null) {
-      parts.add('Captura: ${item.capturedAt!.toLocal()}');
-    }
-    if (item.latitude != null && item.longitude != null) {
-      parts.add(
-        'GPS: ${item.latitude!.toStringAsFixed(5)}, ${item.longitude!.toStringAsFixed(5)}',
-      );
-    }
-    if (item.watermarked) {
-      parts.add('Con marca de agua');
-    }
-    if (parts.isEmpty) {
-      return item.fileUrl;
-    }
-    return parts.join(' • ');
   }
 
   Future<void> _saveWorkLogChanges() async {
