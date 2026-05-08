@@ -390,9 +390,57 @@ class _FlotaScreenState extends State<FlotaScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  Text(
-                    'Propietarios',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 920;
+                      final actions = Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        alignment: compact
+                            ? WrapAlignment.start
+                            : WrapAlignment.end,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: _createOwner,
+                            icon: const Icon(Icons.person_add),
+                            label: const Text('Nuevo propietario'),
+                          ),
+                          NavalgoGradientButton(
+                            label: 'Nueva embarcación',
+                            icon: Icons.directions_boat,
+                            onPressed: () => _createVessel(vm.owners),
+                          ),
+                        ],
+                      );
+
+                      if (compact) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Propietarios',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                            const SizedBox(height: 16),
+                            actions,
+                          ],
+                        );
+                      }
+
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Propietarios',
+                              style: Theme.of(context).textTheme.headlineSmall,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          actions,
+                        ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   NavalgoSearchField(
@@ -775,34 +823,6 @@ class _FlotaScreenState extends State<FlotaScreen> {
                 ],
               ),
             ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: NavalgoPanel(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _createOwner,
-                    icon: const Icon(Icons.person_add),
-                    label: const Text('Nuevo Propietario'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: () => _createVessel(vm.owners),
-                    icon: const Icon(Icons.directions_boat),
-                    label: const Text('Nueva embarcación'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

@@ -434,6 +434,23 @@ class _EquipoScreenState extends State<EquipoScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Equipo',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      NavalgoGradientButton(
+                        label: 'Crear usuario',
+                        icon: Icons.person_add,
+                        onPressed: _openCreateWorkerDialog,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
                   NavalgoSearchField(
                     controller: _searchCtrl,
                     label: 'Buscar trabajador',
@@ -492,20 +509,6 @@ class _EquipoScreenState extends State<EquipoScreen> {
                 ],
               ),
             ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: NavalgoPanel(
-            padding: const EdgeInsets.all(12),
-            child: FilledButton.icon(
-              onPressed: _openCreateWorkerDialog,
-              icon: const Icon(Icons.person_add),
-              label: const Text('Crear usuario'),
-            ),
-          ),
-        ),
-      ),
     );
   }
 

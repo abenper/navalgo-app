@@ -299,7 +299,7 @@ class _PartesScreenState extends State<PartesScreen> {
                     );
                   },
                   child: ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 120),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     itemCount: filteredWorkOrders.isEmpty
                         ? 1
                         : filteredWorkOrders.length + 1,
@@ -308,9 +308,24 @@ class _PartesScreenState extends State<PartesScreen> {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Partes de trabajo',
-                              style: Theme.of(context).textTheme.headlineSmall,
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    'Partes de trabajo',
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.headlineSmall,
+                                  ),
+                                ),
+                                if (isAdmin)
+                                  NavalgoGradientButton(
+                                    label: 'Nuevo parte',
+                                    onPressed: _openCreateDialog,
+                                    icon: Icons.note_add_outlined,
+                                  ),
+                              ],
                             ),
                             const SizedBox(height: 14),
                             NavalgoSearchField(
@@ -584,26 +599,6 @@ class _PartesScreenState extends State<PartesScreen> {
                 ),
               ),
       ),
-      bottomNavigationBar: isAdmin
-          ? SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: NavalgoGradientButton(
-                        label: 'Nuevo parte',
-                        onPressed: _openCreateDialog,
-                        icon: Icons.note_add_outlined,
-                        expand: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          : null,
     );
   }
 

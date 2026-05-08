@@ -177,7 +177,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                 ? 'El cliente no tiene correo para recibir el presupuesto.'
                 : budget.clientHasAccount
                 ? 'Presupuesto enviado al cliente por correo.'
-                : 'Presupuesto enviado. El cliente recibirÃ¡ tambiÃ©n la invitaciÃ³n para darse de alta.',
+                : 'Presupuesto enviado. El cliente recibirá también la invitación para darse de alta.',
           ),
         ),
       );
@@ -212,24 +212,30 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _isCreating ? null : _createBudget,
-        icon: _isCreating
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.add_circle_outline),
-        label: Text(_isCreating ? 'Creando...' : 'Nuevo presupuesto'),
-      ),
       body: NavalgoPageBackground(
         child: SafeArea(
           child: RefreshIndicator(
             onRefresh: _loadData,
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Presupuestos',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    NavalgoGradientButton(
+                      label: _isCreating ? 'Creando...' : 'Nuevo presupuesto',
+                      icon: _isCreating ? null : Icons.add_circle_outline,
+                      onPressed: _isCreating ? null : _createBudget,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final crossAxisCount = constraints.maxWidth >= 900 ? 3 : 1;
@@ -283,7 +289,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                 else if (_budgets.isEmpty)
                   const NavalgoPanel(
                     child: Text(
-                      'A\u00FAn no hay presupuestos creados. Usa el bot\u00F3n de abajo para preparar el primero.',
+                      'A\u00FAn no hay presupuestos creados. Usa el bot\u00F3n de arriba para preparar el primero.',
                     ),
                   )
                 else
@@ -371,7 +377,7 @@ class _BudgetCard extends StatelessWidget {
           if (!budget.clientHasAccount) ...[
             const SizedBox(height: 8),
             Text(
-              'Este cliente aÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºn no tiene cuenta. Al enviarlo, recibirÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ un correo para darse de alta con este mismo email.',
+              'Este cliente aún no tiene cuenta. Al enviarlo, recibirá un correo para darse de alta con este mismo email.',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: NavalgoColors.coral,
                 fontWeight: FontWeight.w600,
@@ -457,7 +463,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   final _contactEmailCtrl = TextEditingController();
   int? _ownerId;
   int? _vesselId;
-  String _currency = 'EUR';
   PlatformFile? _pickedFile;
 
   @override
@@ -592,7 +597,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
             ? null
             : _descriptionCtrl.text.trim(),
         amount: amount,
-        currency: _currency,
+        currency: 'EUR',
         fileName: _pickedFile!.name,
         fileBytes: fileBytes,
       ),
@@ -612,182 +617,178 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     return AlertDialog(
       title: const Text('Nuevo presupuesto'),
       content: SizedBox(
-        width: 520,
+        width: 560,
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextFormField(
-                  controller: _searchCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Buscar cliente',
-                    hintText: 'Nombre, correo, telÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â©fono o documento',
-                    prefixIcon: Icon(Icons.search_rounded),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.68,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextFormField(
+                    controller: _searchCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Buscar cliente',
+                      hintText: 'Nombre, correo, tel\u00e9fono o documento',
+                      prefixIcon: Icon(Icons.search_rounded),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  key: ValueKey('owner-${selectedOwnerId ?? 'none'}-${filteredOwners.length}'),
-                  initialValue: selectedOwnerId,
-                  decoration: const InputDecoration(labelText: 'Cliente'),
-                  items: filteredOwners
-                      .map(
-                        (owner) => DropdownMenuItem<int>(
-                          value: owner.id,
-                          child: Text(
-                            owner.email == null || owner.email!.isEmpty
-                                ? owner.displayName
-                                : '${owner.displayName} ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· ${owner.email}',
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('owner-${selectedOwnerId ?? 'none'}-${filteredOwners.length}'),
+                    initialValue: selectedOwnerId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Cliente'),
+                    items: filteredOwners
+                        .map(
+                          (owner) => DropdownMenuItem<int>(
+                            value: owner.id,
+                            child: Text(
+                              owner.email == null || owner.email!.isEmpty
+                                  ? owner.displayName
+                                  : '${owner.displayName} - ${owner.email}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _ownerId = value;
-                      if (value == null) {
-                        _contactEmailCtrl.clear();
-                        _vesselId = null;
-                        return;
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _ownerId = value;
+                        if (value == null) {
+                          _contactEmailCtrl.clear();
+                          _vesselId = null;
+                          return;
+                        }
+                        final selectedOwner = widget.owners.where(
+                          (owner) => owner.id == value,
+                        );
+                        final owner = selectedOwner.isEmpty ? null : selectedOwner.first;
+                        _contactEmailCtrl.text = owner?.email ?? '';
+                        _syncVesselSelection();
+                      });
+                    },
+                    validator: (_) {
+                      if (filteredOwners.isEmpty) {
+                        return 'No hay clientes que coincidan con la b\u00fasqueda.';
                       }
-                      final selectedOwner = widget.owners.where(
-                        (owner) => owner.id == value,
-                      );
-                      final owner = selectedOwner.isEmpty ? null : selectedOwner.first;
-                      _contactEmailCtrl.text = owner?.email ?? '';
-                      _syncVesselSelection();
-                    });
-                  },
-                  validator: (_) {
-                    if (filteredOwners.isEmpty) {
-                      return 'No hay clientes que coincidan con la bÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âºsqueda.';
-                    }
-                    if (_ownerId == null) {
-                      return 'Selecciona un cliente';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  key: ValueKey('vessel-${selectedVesselId ?? 'none'}-${availableVessels.length}'),
-                  initialValue: selectedVesselId,
-                  decoration: const InputDecoration(labelText: 'Embarcaci\u00F3n'),
-                  items: availableVessels
-                      .map(
-                        (vessel) => DropdownMenuItem<int>(
-                          value: vessel.id,
-                          child: Text(vessel.name),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _vesselId = value;
-                    });
-                  },
-                  validator: (_) {
-                    if (availableVessels.isEmpty) {
-                      return 'Ese cliente no tiene embarcaciones.';
-                    }
-                    if (_vesselId == null) {
-                      return 'Selecciona una embarcaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _contactEmailCtrl,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Correo del cliente',
-                    hintText: 'Se usarÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ para enviar el presupuesto',
+                      if (_ownerId == null) {
+                        return 'Selecciona un cliente';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (value) {
-                    final trimmed = value?.trim() ?? '';
-                    if (trimmed.isEmpty) {
-                      return 'Indica un correo electrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³nico';
-                    }
-                    if (!trimmed.contains('@')) {
-                      return 'Introduce un correo electrÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³nico vÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡lido';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _titleCtrl,
-                  decoration: const InputDecoration(labelText: 'TÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­tulo'),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'Introduce un tÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­tulo';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _descriptionCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(
-                    labelText: 'DescripciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n',
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey('vessel-${selectedVesselId ?? 'none'}-${availableVessels.length}'),
+                    initialValue: selectedVesselId,
+                    isExpanded: true,
+                    decoration: const InputDecoration(labelText: 'Embarcaci\u00f3n'),
+                    items: availableVessels
+                        .map(
+                          (vessel) => DropdownMenuItem<int>(
+                            value: vessel.id,
+                            child: Text(
+                              vessel.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _vesselId = value;
+                      });
+                    },
+                    validator: (_) {
+                      if (availableVessels.isEmpty) {
+                        return 'Ese cliente no tiene embarcaciones.';
+                      }
+                      if (_vesselId == null) {
+                        return 'Selecciona una embarcaci\u00f3n';
+                      }
+                      return null;
+                    },
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _amountCtrl,
-                        decoration: const InputDecoration(labelText: 'Importe'),
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
-                        ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _contactEmailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Correo del cliente',
+                      hintText: 'Se usar\u00e1 para enviar el presupuesto',
+                    ),
+                    validator: (value) {
+                      final trimmed = value?.trim() ?? '';
+                      if (trimmed.isEmpty) {
+                        return 'Indica un correo electr\u00f3nico';
+                      }
+                      if (!trimmed.contains('@')) {
+                        return 'Introduce un correo electr\u00f3nico v\u00e1lido';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _titleCtrl,
+                    decoration: const InputDecoration(labelText: 'T\u00edtulo'),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Introduce un t\u00edtulo';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _descriptionCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Descripci\u00f3n',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _amountCtrl,
+                    decoration: const InputDecoration(
+                      labelText: 'Importe',
+                      suffixText: '€',
+                    ),
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: _pickPdf,
+                    icon: const Icon(Icons.upload_file_outlined),
+                    label: SizedBox(
+                      width: 240,
+                      child: Text(
+                        _pickedFile == null ? 'Adjuntar PDF' : _pickedFile!.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: 110,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: _currency,
-                        decoration: const InputDecoration(labelText: 'Moneda'),
-                        items: const [
-                          DropdownMenuItem(value: 'EUR', child: Text('EUR')),
-                          DropdownMenuItem(value: 'USD', child: Text('USD')),
-                        ],
-                        onChanged: (value) {
-                          setState(() {
-                            _currency = value ?? 'EUR';
-                          });
-                        },
+                  ),
+                  if (filteredOwners.isEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'No hemos encontrado ese cliente. Primero crea el cliente y su embarcaci\u00f3n en Flota, o usa el correo del propietario de una ficha ya existente.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: NavalgoColors.coral,
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: _pickPdf,
-                  icon: const Icon(Icons.upload_file_outlined),
-                  label: Text(
-                    _pickedFile == null
-                        ? 'Adjuntar PDF'
-                        : _pickedFile!.name,
-                  ),
-                ),
-                if (filteredOwners.isEmpty) ...[
-                  const SizedBox(height: 12),
-                  Text(
-                    'No hemos encontrado ese cliente. Primero crea el cliente y su embarcaciÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â³n en Flota, o usa el correo del propietario de una ficha ya existente.',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: NavalgoColors.coral,
-                    ),
-                  ),
                 ],
-              ],
+              ),
             ),
           ),
         ),

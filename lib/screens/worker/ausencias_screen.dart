@@ -47,42 +47,54 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: ListView.builder(
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        itemCount: _requests.length,
-        itemBuilder: (context, index) {
-          final req = _requests[index];
-          final color = req['color'] as Color;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: NavalgoPanel(
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: CircleAvatar(
-                  backgroundColor: color.withValues(alpha: 0.12),
-                  child: Icon(Icons.event_note_outlined, color: color),
-                ),
-                title: Text(
-                  'Fechas: ${req['fecha']}',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text('Motivo: ${req['motivo']}'),
-                ),
-                trailing: NavalgoStatusChip(
-                  label: req['estado'] as String,
-                  color: color,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  'Ausencias',
+                  style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ),
-            ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _mostrarFormulario,
-        icon: const Icon(Icons.add),
-        label: const Text('Solicitar ausencia'),
+              NavalgoGradientButton(
+                label: 'Solicitar ausencia',
+                icon: Icons.add,
+                onPressed: _mostrarFormulario,
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ..._requests.map((req) {
+            final color = req['color'] as Color;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: NavalgoPanel(
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: CircleAvatar(
+                    backgroundColor: color.withValues(alpha: 0.12),
+                    child: Icon(Icons.event_note_outlined, color: color),
+                  ),
+                  title: Text(
+                    'Fechas: ${req['fecha']}',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text('Motivo: ${req['motivo']}'),
+                  ),
+                  trailing: NavalgoStatusChip(
+                    label: req['estado'] as String,
+                    color: color,
+                  ),
+                ),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }

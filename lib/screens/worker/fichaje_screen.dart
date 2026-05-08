@@ -182,10 +182,22 @@ class _FichajeScreenState extends State<FichajeScreen> {
     }
     if (_error != null) {
       return Scaffold(
-        body: Center(child: Text(_error!)),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _loadEntries,
-          child: const Icon(Icons.refresh),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _loadEntries,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Actualizar'),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }

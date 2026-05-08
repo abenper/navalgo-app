@@ -375,37 +375,54 @@ class _WorkerJornadaAdjustmentScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const NavalgoSectionHeader(title: 'Calidad operativa'),
+const NavalgoSectionHeader(title: 'Calidad operativa'),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            NavalgoMetricCard(
-              label: 'Horas hoy',
-              value: _formatMinutes(insight.workedMinutesToday),
-              icon: const Icon(Icons.today_outlined),
-              accent: NavalgoColors.tide,
-            ),
-            NavalgoMetricCard(
-              label: 'Horas este mes',
-              value: _formatMinutes(insight.workedMinutesThisMonth),
-              icon: const Icon(Icons.calendar_view_month_rounded),
-              accent: NavalgoColors.harbor,
-            ),
-            NavalgoMetricCard(
-              label: 'Horas este año',
-              value: _formatMinutes(insight.workedMinutesThisYear),
-              icon: const Icon(Icons.calendar_month_rounded),
-              accent: NavalgoColors.kelp,
-            ),
-            NavalgoMetricCard(
-              label: 'Ausencias no vacacionales',
-              value: '${insight.approvedNonVacationAbsenceDaysThisYear}',
-              icon: const Icon(Icons.event_busy_outlined),
-              accent: NavalgoColors.coral,
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final crossAxisCount = constraints.maxWidth >= 1180
+                ? 4
+                : constraints.maxWidth >= 760
+                ? 2
+                : 1;
+            final childAspectRatio = crossAxisCount == 1 ? 2.9 : 1.8;
+
+            return GridView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: childAspectRatio,
+              ),
+              children: [
+                NavalgoMetricCard(
+                  label: 'Horas hoy',
+                  value: _formatMinutes(insight.workedMinutesToday),
+                  icon: const Icon(Icons.today_outlined),
+                  accent: NavalgoColors.tide,
+                ),
+                NavalgoMetricCard(
+                  label: 'Horas este mes',
+                  value: _formatMinutes(insight.workedMinutesThisMonth),
+                  icon: const Icon(Icons.calendar_view_month_rounded),
+                  accent: NavalgoColors.harbor,
+                ),
+                NavalgoMetricCard(
+                  label: 'Horas este año',
+                  value: _formatMinutes(insight.workedMinutesThisYear),
+                  icon: const Icon(Icons.calendar_month_rounded),
+                  accent: NavalgoColors.kelp,
+                ),
+                NavalgoMetricCard(
+                  label: 'Ausencias no vacacionales',
+                  value: '${insight.approvedNonVacationAbsenceDaysThisYear}',
+                  icon: const Icon(Icons.event_busy_outlined),
+                  accent: NavalgoColors.coral,
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 14),
         ...insight.qualityFactors.map(

@@ -1099,8 +1099,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     );
   }
 
-  Widget _buildBottomBarActions() {
-    final compact = MediaQuery.sizeOf(context).width < 520;
+  Widget _buildHeaderActions({required bool compact}) {
     if (_isAdmin) {
       if (compact) {
         return Column(
@@ -1112,40 +1111,38 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
               label: const Text('Actualizar'),
             ),
             const SizedBox(height: 10),
-            FilledButton.icon(
+            NavalgoGradientButton(
               onPressed: _adminAssignRequest,
-              icon: const Icon(Icons.event_available),
-              label: const Text('Asignar ausencia'),
+              icon: Icons.event_available,
+              label: 'Asignar ausencia',
+              expand: true,
             ),
           ],
         );
       }
 
-      return Row(
+      return Wrap(
+        spacing: 10,
+        runSpacing: 10,
         children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _loadData,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Actualizar'),
-            ),
+          OutlinedButton.icon(
+            onPressed: _loadData,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Actualizar'),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: _adminAssignRequest,
-              icon: const Icon(Icons.event_available),
-              label: const Text('Asignar ausencia'),
-            ),
+          NavalgoGradientButton(
+            onPressed: _adminAssignRequest,
+            icon: Icons.event_available,
+            label: 'Asignar ausencia',
           ),
         ],
       );
     }
 
-    return FilledButton.icon(
+    return NavalgoGradientButton(
       onPressed: _createRequest,
-      icon: const Icon(Icons.add),
-      label: const Text('Solicitar ausencia'),
+      icon: Icons.add,
+      label: 'Solicitar ausencia',
     );
   }
 
@@ -1160,10 +1157,22 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
 
     if (_error != null) {
       return Scaffold(
-        body: Center(child: Text(_error!)),
-        floatingActionButton: FloatingActionButton(
-          onPressed: _loadData,
-          child: const Icon(Icons.refresh),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_error!, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: _loadData,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Actualizar'),
+                ),
+              ],
+            ),
+          ),
         ),
       );
     }
@@ -1174,6 +1183,38 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final compactHeader = constraints.maxWidth < 920;
+                final actions = _buildHeaderActions(compact: compactHeader);
+                if (!_isAdmin && !compactHeader) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Vacaciones',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                      ),
+                      actions,
+                    ],
+                  );
+                }
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Vacaciones',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 16),
+                    actions,
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 18),
             if (_isAdmin && !useAdminCardsLayout) ...[
               _buildAdminCalendar(),
               const SizedBox(height: 18),
@@ -1215,16 +1256,6 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
               ),
             ..._requests.map(_buildRequestCard),
           ],
-        ),
-      ),
-      bottomNavigationBar: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: NavalgoPanel(
-            padding: const EdgeInsets.all(12),
-            child: _buildBottomBarActions(),
-          ),
         ),
       ),
     );
