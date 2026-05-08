@@ -8,6 +8,7 @@ public record BudgetDto(
         Long ownerId,
         String ownerName,
         String ownerEmail,
+        boolean clientHasAccount,
         Long vesselId,
         String vesselName,
         Long createdByWorkerId,

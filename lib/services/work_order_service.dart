@@ -1,5 +1,9 @@
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
 import '../config/api_config.dart';
 import '../models/work_order.dart';
+import '../utils/browser_file_download.dart';
 import 'network/api_client.dart';
 
 class WorkOrderService {
@@ -168,5 +172,71 @@ class WorkOrderService {
       '/work-orders/$workOrderId',
       headers: {'Authorization': 'Bearer $token'},
     );
+  }
+
+  Future<void> downloadEvidenceReport(
+    String token, {
+    required int workOrderId,
+  }) async {
+    await _ensureSessionIsValid(token);
+
+    final uri = Uri.parse(
+      '${ApiConfig.baseUrl}/work-orders/$workOrderId/evidence-report',
+    );
+    final response = await http.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final sessionError = await ApiClient.maybeHandleSessionExpired(
+        token: token,
+        statusCode: response.statusCode,
+      );
+      if (sessionError != null) {
+        throw sessionError;
+      }
+      throw Exception(
+        'Error descargando informe probatorio (${response.statusCode})',
+      );
+    }
+
+    if (!kIsWeb) {
+      throw UnsupportedError(
+        'La descarga directa del informe probatorio solo está disponible en web.',
+      );
+    }
+
+    final fileName = _extractFileName(response.headers['content-disposition']) ??
+        'informe_probatorio_parte_$workOrderId.pdf';
+    await downloadFileBytes(
+      Uint8List.fromList(response.bodyBytes),
+      fileName: fileName,
+      mimeType: 'application/pdf',
+    );
+  }
+
+  Future<void> _ensureSessionIsValid(String token) async {
+    if (!ApiClient.isJwtExpired(token)) {
+      return;
+    }
+
+    final sessionError = await ApiClient.maybeHandleSessionExpired(
+      token: token,
+      statusCode: 403,
+    );
+    if (sessionError != null) {
+      throw sessionError;
+    }
+  }
+
+  String? _extractFileName(String? contentDisposition) {
+    if (contentDisposition == null || contentDisposition.isEmpty) {
+      return null;
+    }
+    final match = RegExp(r'filename=\"?([^\";]+)\"?').firstMatch(
+      contentDisposition,
+    );
+    return match?.group(1);
   }
 }

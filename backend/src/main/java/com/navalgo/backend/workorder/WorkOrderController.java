@@ -2,6 +2,8 @@ package com.navalgo.backend.workorder;
 
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/work-orders")
@@ -56,8 +59,9 @@ public class WorkOrderController {
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<WorkOrderDto> create(@RequestBody @Valid CreateWorkOrderRequest request) {
-        return ResponseEntity.ok(service.create(request));
+    public ResponseEntity<WorkOrderDto> create(@RequestBody @Valid CreateWorkOrderRequest request,
+                                               Authentication authentication) {
+        return ResponseEntity.ok(service.create(request, authentication.getName()));
     }
 
     @PatchMapping("/{id}/status")
@@ -129,6 +133,7 @@ public class WorkOrderController {
                                                       @RequestParam(required = false) Double latitude,
                                                       @RequestParam(required = false) Double longitude,
                                                       @RequestParam(required = false) Instant capturedAt,
+                                                      HttpServletRequest request,
                                                       Authentication authentication) {
         String email = authentication.getName();
         WorkOrderService.WorkOrderMediaContext context = service.getWorkOrderMediaContext(id, email);
@@ -144,7 +149,13 @@ public class WorkOrderController {
                 context.workOrderDate()
         );
 
-        return ResponseEntity.ok(service.addAttachment(id, uploaded, email));
+        return ResponseEntity.ok(service.addAttachment(
+                id,
+                uploaded,
+                email,
+                resolveClientIp(request),
+                request.getHeader("User-Agent")
+        ));
     }
 
     @PostMapping("/uploads")
@@ -185,6 +196,7 @@ public class WorkOrderController {
             @RequestParam(value = "proofFile", required = false) List<MultipartFile> proofFiles,
             @RequestParam(required = false) Double latitude,
             @RequestParam(required = false) Double longitude,
+            HttpServletRequest request,
             Authentication authentication) {
 
         String email = authentication.getName();
@@ -220,7 +232,14 @@ public class WorkOrderController {
             }
         }
 
-        return ResponseEntity.ok(service.signWorkOrder(id, signatureWithoutWatermark, proofDtos, email));
+        return ResponseEntity.ok(service.signWorkOrder(
+                id,
+                signatureWithoutWatermark,
+                proofDtos,
+                email,
+                resolveClientIp(request),
+                request.getHeader("User-Agent")
+        ));
     }
 
     @PostMapping(value = "/{id}/client-signature", consumes = "multipart/form-data")
@@ -248,5 +267,28 @@ public class WorkOrderController {
         );
 
         return ResponseEntity.ok(service.saveClientSignature(id, clientSignature, email));
+    }
+
+    @GetMapping("/{id}/evidence-report")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> downloadEvidenceReport(@PathVariable Long id,
+                                                         Authentication authentication) {
+        WorkOrderService.WorkOrderEvidenceReport report = service.generateEvidenceReport(id, authentication.getName());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + report.fileName() + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(report.content());
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        String realIp = request.getHeader("X-Real-IP");
+        if (realIp != null && !realIp.isBlank()) {
+            return realIp.trim();
+        }
+        return request.getRemoteAddr();
     }
 }

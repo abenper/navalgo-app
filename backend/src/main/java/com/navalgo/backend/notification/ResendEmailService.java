@@ -10,9 +10,11 @@ import org.springframework.stereotype.Service;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -83,13 +85,18 @@ public class ResendEmailService {
                                           String vesselName,
                                           BigDecimal amount,
                                           String currency,
-                                          String pdfUrl) {
+                                          String pdfUrl,
+                                          boolean clientHasAccount) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("from", fromAddress);
         payload.put("to", List.of(clientEmail));
         payload.put("subject", sanitizeSubject("Nuevo presupuesto disponible"));
-        payload.put("html", buildBudgetNotificationHtml(clientName, budgetTitle, vesselName, amount, currency, pdfUrl));
-        payload.put("text", buildBudgetNotificationText(clientName, budgetTitle, vesselName, amount, currency, pdfUrl));
+        payload.put("html", buildBudgetNotificationHtml(
+                clientName, clientEmail, budgetTitle, vesselName, amount, currency, pdfUrl, clientHasAccount
+        ));
+        payload.put("text", buildBudgetNotificationText(
+                clientName, clientEmail, budgetTitle, vesselName, amount, currency, pdfUrl, clientHasAccount
+        ));
         return sendEmail(payload, "No se pudo enviar el email de presupuesto");
     }
 
@@ -286,12 +293,27 @@ public class ResendEmailService {
     }
 
     private String buildBudgetNotificationHtml(String clientName,
+                                               String clientEmail,
                                                String budgetTitle,
                                                String vesselName,
                                                BigDecimal amount,
                                                String currency,
-                                               String pdfUrl) {
+                                               String pdfUrl,
+                                               boolean clientHasAccount) {
         String formattedAmount = formatAmount(amount, currency);
+        String signupUrl = buildClientSignupUrl(clientName, clientEmail);
+        String accountHint = clientHasAccount
+                ? """
+                  <p>En breve podras aceptarlo o rechazarlo directamente desde tu area de cliente. Mientras tanto, ya tienes el documento disponible en el enlace anterior.</p>
+                  """
+                : """
+                  <p>Tu presupuesto ya te esta esperando en Naval-GO. Si aun no tienes cuenta, entra en la plataforma y pulsa <strong>Crear cuenta</strong> usando este mismo correo: <strong>%s</strong>.</p>
+                  <p style="margin:20px 0;">
+                    <a href="%s" style="background:#17324d;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
+                      Crear cuenta
+                    </a>
+                  </p>
+                  """.formatted(escapeHtml(clientEmailSafe(clientName, clientEmail)), escapeHtmlAttribute(signupUrl));
         return """
                 <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
                   <h2 style="margin-bottom:12px;">Nuevo presupuesto disponible</h2>
@@ -304,7 +326,7 @@ public class ResendEmailService {
                       Ver PDF del presupuesto
                     </a>
                   </p>
-                  <p>En breve podras aceptarlo o rechazarlo directamente desde tu area de cliente. Mientras tanto, ya tienes el documento disponible en el enlace anterior.</p>
+                  %s
                   <p>Equipo Naval-GO</p>
                 </div>
                 """.formatted(
@@ -312,16 +334,29 @@ public class ResendEmailService {
                 escapeHtml(vesselName),
                 escapeHtml(budgetTitle),
                 escapeHtml(formattedAmount),
-                escapeHtmlAttribute(pdfUrl)
+                escapeHtmlAttribute(pdfUrl),
+                accountHint
         );
     }
 
     private String buildBudgetNotificationText(String clientName,
+                                               String clientEmail,
                                                String budgetTitle,
                                                String vesselName,
                                                BigDecimal amount,
                                                String currency,
-                                               String pdfUrl) {
+                                               String pdfUrl,
+                                               boolean clientHasAccount) {
+        String signupUrl = buildClientSignupUrl(clientName, clientEmail);
+        String accountHint = clientHasAccount
+                ? "En breve podras aceptarlo o rechazarlo directamente desde tu area de cliente."
+                : """
+                Tu presupuesto ya te esta esperando en Naval-GO.
+                Si aun no tienes cuenta, entra en la plataforma y pulsa Crear cuenta usando este mismo correo: %s.
+
+                Crear cuenta:
+                %s
+                """.formatted(clientEmailSafe(clientName, clientEmail), signupUrl);
         return """
                 Hola, %s:
 
@@ -331,13 +366,33 @@ public class ResendEmailService {
 
                 Ver PDF del presupuesto:
                 %s
+                
+                %s
                 """.formatted(
                 clientName,
                 vesselName,
                 budgetTitle,
                 formatAmount(amount, currency),
-                pdfUrl
+                pdfUrl,
+                accountHint
         );
+    }
+
+    private String clientEmailSafe(String fallbackName, String email) {
+        if (email != null && !email.isBlank()) {
+            return email;
+        }
+        return fallbackName == null || fallbackName.isBlank() ? "tu correo" : fallbackName;
+    }
+
+    private String buildClientSignupUrl(String clientName, String clientEmail) {
+        String baseUrl = normalizeFrontendBaseUrl();
+        String separator = baseUrl.contains("?") ? "&" : "?";
+        return baseUrl
+                + separator
+                + "screen=create-account"
+                + "&email=" + urlEncode(clientEmail)
+                + "&name=" + urlEncode(clientName);
     }
 
     private String buildPasswordResetHtml(String accountName, String resetLink) {
@@ -381,6 +436,10 @@ public class ResendEmailService {
             return "https://naval-go.com";
         }
         return frontendBaseUrl.trim();
+    }
+
+    private String urlEncode(String value) {
+        return URLEncoder.encode(value == null ? "" : value, StandardCharsets.UTF_8);
     }
 
     private String sanitizeSubject(String title) {

@@ -61,6 +61,13 @@ public class BudgetService {
             throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
         }
 
+        String normalizedContactEmail = inputSanitizer.email(request.contactEmail());
+        if (normalizedContactEmail != null && !normalizedContactEmail.isBlank()) {
+            ensureOwnerEmailAvailable(normalizedContactEmail, owner.getId());
+            owner.setEmail(normalizedContactEmail);
+            ownerRepository.save(owner);
+        }
+
         Budget budget = new Budget();
         budget.setOwner(owner);
         budget.setVessel(vessel);
@@ -109,6 +116,9 @@ public class BudgetService {
         if (ownerEmail == null || ownerEmail.isBlank()) {
             throw new IllegalArgumentException("El cliente no tiene correo electronico para enviar el presupuesto");
         }
+        boolean clientHasAccount = workerRepository.findByOwner_Id(budget.getOwner().getId())
+                .filter(worker -> worker.getRole() == Role.CLIENT)
+                .isPresent();
         resendEmailService.sendBudgetNotification(
                 budget.getOwner().getDisplayName(),
                 ownerEmail,
@@ -116,7 +126,8 @@ public class BudgetService {
                 budget.getVessel().getName(),
                 budget.getAmount(),
                 budget.getCurrency(),
-                budget.getPdfUrl()
+                budget.getPdfUrl(),
+                clientHasAccount
         );
     }
 
@@ -140,12 +151,25 @@ public class BudgetService {
         return normalized.toUpperCase(Locale.ROOT);
     }
 
+    private void ensureOwnerEmailAvailable(String email, Long ownerId) {
+        boolean exists = ownerId == null
+                ? ownerRepository.existsByEmailIgnoreCase(email)
+                : ownerRepository.existsByEmailIgnoreCaseAndIdNot(email, ownerId);
+        if (exists) {
+            throw new IllegalArgumentException("Ya existe un cliente con ese correo electronico");
+        }
+    }
+
     private BudgetDto toDto(Budget budget) {
+        boolean clientHasAccount = workerRepository.findByOwner_Id(budget.getOwner().getId())
+                .filter(worker -> worker.getRole() == Role.CLIENT)
+                .isPresent();
         return new BudgetDto(
                 budget.getId(),
                 budget.getOwner().getId(),
                 budget.getOwner().getDisplayName(),
                 budget.getOwner().getEmail(),
+                clientHasAccount,
                 budget.getVessel().getId(),
                 budget.getVessel().getName(),
                 budget.getCreatedByWorker().getId(),

@@ -87,6 +87,15 @@ public class WorkOrder {
     @JoinColumn(name = "signed_by_worker_id")
     private Worker signedByWorker;
 
+    @Column(name = "evidence_sealed_at")
+    private Instant evidenceSealedAt;
+
+    @Column(name = "evidence_manifest_hash", length = 64)
+    private String evidenceManifestHash;
+
+    @Column(name = "evidence_server_signature", length = 128)
+    private String evidenceServerSignature;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -156,4 +165,13 @@ public class WorkOrder {
 
     public Worker getSignedByWorker() { return signedByWorker; }
     public void setSignedByWorker(Worker signedByWorker) { this.signedByWorker = signedByWorker; }
+
+    public Instant getEvidenceSealedAt() { return evidenceSealedAt; }
+    public void setEvidenceSealedAt(Instant evidenceSealedAt) { this.evidenceSealedAt = evidenceSealedAt; }
+
+    public String getEvidenceManifestHash() { return evidenceManifestHash; }
+    public void setEvidenceManifestHash(String evidenceManifestHash) { this.evidenceManifestHash = evidenceManifestHash; }
+
+    public String getEvidenceServerSignature() { return evidenceServerSignature; }
+    public void setEvidenceServerSignature(String evidenceServerSignature) { this.evidenceServerSignature = evidenceServerSignature; }
 }

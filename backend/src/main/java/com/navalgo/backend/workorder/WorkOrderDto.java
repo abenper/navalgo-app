@@ -30,6 +30,9 @@ public record WorkOrderDto(
         Instant signedAt,
         Instant clientSignedAt,
         Long signedByWorkerId,
-        String signedByWorkerName
+        String signedByWorkerName,
+        Instant evidenceSealedAt,
+        String evidenceManifestHash,
+        String evidenceServerSignature
 ) {
 }

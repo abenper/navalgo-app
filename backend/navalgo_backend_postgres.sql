@@ -76,8 +76,13 @@ CREATE TABLE IF NOT EXISTS work_orders (
     created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_close_reminder_sent_at TIMESTAMP WITHOUT TIME ZONE,
     signature_url VARCHAR(2000),
+    client_signature_url VARCHAR(2000),
     signed_at TIMESTAMP WITHOUT TIME ZONE,
+    client_signed_at TIMESTAMP WITHOUT TIME ZONE,
     signed_by_worker_id BIGINT,
+    evidence_sealed_at TIMESTAMP WITHOUT TIME ZONE,
+    evidence_manifest_hash VARCHAR(64),
+    evidence_server_signature VARCHAR(128),
     CONSTRAINT fk_work_orders_owner FOREIGN KEY (owner_id) REFERENCES owners(id),
     CONSTRAINT fk_work_orders_vessel FOREIGN KEY (vessel_id) REFERENCES vessels(id),
     CONSTRAINT fk_work_orders_signed_by_worker FOREIGN KEY (signed_by_worker_id) REFERENCES workers(id),
@@ -106,13 +111,23 @@ CREATE TABLE IF NOT EXISTS work_order_attachments (
     work_order_id BIGINT NOT NULL,
     file_url VARCHAR(2000) NOT NULL,
     file_type VARCHAR(255) NOT NULL,
+    content_type VARCHAR(255),
     original_file_name VARCHAR(255),
     captured_at TIMESTAMP WITHOUT TIME ZONE,
+    uploaded_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    uploaded_by_worker_id BIGINT,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION,
+    file_size_bytes BIGINT,
+    storage_object_key VARCHAR(2000),
+    sha256_hex VARCHAR(64),
+    server_signature VARCHAR(128),
+    upload_ip VARCHAR(128),
+    upload_user_agent VARCHAR(1000),
     watermarked BOOLEAN NOT NULL DEFAULT FALSE,
     audio_removed BOOLEAN NOT NULL DEFAULT FALSE,
-    CONSTRAINT fk_wo_attachments_work_order FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE
+    CONSTRAINT fk_wo_attachments_work_order FOREIGN KEY (work_order_id) REFERENCES work_orders(id) ON DELETE CASCADE,
+    CONSTRAINT fk_wo_attachments_uploaded_by_worker FOREIGN KEY (uploaded_by_worker_id) REFERENCES workers(id)
 );
 
 CREATE TABLE IF NOT EXISTS material_products (
@@ -327,6 +342,9 @@ CREATE INDEX IF NOT EXISTS idx_work_orders_status ON work_orders(status);
 CREATE INDEX IF NOT EXISTS idx_work_orders_owner_id ON work_orders(owner_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_vessel_id ON work_orders(vessel_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_close_due_date ON work_orders(close_due_date);
+CREATE INDEX IF NOT EXISTS idx_work_orders_evidence_sealed_at ON work_orders(evidence_sealed_at);
+CREATE INDEX IF NOT EXISTS idx_work_order_attachments_uploaded_by_worker_id ON work_order_attachments(uploaded_by_worker_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_attachments_sha256_hex ON work_order_attachments(sha256_hex);
 CREATE INDEX IF NOT EXISTS idx_wow_worker_id ON work_order_workers(worker_id);
 CREATE INDEX IF NOT EXISTS idx_material_products_reference_code ON material_products(reference_code);
 CREATE INDEX IF NOT EXISTS idx_material_checklist_templates_updated_at ON material_checklist_templates(updated_at);
@@ -383,7 +401,13 @@ ALTER TABLE work_orders
     ADD COLUMN IF NOT EXISTS signature_url VARCHAR(2000);
 
 ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS client_signature_url VARCHAR(2000);
+
+ALTER TABLE work_orders
     ADD COLUMN IF NOT EXISTS signed_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS client_signed_at TIMESTAMP WITHOUT TIME ZONE;
 
 ALTER TABLE work_orders
     ADD COLUMN IF NOT EXISTS signed_by_worker_id BIGINT;
@@ -396,6 +420,15 @@ ALTER TABLE work_orders
 
 ALTER TABLE work_orders
     ADD COLUMN IF NOT EXISTS last_close_reminder_sent_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS evidence_sealed_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS evidence_manifest_hash VARCHAR(64);
+
+ALTER TABLE work_orders
+    ADD COLUMN IF NOT EXISTS evidence_server_signature VARCHAR(128);
 
 DO $$
 BEGIN
@@ -447,13 +480,40 @@ ALTER TABLE work_order_attachments
     ADD COLUMN IF NOT EXISTS original_file_name VARCHAR(255);
 
 ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS content_type VARCHAR(255);
+
+ALTER TABLE work_order_attachments
     ADD COLUMN IF NOT EXISTS captured_at TIMESTAMP WITHOUT TIME ZONE;
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS uploaded_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS uploaded_by_worker_id BIGINT;
 
 ALTER TABLE work_order_attachments
     ADD COLUMN IF NOT EXISTS latitude DOUBLE PRECISION;
 
 ALTER TABLE work_order_attachments
     ADD COLUMN IF NOT EXISTS longitude DOUBLE PRECISION;
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS file_size_bytes BIGINT;
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS storage_object_key VARCHAR(2000);
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS sha256_hex VARCHAR(64);
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS server_signature VARCHAR(128);
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS upload_ip VARCHAR(128);
+
+ALTER TABLE work_order_attachments
+    ADD COLUMN IF NOT EXISTS upload_user_agent VARCHAR(1000);
 
 ALTER TABLE work_order_attachments
     ADD COLUMN IF NOT EXISTS watermarked BOOLEAN NOT NULL DEFAULT FALSE;
@@ -463,6 +523,19 @@ ALTER TABLE work_order_attachments
 
 ALTER TABLE work_order_attachments
     ALTER COLUMN file_url TYPE VARCHAR(2000);
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_wo_attachments_uploaded_by_worker'
+    ) THEN
+        ALTER TABLE work_order_attachments
+            ADD CONSTRAINT fk_wo_attachments_uploaded_by_worker
+            FOREIGN KEY (uploaded_by_worker_id) REFERENCES workers(id);
+    END IF;
+END $$;
 
 ALTER TABLE time_entries
     ADD COLUMN IF NOT EXISTS work_site VARCHAR(20) NOT NULL DEFAULT 'WORKSHOP';

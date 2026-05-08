@@ -30,6 +30,7 @@ import 'package:navalgo/viewmodels/work_orders_view_model.dart';
 import 'package:navalgo/viewmodels/workers_view_model.dart';
 import 'package:provider/provider.dart';
 import 'screens/common/complete_registration_screen.dart';
+import 'screens/common/create_account_screen.dart';
 import 'screens/common/login_screen.dart';
 import 'screens/common/privacy_policy_screen.dart';
 import 'screens/common/reset_password_screen.dart';
@@ -238,6 +239,13 @@ class _RootScreen extends StatelessWidget {
 
     if (isPrivacyPolicyEntryUri(Uri.base)) {
       return const PrivacyPolicyScreen(isPublicEntry: true);
+    }
+
+    if (isCreateAccountEntryUri(Uri.base)) {
+      return CreateAccountScreen(
+        prefilledName: Uri.base.queryParameters['name'],
+        prefilledEmail: Uri.base.queryParameters['email'],
+      );
     }
 
     if (isVerifyEmailEntryUri(Uri.base)) {

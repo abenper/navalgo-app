@@ -4,6 +4,7 @@ class Budget {
     required this.ownerId,
     required this.ownerName,
     required this.ownerEmail,
+    required this.clientHasAccount,
     required this.vesselId,
     required this.vesselName,
     required this.createdByWorkerId,
@@ -25,6 +26,7 @@ class Budget {
   final int ownerId;
   final String ownerName;
   final String? ownerEmail;
+  final bool clientHasAccount;
   final int vesselId;
   final String vesselName;
   final int createdByWorkerId;
@@ -54,6 +56,7 @@ class Budget {
       ownerId: (json['ownerId'] as num).toInt(),
       ownerName: json['ownerName'] as String,
       ownerEmail: json['ownerEmail'] as String?,
+      clientHasAccount: json['clientHasAccount'] as bool? ?? false,
       vesselId: (json['vesselId'] as num).toInt(),
       vesselName: json['vesselName'] as String,
       createdByWorkerId: (json['createdByWorkerId'] as num).toInt(),

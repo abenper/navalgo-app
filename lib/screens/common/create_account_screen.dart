@@ -7,8 +7,23 @@ import '../../theme/navalgo_theme.dart';
 import '../../widgets/navalgo_logo.dart';
 import 'privacy_policy_screen.dart';
 
+const String createAccountQueryKey = 'screen';
+const String createAccountQueryValue = 'create-account';
+
+bool isCreateAccountEntryUri(Uri uri) {
+  final screen = uri.queryParameters[createAccountQueryKey];
+  return screen == createAccountQueryValue;
+}
+
 class CreateAccountScreen extends StatefulWidget {
-  const CreateAccountScreen({super.key});
+  const CreateAccountScreen({
+    super.key,
+    this.prefilledName,
+    this.prefilledEmail,
+  });
+
+  final String? prefilledName;
+  final String? prefilledEmail;
 
   @override
   State<CreateAccountScreen> createState() => _CreateAccountScreenState();
@@ -24,6 +39,13 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   bool _loading = false;
   bool _done = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl.text = widget.prefilledName ?? '';
+    _emailCtrl.text = widget.prefilledEmail ?? '';
+  }
 
   @override
   void dispose() {

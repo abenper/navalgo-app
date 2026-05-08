@@ -30,6 +30,8 @@ public class WorkOrderService {
     private final WorkerRepository workerRepository;
     private final NotificationService notificationService;
     private final WorkOrderMediaService workOrderMediaService;
+    private final WorkOrderEvidenceService workOrderEvidenceService;
+    private final WorkOrderEvidencePdfService workOrderEvidencePdfService;
     private final MaterialChecklistTemplateRepository materialChecklistTemplateRepository;
     private final InputSanitizer inputSanitizer;
 
@@ -39,6 +41,8 @@ public class WorkOrderService {
                             WorkerRepository workerRepository,
                             NotificationService notificationService,
                             WorkOrderMediaService workOrderMediaService,
+                            WorkOrderEvidenceService workOrderEvidenceService,
+                            WorkOrderEvidencePdfService workOrderEvidencePdfService,
                             MaterialChecklistTemplateRepository materialChecklistTemplateRepository,
                             InputSanitizer inputSanitizer) {
         this.workOrderRepository = workOrderRepository;
@@ -47,6 +51,8 @@ public class WorkOrderService {
         this.workerRepository = workerRepository;
         this.notificationService = notificationService;
         this.workOrderMediaService = workOrderMediaService;
+        this.workOrderEvidenceService = workOrderEvidenceService;
+        this.workOrderEvidencePdfService = workOrderEvidencePdfService;
         this.materialChecklistTemplateRepository = materialChecklistTemplateRepository;
         this.inputSanitizer = inputSanitizer;
     }
@@ -114,7 +120,11 @@ public class WorkOrderService {
     }
 
     @Transactional
-    public WorkOrderDto create(CreateWorkOrderRequest request) {
+    public WorkOrderDto create(CreateWorkOrderRequest request, String currentUserEmail) {
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current)) {
+            throw new AccessDeniedException("Solo un administrador puede crear partes");
+        }
         Owner owner = ownerRepository.findById(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
@@ -157,20 +167,19 @@ public class WorkOrderService {
 
         if (request.attachments() != null) {
             for (AttachmentRequest item : request.attachments()) {
-                WorkOrderAttachment att = mapAttachmentRequest(workOrder, item);
+                WorkOrderAttachment att = mapAttachmentRequest(workOrder, item, current);
                 workOrder.getAttachments().add(att);
             }
         } else if (request.attachmentUrls() != null) {
             for (String url : request.attachmentUrls()) {
-                WorkOrderAttachment att = new WorkOrderAttachment();
-                att.setWorkOrder(workOrder);
-                att.setFileUrl(inputSanitizer.optionalUrl(url, 2000));
-                att.setFileType(inferType(url));
+                WorkOrderAttachment att = mapLegacyAttachmentUrl(workOrder, url, current);
                 workOrder.getAttachments().add(att);
             }
         }
 
-        WorkOrder saved = workOrderRepository.save(workOrder);
+        WorkOrder saved = workOrderRepository.saveAndFlush(workOrder);
+        signAllAttachmentEvidence(saved);
+        saved = workOrderRepository.save(saved);
 
         for (Worker worker : saved.getAssignedWorkers()) {
             notificationService.notifyWorker(
@@ -195,6 +204,7 @@ public class WorkOrderService {
         if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
             throw new AccessDeniedException("No puedes actualizar el estado de este parte");
         }
+        ensureNotSealed(workOrder);
 
         workOrder.setStatus(request.status());
         return toDto(workOrderRepository.save(workOrder));
@@ -212,6 +222,7 @@ public class WorkOrderService {
         if (!admin && !assigned) {
             throw new AccessDeniedException("No tienes permiso para editar este parte");
         }
+        ensureNotSealed(workOrder);
 
         boolean canAdvancedEdit = hasAdvancedEditPermission(current, workOrder);
 
@@ -318,10 +329,7 @@ public class WorkOrderService {
             }
             workOrder.getAttachments().clear();
             for (String url : request.attachmentUrls()) {
-                WorkOrderAttachment att = new WorkOrderAttachment();
-                att.setWorkOrder(workOrder);
-                att.setFileUrl(inputSanitizer.optionalUrl(url, 2000));
-                att.setFileType(inferType(url));
+                WorkOrderAttachment att = mapLegacyAttachmentUrl(workOrder, url, current);
                 workOrder.getAttachments().add(att);
             }
         }
@@ -332,12 +340,14 @@ public class WorkOrderService {
             }
             workOrder.getAttachments().clear();
             for (AttachmentRequest item : request.attachments()) {
-                WorkOrderAttachment att = mapAttachmentRequest(workOrder, item);
+                WorkOrderAttachment att = mapAttachmentRequest(workOrder, item, current);
                 workOrder.getAttachments().add(att);
             }
         }
 
-        WorkOrder saved = workOrderRepository.save(workOrder);
+        WorkOrder saved = workOrderRepository.saveAndFlush(workOrder);
+        signAllAttachmentEvidence(saved);
+        saved = workOrderRepository.save(saved);
         Set<Long> updatedWorkerIds = saved.getAssignedWorkers().stream().map(Worker::getId).collect(java.util.stream.Collectors.toSet());
 
         for (Long workerId : updatedWorkerIds) {
@@ -376,6 +386,7 @@ public class WorkOrderService {
         if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
             throw new AccessDeniedException("No puedes revisar material en este parte");
         }
+        ensureNotSealed(workOrder);
 
         WorkOrderChecklist checklist = requireMaterialChecklist(workOrder);
         Map<Long, WorkOrderChecklistItem> itemsById = new HashMap<>();
@@ -409,6 +420,7 @@ public class WorkOrderService {
         if (!isAdmin(current) && !isAssignedToWorkOrder(current, workOrder)) {
             throw new AccessDeniedException("No puedes crear incidencias de material en este parte");
         }
+        ensureNotSealed(workOrder);
 
         WorkOrderChecklist checklist = requireMaterialChecklist(workOrder);
         WorkOrderChecklistItem checklistItem = checklist.getItems().stream()
@@ -464,6 +476,7 @@ public class WorkOrderService {
         if (!isAdmin(current)) {
             throw new AccessDeniedException("Solo un administrador puede revisar incidencias de material");
         }
+        ensureNotSealed(workOrder);
 
         MaterialRevisionRequest revisionRequest = workOrder.getMaterialRevisionRequests().stream()
                 .filter(item -> item.getId().equals(requestId))
@@ -492,6 +505,7 @@ public class WorkOrderService {
         if (!canDeleteAttachment(current, workOrder)) {
             throw new AccessDeniedException("No tienes permiso para borrar multimedia de este parte");
         }
+        ensureNotSealed(workOrder);
 
         WorkOrderAttachment attachment = workOrder.getAttachments().stream()
                 .filter(item -> item.getId().equals(attachmentId))
@@ -507,7 +521,9 @@ public class WorkOrderService {
     @Transactional
     public WorkOrderDto addAttachment(Long workOrderId,
                                       UploadedAttachmentDto attachment,
-                                      String currentUserEmail) {
+                                      String currentUserEmail,
+                                      String uploadIp,
+                                      String uploadUserAgent) {
         WorkOrder workOrder = workOrderRepository.findById(workOrderId)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
@@ -515,20 +531,13 @@ public class WorkOrderService {
         if (!canModifyMultimedia(current, workOrder)) {
             throw new AccessDeniedException("No puedes modificar multimedia de este parte");
         }
+        ensureNotSealed(workOrder);
 
-        WorkOrderAttachment att = new WorkOrderAttachment();
-        att.setWorkOrder(workOrder);
-        att.setFileUrl(attachment.fileUrl());
-        att.setFileType(attachment.fileType());
-        att.setOriginalFileName(attachment.originalFileName());
-        att.setCapturedAt(attachment.capturedAt());
-        att.setLatitude(attachment.latitude());
-        att.setLongitude(attachment.longitude());
-        att.setWatermarked(attachment.watermarked());
-        att.setAudioRemoved(attachment.audioRemoved());
+        WorkOrderAttachment att = buildAttachmentEntity(workOrder, attachment, current, uploadIp, uploadUserAgent);
         workOrder.getAttachments().add(att);
-
-        return toDto(workOrderRepository.save(workOrder));
+        WorkOrder saved = workOrderRepository.saveAndFlush(workOrder);
+        signAttachmentEvidence(saved, att);
+        return toDto(workOrderRepository.save(saved));
     }
 
     @Transactional
@@ -539,6 +548,9 @@ public class WorkOrderService {
         Worker current = requireWorkerByEmail(currentUserEmail);
         if (!isAdmin(current)) {
             throw new AccessDeniedException("Solo un administrador puede borrar partes");
+        }
+        if (isSealed(workOrder)) {
+            throw new AccessDeniedException("No se puede borrar un parte sellado");
         }
 
         List<String> mediaUrls = new ArrayList<>();
@@ -612,29 +624,26 @@ public class WorkOrderService {
     }
 
     private boolean canModifyMultimedia(Worker worker, WorkOrder workOrder) {
-        if (isAdmin(worker)) {
-            return true;
-        }
-        if (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders()) {
-            return true;
-        }
-        return !isSigned(workOrder);
+        return !isSealed(workOrder)
+                && (isAdmin(worker)
+                || (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders())
+                || isAssignedToWorkOrder(worker, workOrder));
     }
 
     private boolean canDeleteAttachment(Worker worker, WorkOrder workOrder) {
-        if (isAdmin(worker)) {
-            return true;
-        }
-        if (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders()) {
-            return true;
-        }
-        // Workers without edit permission can only remove media while work order is unsigned.
-        return isAssignedToWorkOrder(worker, workOrder) && !isSigned(workOrder);
+        return !isSealed(workOrder)
+                && (isAdmin(worker)
+                || (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders())
+                || isAssignedToWorkOrder(worker, workOrder));
     }
 
     private boolean isSigned(WorkOrder workOrder) {
         return (workOrder.getSignatureUrl() != null && !workOrder.getSignatureUrl().isBlank())
                 || workOrder.getSignedAt() != null;
+    }
+
+    private boolean isSealed(WorkOrder workOrder) {
+        return isSigned(workOrder) || workOrder.getEvidenceSealedAt() != null;
     }
 
     private boolean isAssignedToWorkOrder(Worker worker, WorkOrder workOrder) {
@@ -708,7 +717,10 @@ public class WorkOrderService {
                 w.getSignedAt(),
                 w.getClientSignedAt(),
                 w.getSignedByWorker() != null ? w.getSignedByWorker().getId() : null,
-                w.getSignedByWorker() != null ? w.getSignedByWorker().getFullName() : null
+                w.getSignedByWorker() != null ? w.getSignedByWorker().getFullName() : null,
+                w.getEvidenceSealedAt(),
+                w.getEvidenceManifestHash(),
+                w.getEvidenceServerSignature()
         );
     }
 
@@ -732,7 +744,9 @@ public class WorkOrderService {
     public WorkOrderDto signWorkOrder(Long id,
                                       UploadedAttachmentDto signature,
                                       List<UploadedAttachmentDto> proofAttachments,
-                                      String signerEmail) {
+                                      String signerEmail,
+                                      String uploadIp,
+                                      String uploadUserAgent) {
         WorkOrder workOrder = workOrderRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
 
@@ -740,26 +754,22 @@ public class WorkOrderService {
         if (!isAdmin(signer) && !isAssignedToWorkOrder(signer, workOrder)) {
             throw new AccessDeniedException("Solo puedes firmar partes que tienes asignados");
         }
+        ensureNotSealed(workOrder);
 
         workOrder.setSignatureUrl(signature.fileUrl());
         workOrder.setSignedAt(java.time.Instant.now());
         workOrder.setSignedByWorker(signer);
+        workOrder.setStatus(WorkOrderStatus.DONE);
 
         for (UploadedAttachmentDto proof : proofAttachments) {
-            WorkOrderAttachment att = new WorkOrderAttachment();
-            att.setWorkOrder(workOrder);
-            att.setFileUrl(proof.fileUrl());
-            att.setFileType(proof.fileType());
-            att.setOriginalFileName(proof.originalFileName());
-            att.setCapturedAt(proof.capturedAt());
-            att.setLatitude(proof.latitude());
-            att.setLongitude(proof.longitude());
-            att.setWatermarked(proof.watermarked());
-            att.setAudioRemoved(proof.audioRemoved());
+            WorkOrderAttachment att = buildAttachmentEntity(workOrder, proof, signer, uploadIp, uploadUserAgent);
             workOrder.getAttachments().add(att);
         }
 
-        WorkOrder saved = workOrderRepository.save(workOrder);
+        WorkOrder saved = workOrderRepository.saveAndFlush(workOrder);
+        signAllAttachmentEvidence(saved);
+        sealWorkOrderEvidence(saved);
+        saved = workOrderRepository.save(saved);
 
         if (!isAdmin(signer)) {
             notificationService.notifyAdmins(
@@ -785,6 +795,7 @@ public class WorkOrderService {
         if (!isAdmin(signer) && !isAssignedToWorkOrder(signer, workOrder)) {
             throw new AccessDeniedException("Solo puedes registrar la firma de cliente en partes que tienes asignados");
         }
+        ensureNotSealed(workOrder);
 
         String previousClientSignatureUrl = workOrder.getClientSignatureUrl();
         workOrder.setClientSignatureUrl(clientSignature.fileUrl());
@@ -979,18 +990,123 @@ public class WorkOrderService {
         return "reference:" + item.getReference().trim().toLowerCase(Locale.ROOT);
     }
 
-    private WorkOrderAttachment mapAttachmentRequest(WorkOrder workOrder, AttachmentRequest item) {
+    private WorkOrderAttachment mapAttachmentRequest(WorkOrder workOrder, AttachmentRequest item, Worker uploader) {
         WorkOrderAttachment att = new WorkOrderAttachment();
         att.setWorkOrder(workOrder);
         att.setFileUrl(inputSanitizer.optionalUrl(item.fileUrl(), 2000));
+        String sanitizedFileUrl = att.getFileUrl();
+        WorkOrderMediaService.StoredMediaMetadata storedMedia = workOrderMediaService.inspectStoredMedia(sanitizedFileUrl);
         att.setFileType(inputSanitizer.requiredText(item.fileType(), "El tipo de archivo", 255));
+        att.setContentType(inputSanitizer.optionalText(storedMedia.contentType(), 255));
         att.setOriginalFileName(inputSanitizer.optionalText(item.originalFileName(), 255));
         att.setCapturedAt(item.capturedAt());
+        att.setUploadedAt(Instant.now());
         att.setLatitude(item.latitude());
         att.setLongitude(item.longitude());
+        att.setFileSizeBytes(storedMedia.fileSizeBytes());
+        att.setStorageObjectKey(storedMedia.objectKey());
+        att.setSha256Hex(storedMedia.sha256Hex());
+        att.setUploadedByWorker(uploader);
         att.setWatermarked(item.watermarked());
         att.setAudioRemoved(item.audioRemoved());
         return att;
+    }
+
+    private WorkOrderAttachment mapLegacyAttachmentUrl(WorkOrder workOrder, String url, Worker uploader) {
+        String sanitizedFileUrl = inputSanitizer.optionalUrl(url, 2000);
+        WorkOrderMediaService.StoredMediaMetadata storedMedia = workOrderMediaService.inspectStoredMedia(sanitizedFileUrl);
+        WorkOrderAttachment att = new WorkOrderAttachment();
+        att.setWorkOrder(workOrder);
+        att.setFileUrl(sanitizedFileUrl);
+        att.setFileType(inferType(sanitizedFileUrl));
+        att.setContentType(inputSanitizer.optionalText(storedMedia.contentType(), 255));
+        att.setUploadedAt(Instant.now());
+        att.setFileSizeBytes(storedMedia.fileSizeBytes());
+        att.setStorageObjectKey(storedMedia.objectKey());
+        att.setSha256Hex(storedMedia.sha256Hex());
+        att.setUploadedByWorker(uploader);
+        return att;
+    }
+
+    private WorkOrderAttachment buildAttachmentEntity(WorkOrder workOrder,
+                                                      UploadedAttachmentDto attachment,
+                                                      Worker uploader,
+                                                      String uploadIp,
+                                                      String uploadUserAgent) {
+        WorkOrderAttachment att = new WorkOrderAttachment();
+        att.setWorkOrder(workOrder);
+        att.setFileUrl(attachment.fileUrl());
+        att.setFileType(attachment.fileType());
+        att.setContentType(inputSanitizer.optionalText(attachment.contentType(), 255));
+        att.setOriginalFileName(inputSanitizer.optionalText(attachment.originalFileName(), 255));
+        att.setCapturedAt(attachment.capturedAt());
+        att.setUploadedAt(attachment.uploadedAt() == null ? Instant.now() : attachment.uploadedAt());
+        att.setLatitude(attachment.latitude());
+        att.setLongitude(attachment.longitude());
+        att.setFileSizeBytes(attachment.fileSizeBytes());
+        att.setStorageObjectKey(inputSanitizer.optionalText(attachment.storageObjectKey(), 2000));
+        att.setSha256Hex(inputSanitizer.optionalText(attachment.sha256Hex(), 64));
+        att.setUploadedByWorker(uploader);
+        att.setUploadIp(inputSanitizer.optionalText(uploadIp, 128));
+        att.setUploadUserAgent(inputSanitizer.optionalText(uploadUserAgent, 1000));
+        att.setWatermarked(attachment.watermarked());
+        att.setAudioRemoved(attachment.audioRemoved());
+        return att;
+    }
+
+    private void signAllAttachmentEvidence(WorkOrder workOrder) {
+        for (WorkOrderAttachment attachment : workOrder.getAttachments()) {
+            signAttachmentEvidence(workOrder, attachment);
+        }
+    }
+
+    private void signAttachmentEvidence(WorkOrder workOrder, WorkOrderAttachment attachment) {
+        if (attachment.getUploadedAt() == null) {
+            attachment.setUploadedAt(Instant.now());
+        }
+        if (attachment.getFileUrl() == null || attachment.getFileUrl().isBlank()) {
+            return;
+        }
+        if (attachment.getSha256Hex() == null || attachment.getSha256Hex().isBlank()
+                || attachment.getStorageObjectKey() == null || attachment.getStorageObjectKey().isBlank()) {
+            WorkOrderMediaService.StoredMediaMetadata storedMedia = workOrderMediaService.inspectStoredMedia(attachment.getFileUrl());
+            attachment.setContentType(inputSanitizer.optionalText(storedMedia.contentType(), 255));
+            attachment.setFileSizeBytes(storedMedia.fileSizeBytes());
+            attachment.setStorageObjectKey(storedMedia.objectKey());
+            attachment.setSha256Hex(storedMedia.sha256Hex());
+        }
+        attachment.setServerSignature(workOrderEvidenceService.signAttachment(workOrder, attachment));
+    }
+
+    private void sealWorkOrderEvidence(WorkOrder workOrder) {
+        Instant sealedAt = Instant.now();
+        WorkOrderEvidenceService.WorkOrderSeal seal = workOrderEvidenceService.sealWorkOrder(workOrder, sealedAt);
+        workOrder.setEvidenceSealedAt(sealedAt);
+        workOrder.setEvidenceManifestHash(seal.manifestHash());
+        workOrder.setEvidenceServerSignature(seal.serverSignature());
+    }
+
+    private void ensureNotSealed(WorkOrder workOrder) {
+        if (isSealed(workOrder)) {
+            throw new AccessDeniedException("El parte ya esta sellado y no admite cambios");
+        }
+    }
+
+    public WorkOrderEvidenceReport generateEvidenceReport(Long workOrderId, String currentUserEmail) {
+        WorkOrder workOrder = workOrderRepository.findById(workOrderId)
+                .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
+        Worker current = requireWorkerByEmail(currentUserEmail);
+        if (!isAdmin(current)) {
+            throw new AccessDeniedException("Solo un administrador puede descargar el informe probatorio");
+        }
+        if (workOrder.getAttachments() == null || workOrder.getAttachments().isEmpty()) {
+            throw new IllegalArgumentException("Este parte no tiene adjuntos para generar un informe probatorio");
+        }
+        byte[] pdfBytes = workOrderEvidencePdfService.buildReport(workOrder);
+        return new WorkOrderEvidenceReport(
+                "parte_" + workOrder.getId() + "_informe_probatorio.pdf",
+                pdfBytes
+        );
     }
 
     private String inferType(String fileUrl) {
@@ -1005,6 +1121,12 @@ public class WorkOrderService {
             String ownerName,
             String vesselName,
             LocalDate workOrderDate
+    ) {
+    }
+
+    public record WorkOrderEvidenceReport(
+            String fileName,
+            byte[] content
     ) {
     }
 }

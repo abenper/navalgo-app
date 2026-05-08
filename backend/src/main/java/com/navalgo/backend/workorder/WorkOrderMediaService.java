@@ -8,8 +8,10 @@ import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -23,6 +25,8 @@ import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -114,20 +118,26 @@ public class WorkOrderMediaService {
         String basePath = "usuarios/" + emailFolder + "/perfil";
         String objectKey = buildObjectKey(basePath, ".png");
         try {
-            uploadToSpaces(objectKey, processProfilePhoto(file), "image/png");
+            byte[] storedBytes = processProfilePhoto(file);
+            uploadToSpaces(objectKey, storedBytes, "image/png");
+            return new UploadedAttachmentDto(
+                    buildPublicUrl(objectKey),
+                    "IMAGE",
+                    "image/png",
+                    file.getOriginalFilename(),
+                    null,
+                    Instant.now(),
+                    null,
+                    null,
+                    (long) storedBytes.length,
+                    objectKey,
+                    sha256Hex(storedBytes),
+                    false,
+                    false
+            );
         } catch (IOException exception) {
             throw new IllegalStateException("No se pudo procesar la foto de perfil", exception);
         }
-        return new UploadedAttachmentDto(
-                buildPublicUrl(objectKey),
-                "IMAGE",
-                file.getOriginalFilename(),
-                null,
-                null,
-                null,
-                false,
-                false
-        );
     }
 
     private byte[] processProfilePhoto(MultipartFile file) throws IOException {
@@ -233,22 +243,30 @@ public class WorkOrderMediaService {
         g2.dispose();
 
         ByteArrayOutputStream output = new ByteArrayOutputStream();
+        String storedContentType;
         if (preserveLossless) {
             ImageIO.write(rgbImage, "png", output);
-            uploadToSpaces(objectKey, output.toByteArray(), "image/png");
+            storedContentType = "image/png";
         } else {
             writeCompressedJpeg(rgbImage, output);
-            uploadToSpaces(objectKey, output.toByteArray(), "image/jpeg");
+            storedContentType = "image/jpeg";
         }
+        byte[] storedBytes = output.toByteArray();
+        uploadToSpaces(objectKey, storedBytes, storedContentType);
 
         return new UploadedAttachmentDto(
-            buildPublicUrl(objectKey),
+                buildPublicUrl(objectKey),
                 "IMAGE",
+                storedContentType,
                 file.getOriginalFilename(),
-            includeMetadata ? capturedAt : null,
-            includeMetadata ? latitude : null,
-            includeMetadata ? longitude : null,
-            applyWatermark,
+                includeMetadata ? capturedAt : null,
+                Instant.now(),
+                includeMetadata ? latitude : null,
+                includeMetadata ? longitude : null,
+                (long) storedBytes.length,
+                objectKey,
+                sha256Hex(storedBytes),
+                applyWatermark,
                 false
         );
     }
@@ -290,15 +308,20 @@ public class WorkOrderMediaService {
             }
 
             byte[] bytes = Files.readAllBytes(outputFile);
-                uploadToSpaces(objectKey, bytes, "video/mp4");
+            uploadToSpaces(objectKey, bytes, "video/mp4");
 
             return new UploadedAttachmentDto(
                     buildPublicUrl(objectKey),
                     "VIDEO",
+                    "video/mp4",
                     file.getOriginalFilename(),
                     capturedAt,
+                    Instant.now(),
                     latitude,
                     longitude,
+                    (long) bytes.length,
+                    objectKey,
+                    sha256Hex(bytes),
                     true,
                     true
             );
@@ -458,6 +481,27 @@ public class WorkOrderMediaService {
         }
     }
 
+    public StoredMediaMetadata inspectStoredMedia(String publicUrl) {
+        String objectKey = resolveObjectKeyFromPublicUrl(publicUrl);
+        try {
+            ResponseBytes<software.amazon.awssdk.services.s3.model.GetObjectResponse> response = s3Client.getObjectAsBytes(
+                    GetObjectRequest.builder()
+                            .bucket(mediaProperties.spacesBucket())
+                            .key(objectKey)
+                            .build()
+            );
+            byte[] bytes = response.asByteArray();
+            return new StoredMediaMetadata(
+                    objectKey,
+                    response.response().contentType(),
+                    (long) bytes.length,
+                    sha256Hex(bytes)
+            );
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("No se pudo verificar la integridad del adjunto almacenado", exception);
+        }
+    }
+
     private String buildObjectKey(String keyPrefix, String extension) {
         return keyPrefix + "/" + UUID.randomUUID() + extension;
     }
@@ -524,6 +568,24 @@ public class WorkOrderMediaService {
         return base + "/" + key;
     }
 
+    private String resolveObjectKeyFromPublicUrl(String publicUrl) {
+        if (publicUrl == null || publicUrl.isBlank()) {
+            throw new IllegalArgumentException("La URL del adjunto es obligatoria");
+        }
+
+        String base = mediaProperties.publicBaseUrl();
+        String normalizedBase = base.endsWith("/") ? base : base + "/";
+        if (!publicUrl.startsWith(normalizedBase)) {
+            throw new IllegalArgumentException("El adjunto no pertenece al almacenamiento autorizado");
+        }
+
+        String objectKey = publicUrl.substring(normalizedBase.length());
+        if (objectKey.isBlank()) {
+            throw new IllegalArgumentException("No se pudo resolver el archivo almacenado");
+        }
+        return objectKey;
+    }
+
     private String buildWatermarkText(String workerName, Instant capturedAt, Double latitude, Double longitude) {
         String ts = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
                 .withZone(ZoneId.systemDefault())
@@ -579,6 +641,20 @@ public class WorkOrderMediaService {
         }
     }
 
+    private String sha256Hex(byte[] bytes) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(bytes == null ? new byte[0] : bytes);
+            StringBuilder builder = new StringBuilder(hash.length * 2);
+            for (byte value : hash) {
+                builder.append(String.format(Locale.ROOT, "%02x", value));
+            }
+            return builder.toString();
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 no disponible", exception);
+        }
+    }
+
     public void deleteByPublicUrl(String fileUrl) {
         if (fileUrl == null || fileUrl.isBlank()) {
             return;
@@ -608,5 +684,13 @@ public class WorkOrderMediaService {
         } catch (Exception exception) {
             log.warn("No se pudo borrar el objeto {} del almacenamiento: {}", key, exception.getMessage());
         }
+    }
+
+    public record StoredMediaMetadata(
+            String objectKey,
+            String contentType,
+            Long fileSizeBytes,
+            String sha256Hex
+    ) {
     }
 }

@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 public record CreateBudgetRequest(
         @NotNull Long ownerId,
         @NotNull Long vesselId,
+        @Size(max = 255) String contactEmail,
         @NotBlank @Size(max = 255) String title,
         @Size(max = 3000) String description,
         @DecimalMin(value = "0.0", inclusive = true) BigDecimal amount,

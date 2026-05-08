@@ -1569,6 +1569,14 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                   label: const Text('Vídeo'),
                 ),
               ],
+              if (_isAdmin && _attachments.isNotEmpty) ...[
+                const SizedBox(width: 12),
+                OutlinedButton.icon(
+                  onPressed: _busy ? null : _downloadEvidenceReport,
+                  icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                  label: const Text('Informe probatorio'),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -1748,6 +1756,37 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       attachment: item,
       authToken: context.read<SessionViewModel>().token,
     );
+  }
+
+  Future<void> _downloadEvidenceReport() async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    setState(() => _busy = true);
+    try {
+      await context.read<WorkOrderService>().downloadEvidenceReport(
+        token,
+        workOrderId: _workOrder.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(context, 'Informe probatorio descargado.');
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(
+        context,
+        'No se pudo descargar el informe probatorio: $error',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
   }
 
   Future<void> _openExternal(String url) async {

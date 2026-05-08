@@ -31,6 +31,7 @@ class BudgetService {
     String token, {
     required int ownerId,
     required int vesselId,
+    String? contactEmail,
     required String title,
     String? description,
     double? amount,
@@ -43,6 +44,7 @@ class BudgetService {
       body: {
         'ownerId': ownerId,
         'vesselId': vesselId,
+        'contactEmail': contactEmail,
         'title': title,
         'description': description,
         'amount': amount,
