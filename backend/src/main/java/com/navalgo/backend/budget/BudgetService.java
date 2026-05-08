@@ -106,7 +106,7 @@ public class BudgetService {
                     name = email.split("@")[0];
                 }
                 Owner newOwner = new Owner();
-                newOwner.setType(OwnerType.INDIVIDUAL);
+                newOwner.setType(OwnerType.PERSON);
                 newOwner.setDisplayName(name);
                 newOwner.setDocumentId("PENDIENTE");
                 newOwner.setEmail(email);
@@ -118,14 +118,18 @@ public class BudgetService {
                 vName = "Embarcacion General";
             }
             final String finalVName = vName;
-            vessel = vesselRepository.findByOwnerId(owner.getId()).stream()
+            final Owner finalOwner = owner;
+            final Long finalOwnerId = owner.getId();
+            vessel = vesselRepository.findByOwnerId(finalOwnerId).stream()
                     .filter(v -> v.getName().equalsIgnoreCase(finalVName))
                     .findFirst()
                     .orElseGet(() -> {
                         Vessel newVessel = new Vessel();
-                        newVessel.setOwner(owner);
+                        newVessel.setOwner(finalOwner);
                         newVessel.setName(finalVName);
-                        newVessel.setActive(true);
+                        newVessel.setRegistrationNumber(
+                                buildPlaceholderRegistrationNumber(finalOwnerId, finalVName)
+                        );
                         return vesselRepository.save(newVessel);
                     });
         }
@@ -268,6 +272,23 @@ public class BudgetService {
             return "EUR";
         }
         return normalized.toUpperCase(Locale.ROOT);
+    }
+
+    private String buildPlaceholderRegistrationNumber(Long ownerId, String vesselName) {
+        String baseName = vesselName == null ? "VESSEL" : vesselName.trim().toUpperCase(Locale.ROOT);
+        baseName = baseName.replaceAll("[^A-Z0-9]+", "-");
+        if (baseName.isBlank()) {
+            baseName = "VESSEL";
+        }
+        if (baseName.length() > 18) {
+            baseName = baseName.substring(0, 18);
+        }
+        String ownerPart = ownerId == null ? "0" : Long.toString(ownerId);
+        String suffix = Long.toString(System.currentTimeMillis());
+        if (suffix.length() > 6) {
+            suffix = suffix.substring(suffix.length() - 6);
+        }
+        return "TMP-" + ownerPart + "-" + baseName + "-" + suffix;
     }
 
     private void ensureOwnerEmailAvailable(String email, Long ownerId) {
