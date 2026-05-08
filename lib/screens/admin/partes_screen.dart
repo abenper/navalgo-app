@@ -1595,6 +1595,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
               children: _attachments
                   .map(
                     (item) => Card(
+                      key: ValueKey(item.id ?? item.fileUrl),
                       margin: const EdgeInsets.only(bottom: 10),
                       child: ListTile(
                         onTap: () => _previewAttachment(item),
@@ -2921,7 +2922,26 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
 
   List<WorkOrderAttachmentItem> _resolveAttachments(WorkOrder workOrder) {
     if (workOrder.attachments.isNotEmpty) {
-      return workOrder.attachments;
+      final attachments = List<WorkOrderAttachmentItem>.of(workOrder.attachments);
+      attachments.sort((a, b) {
+        final aCaptured = a.capturedAt;
+        final bCaptured = b.capturedAt;
+        if (aCaptured == null && bCaptured == null) {
+          return (a.id ?? 0).compareTo(b.id ?? 0);
+        }
+        if (aCaptured == null) {
+          return 1;
+        }
+        if (bCaptured == null) {
+          return -1;
+        }
+        final compare = aCaptured.compareTo(bCaptured);
+        if (compare != 0) {
+          return compare;
+        }
+        return (a.id ?? 0).compareTo(b.id ?? 0);
+      });
+      return attachments;
     }
 
     return workOrder.attachmentUrls
