@@ -756,6 +756,10 @@ public class WorkOrderService {
         }
         ensureNotSealed(workOrder);
 
+        if (workOrder.getLaborHours() == null) {
+            throw new IllegalArgumentException("Rellena las horas de trabajo del parte antes de firmar y cerrar.");
+        }
+
         workOrder.setSignatureUrl(signature.fileUrl());
         workOrder.setSignedAt(java.time.Instant.now());
         workOrder.setSignedByWorker(signer);

@@ -77,7 +77,11 @@ public class WorkOrderEvidencePdfService {
         lines.add("Firma HMAC del servidor: " + safe(workOrder.getEvidenceServerSignature()));
         lines.add("");
         lines.add("Advertencia de integridad");
-        lines.add("Una vez firmado y sellado, el parte queda bloqueado en la aplicacion para evitar alteraciones de la evidencia.");
+        lines.add("El proceso de guardado y verificación de evidencias asegura la trazabilidad completa de cada imagen.");
+        lines.add("La foto se captura en la aplicación, se marca con metadatos de ubicación y se protege con un hash SHA-256.");
+        lines.add("Ese hash se incorpora al parte junto con la firma HMAC del servidor, creando un registro inmutable.");
+        lines.add("Cuando el parte se firma y se sella, el documento queda bloqueado para que ninguna foto ni metadato puedan cambiarse.");
+        lines.add("Por eso, si el hash de la foto presentada coincide exactamente con el hash de este informe, la imagen permanece intacta. Si alguien modifica la foto, el hash dejaría de coincidir y se detectaría inmediatamente.");
         lines.add("");
         lines.add("Adjuntos");
 
