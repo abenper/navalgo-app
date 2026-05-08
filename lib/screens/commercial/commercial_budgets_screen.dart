@@ -1,7 +1,8 @@
+import 'dart:math' as math;
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/budget.dart';
 import '../../models/owner.dart';
@@ -12,13 +13,6 @@ import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 import '../../widgets/pdf_preview.dart';
-import '../../models/owner.dart';
-import '../../models/vessel.dart';
-import '../../services/budget_service.dart';
-import '../../services/fleet_service.dart';
-import '../../theme/navalgo_theme.dart';
-import '../../viewmodels/session_view_model.dart';
-import '../../widgets/navalgo_ui.dart';
 
 class CommercialBudgetsScreen extends StatefulWidget {
   const CommercialBudgetsScreen({super.key});
@@ -206,10 +200,11 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     await showDialog<void>(
       context: context,
       builder: (context) {
+        final dialogWidth = math.min(MediaQuery.of(context).size.width * 0.92, 900.0);
         return AlertDialog(
           title: const Text('Vista previa de PDF'),
           content: SizedBox(
-            width: 900,
+            width: dialogWidth,
             height: 640,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

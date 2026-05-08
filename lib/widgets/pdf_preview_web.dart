@@ -1,4 +1,4 @@
-// ignore: avoid_web_libraries_in_flutter
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:html' as html;
 import 'dart:ui' as ui;
 
@@ -15,6 +15,7 @@ Future<void> downloadPdfWidget(String pdfUrl) async {
 
 Widget buildPdfPreviewWidget(String pdfUrl) {
   final viewType = 'pdf-preview-${DateTime.now().microsecondsSinceEpoch}-${pdfUrl.hashCode}';
+  // ignore: undefined_prefixed_name
   ui.platformViewRegistry.registerViewFactory(viewType, (int viewId) {
     final iframe = html.IFrameElement()
       ..src = pdfUrl
