@@ -142,6 +142,13 @@ public class BudgetService {
         return toDto(budgetRepository.save(budget));
     }
 
+    public void delete(Long budgetId, String currentUserEmail) {
+        requireCommercialOrAdmin(currentUserEmail);
+        Budget budget = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new EntityNotFoundException("Presupuesto no encontrado"));
+        budgetRepository.delete(budget);
+    }
+
     private void sendBudgetEmail(Budget budget) {
         String ownerEmail = budget.getOwner().getEmail();
         if (ownerEmail == null || ownerEmail.isBlank()) {

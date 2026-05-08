@@ -54,6 +54,14 @@ public class BudgetController {
         return ResponseEntity.ok(budgetService.updateStatus(id, request, authentication.getName()));
     }
 
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
+    public ResponseEntity<Void> delete(@PathVariable Long id,
+                                       Authentication authentication) {
+        budgetService.delete(id, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping(value = "/uploads", consumes = "multipart/form-data")
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<UploadedBudgetDocumentDto> uploadPdf(@RequestParam("file") MultipartFile file,

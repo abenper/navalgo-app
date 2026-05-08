@@ -55,6 +55,16 @@ class BudgetService {
     return Budget.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<void> deleteBudget(
+    String token, {
+    required int budgetId,
+  }) async {
+    await _apiClient.delete(
+      '/budgets/$budgetId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   Future<Budget> updateBudgetStatus(
     String token, {
     required int budgetId,

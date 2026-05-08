@@ -193,6 +193,63 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     }
   }
 
+  Future<void> _deleteBudget(Budget budget) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Eliminar presupuesto'),
+          content: Text(
+            '¿Seguro que quieres eliminar el presupuesto "${budget.title}"? Esta acción no se puede deshacer.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Eliminar'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    if (!mounted) {
+      return;
+    }
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    try {
+      await context.read<BudgetService>().deleteBudget(
+        token,
+        budgetId: budget.id,
+      );
+      await _loadData();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Presupuesto eliminado.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo eliminar el presupuesto: $error')),
+      );
+    }
+  }
+
   Future<void> _showPdfPreview(String pdfUrl) async {
     if (!mounted) {
       return;
@@ -343,6 +400,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                         onSend: budget.status == 'DRAFT'
                             ? () => _sendBudget(budget)
                             : null,
+                        onDelete: () => _deleteBudget(budget),
                       ),
                     ),
                   ),
@@ -360,11 +418,13 @@ class _BudgetCard extends StatelessWidget {
     required this.budget,
     required this.onOpenPdf,
     this.onSend,
+    this.onDelete,
   });
 
   final Budget budget;
   final VoidCallback onOpenPdf;
   final VoidCallback? onSend;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -440,6 +500,15 @@ class _BudgetCard extends StatelessWidget {
                   onPressed: onSend,
                   icon: const Icon(Icons.send_outlined),
                   label: const Text('Enviar al cliente'),
+                ),
+              if (onDelete != null)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: NavalgoColors.coral,
+                  ),
+                  onPressed: onDelete,
+                  icon: const Icon(Icons.delete_forever_outlined),
+                  label: const Text('Eliminar'),
                 ),
             ],
           ),
