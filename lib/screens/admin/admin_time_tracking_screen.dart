@@ -99,7 +99,7 @@ class _WorkerJornadaAdjustmentScreenState
   Future<void> _editEntry(TimeEntry entry) async {
     final input = await showDialog<_EditTimeEntryInput>(
       context: context,
-      builder: (context) => _EditTimeEntryDialog(entry: entry),
+      builder: (context) => _EditTimeEntryDialog(entry: entry, role: widget.worker.role),
     );
     if (!mounted || input == null) {
       return;
@@ -645,7 +645,7 @@ class _WorkerJornadaAdjustmentScreenState
                   workDateLabel: _formatAdjustmentDate(request.workDate),
                   requestedHoursLabel:
                       '${requestedClockIn == null ? '--:--' : _formatAdjustmentHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _formatAdjustmentHour(requestedClockOut)}',
-                  workSiteLabel: _workSiteLabel(request.workSite),
+                  workSiteLabel: _workSiteLabel(request.workSite, widget.worker.role),
                   busy: _adjustmentBusy,
                   onApprove: () => _reviewAdjustmentRequest(request, approve: true),
                   onReject: () => _reviewAdjustmentRequest(request, approve: false),
@@ -1204,7 +1204,7 @@ class _TimeEntryAdminCard extends StatelessWidget {
             children: [
               _EntryMetaChip(
                 icon: Icons.category_outlined,
-                label: _workSiteLabel(entry.workSite),
+                label: _workSiteLabel(entry.workSite, widget.worker.role),
                 color: NavalgoColors.tide,
               ),
               if (duration != null)
@@ -1407,9 +1407,10 @@ class _EditTimeEntryInput {
 }
 
 class _EditTimeEntryDialog extends StatefulWidget {
-  const _EditTimeEntryDialog({required this.entry});
+  const _EditTimeEntryDialog({required this.entry, required this.role});
 
   final TimeEntry entry;
+  final String? role;
 
   @override
   State<_EditTimeEntryDialog> createState() => _EditTimeEntryDialogState();
@@ -1649,12 +1650,13 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
                       label: 'Tipo de jornada',
                       prefixIcon: const Icon(Icons.route_outlined),
                     ),
-                    items: const [
+                    items: [
                       DropdownMenuItem(
                         value: 'WORKSHOP',
-                        child: Text('Taller'),
+                        child: Text(widget.role == 'COMERCIAL' ? 'Oficina' : 'Taller'),
                       ),
-                      DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
+                      if (widget.role != 'COMERCIAL')
+                        const DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
                     ],
                     onChanged: (value) {
                       if (value == null) {
@@ -1892,8 +1894,9 @@ String _absenceComparisonLabel(double percent) {
   return '${percent.abs().toStringAsFixed(0)}% menos ausencias que la media';
 }
 
-String _workSiteLabel(String workSite) {
-  return workSite == 'TRAVEL' ? 'Viaje' : 'Taller';
+String _workSiteLabel(String workSite, [String? role]) {
+  if (workSite == 'TRAVEL') return 'Viaje';
+  return role == 'COMERCIAL' ? 'Oficina' : 'Taller';
 }
 
 String _entryStatusLabel(TimeEntry entry) {
@@ -1968,7 +1971,7 @@ String? _entryDurationLabel(TimeEntry entry) {
                   workDateLabel: _formatAdjustmentDate(request.workDate),
                   requestedHoursLabel:
                       '${requestedClockIn == null ? '--:--' : _formatAdjustmentHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _formatAdjustmentHour(requestedClockOut)}',
-                  workSiteLabel: _workSiteLabel(request.workSite),
+                  workSiteLabel: _workSiteLabel(request.workSite, widget.worker.role),
                   busy: _adjustmentBusy,
                   onApprove: () => _reviewAdjustmentRequest(request, approve: true),
                   onReject: () => _reviewAdjustmentRequest(request, approve: false),

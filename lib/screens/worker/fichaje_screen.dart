@@ -535,12 +535,28 @@ class _FichajeScreenState extends State<FichajeScreen> {
     }
   }
 
+  List<_ClockWorkSiteOption> _getDynamicWorkSiteOptions() {
+    final role = context.read<SessionViewModel>().user?.role;
+    if (role == 'COMERCIAL') {
+      return const [
+        _ClockWorkSiteOption(
+          value: 'WORKSHOP',
+          title: 'Oficina',
+          subtitle: 'Jornada en oficina o instalaciones propias.',
+          icon: Icons.business_center_rounded,
+          accent: NavalgoColors.tide,
+        ),
+      ];
+    }
+    return _clockWorkSiteOptions;
+  }
+
   Future<_ClockInInput?> _selectClockInInput() async {
     return showModalBottomSheet<_ClockInInput>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _ClockInSheet(options: _clockWorkSiteOptions),
+      builder: (_) => _ClockInSheet(options: _getDynamicWorkSiteOptions()),
     );
   }
 
@@ -549,7 +565,8 @@ class _FichajeScreenState extends State<FichajeScreen> {
       case 'TRAVEL':
         return 'Viaje';
       default:
-        return 'Taller';
+        final role = context.read<SessionViewModel>().user?.role;
+        return role == 'COMERCIAL' ? 'Oficina' : 'Taller';
     }
   }
 
@@ -846,7 +863,7 @@ class _TimeAdjustmentRequestDialogState
                     (entry) => DropdownMenuItem<int?>(
                       value: entry.id,
                       child: Text(
-                        '${_formatDialogDate(entry.clockIn)} · ${_workSiteLabelForDialog(entry.workSite)} · ${_formatDialogHour(entry.clockIn)} - ${entry.clockOut == null ? '--:--' : _formatDialogHour(entry.clockOut!)}',
+                        '${_formatDialogDate(entry.clockIn)} · ${_workSiteLabelForDialog(entry.workSite, context.read<SessionViewModel>().user?.role)} · ${_formatDialogHour(entry.clockIn)} - ${entry.clockOut == null ? '--:--' : _formatDialogHour(entry.clockOut!)}',
                       ),
                     ),
                   ),
@@ -970,9 +987,17 @@ class _TimeAdjustmentRequestDialogState
                   label: 'Tipo de jornada',
                   prefixIcon: const Icon(Icons.route_outlined),
                 ),
-                items: const [
-                  DropdownMenuItem(value: 'WORKSHOP', child: Text('Taller')),
-                  DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
+                items: [
+                  DropdownMenuItem(
+                    value: 'WORKSHOP',
+                    child: Text(
+                      context.read<SessionViewModel>().user?.role == 'COMERCIAL'
+                          ? 'Oficina'
+                          : 'Taller',
+                    ),
+                  ),
+                  if (context.read<SessionViewModel>().user?.role != 'COMERCIAL')
+                    const DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
                 ],
                 onChanged: (value) {
                   if (value == null) {
@@ -1546,11 +1571,11 @@ String _fmtLongDate(DateTime d) {
   return '${weekdays[d.weekday - 1]}, ${d.day} de ${months[d.month - 1]}';
 }
 
-String _workSiteLabelForDialog(String workSite) {
+String _workSiteLabelForDialog(String workSite, String? role) {
   switch (workSite) {
     case 'TRAVEL':
       return 'Viaje';
     default:
-      return 'Taller';
+      return role == 'COMERCIAL' ? 'Oficina' : 'Taller';
   }
 }
