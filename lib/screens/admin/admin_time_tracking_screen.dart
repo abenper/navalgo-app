@@ -64,12 +64,26 @@ class _WorkerJornadaAdjustmentScreenState
 
     try {
       final service = context.read<TimeTrackingService>();
-      final insight = await service.getWorkerInsight(token, workerId: widget.worker.id);
-      final entries = await service.getByWorker(token, workerId: widget.worker.id);
-      final adjustmentRequests = await service.getAdjustmentRequests(
+      final insightFuture = service.getWorkerInsight(
+        token,
+        workerId: widget.worker.id,
+      );
+      final entriesFuture = service.getByWorker(
+        token,
+        workerId: widget.worker.id,
+      );
+      final adjustmentRequestsFuture = service.getAdjustmentRequests(
         token,
         status: 'PENDING',
       );
+      await Future.wait<dynamic>([
+        insightFuture,
+        entriesFuture,
+        adjustmentRequestsFuture,
+      ]);
+      final insight = await insightFuture;
+      final entries = await entriesFuture;
+      final adjustmentRequests = await adjustmentRequestsFuture;
       if (!mounted) {
         return;
       }
@@ -79,6 +93,7 @@ class _WorkerJornadaAdjustmentScreenState
         _pendingAdjustmentRequests = adjustmentRequests
             .where((request) => request.workerId == widget.worker.id)
             .toList();
+        _isLoading = false;
       });
     } catch (e) {
       if (!mounted) {
@@ -86,13 +101,8 @@ class _WorkerJornadaAdjustmentScreenState
       }
       setState(() {
         _error = '$e';
+        _isLoading = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 

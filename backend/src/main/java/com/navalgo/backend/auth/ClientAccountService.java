@@ -31,6 +31,7 @@ public class ClientAccountService {
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
     private final SecureTokenSupport secureTokenSupport;
     private final ResendEmailService resendEmailService;
+    private final LoginAttemptService loginAttemptService;
     private final String frontendBaseUrl;
     private final long emailVerificationTtlHours;
 
@@ -41,6 +42,7 @@ public class ClientAccountService {
                                 EmailVerificationTokenRepository emailVerificationTokenRepository,
                                 SecureTokenSupport secureTokenSupport,
                                 ResendEmailService resendEmailService,
+                                LoginAttemptService loginAttemptService,
                                 @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl,
                                 @Value("${app.auth.email-verification-ttl-hours:48}") long emailVerificationTtlHours) {
         this.workerRepository = workerRepository;
@@ -50,16 +52,20 @@ public class ClientAccountService {
         this.emailVerificationTokenRepository = emailVerificationTokenRepository;
         this.secureTokenSupport = secureTokenSupport;
         this.resendEmailService = resendEmailService;
+        this.loginAttemptService = loginAttemptService;
         this.frontendBaseUrl = frontendBaseUrl;
         this.emailVerificationTtlHours = emailVerificationTtlHours;
     }
 
     @Transactional
-    public void signup(ClientSignupRequest request) {
+    public void signup(ClientSignupRequest request, String clientIp) {
         String email = inputSanitizer.email(request.email());
         String fullName = inputSanitizer.requiredText(request.fullName(), "El nombre", 255);
         String password = request.password() == null ? "" : request.password().trim();
         String phone = inputSanitizer.optionalText(request.phone(), 255);
+
+        loginAttemptService.checkSignupAllowed(email, clientIp);
+        loginAttemptService.recordSignupAttempt(email, clientIp);
 
         if (!isStrongPassword(password)) {
             throw new IllegalArgumentException("La contrasena debe tener minimo 12 caracteres e incluir mayuscula, minuscula, numero y simbolo");

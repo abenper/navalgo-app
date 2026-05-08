@@ -34,9 +34,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
-    });
+    _loadData();
   }
 
   Future<void> _loadData() async {
@@ -53,9 +51,17 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     });
 
     try {
-      final budgets = await budgetService.getBudgets(token);
-      final owners = await fleetService.getOwners(token);
-      final vessels = await fleetService.getVessels(token);
+      final budgetsFuture = budgetService.getBudgets(token);
+      final ownersFuture = fleetService.getOwners(token);
+      final vesselsFuture = fleetService.getVessels(token);
+      await Future.wait<dynamic>([
+        budgetsFuture,
+        ownersFuture,
+        vesselsFuture,
+      ]);
+      final budgets = await budgetsFuture;
+      final owners = await ownersFuture;
+      final vessels = await vesselsFuture;
       if (!mounted) {
         return;
       }

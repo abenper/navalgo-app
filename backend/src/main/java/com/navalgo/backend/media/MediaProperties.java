@@ -9,6 +9,7 @@ public record MediaProperties(
         String spacesBucket,
         String spacesAccessKey,
         String spacesSecretKey,
-        String publicBaseUrl
+        String publicBaseUrl,
+        String proxyAllowedPrefixes
 ) {
 }

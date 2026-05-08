@@ -49,6 +49,7 @@ public class UploadValidationService {
         String contentType = normalizeContentType(file);
         if (ALLOWED_IMAGE_TYPES.contains(contentType)) {
             validateMaxSize(file, maxImageBytes, "La imagen supera el tamano maximo permitido de 10MB");
+            validateImageSignature(file);
             return;
         }
         if (allowVideo && ALLOWED_VIDEO_TYPES.contains(contentType)) {
@@ -66,6 +67,7 @@ public class UploadValidationService {
             throw new IllegalArgumentException("La firma debe ser una imagen valida");
         }
         validateMaxSize(file, maxSignatureBytes, "La firma supera el tamano maximo permitido de 5MB");
+        validateImageSignature(file);
     }
 
     public void validateProfilePhoto(MultipartFile file) {
@@ -75,6 +77,7 @@ public class UploadValidationService {
             throw new IllegalArgumentException("La foto de perfil debe ser una imagen valida");
         }
         validateMaxSize(file, maxProfilePhotoBytes, "La foto de perfil supera el tamano maximo permitido de 5MB");
+        validateImageSignature(file);
     }
 
     public void validateBudgetPdf(MultipartFile file) {
@@ -165,5 +168,16 @@ public class UploadValidationService {
             throw new IllegalArgumentException("No se pudo validar la cabecera binaria del PDF");
         }
         throw new IllegalArgumentException("El contenido binario del PDF no es valido");
+    }
+
+    private void validateImageSignature(MultipartFile file) {
+        try (InputStream stream = file.getInputStream()) {
+            if (javax.imageio.ImageIO.read(stream) != null) {
+                return;
+            }
+        } catch (IOException exception) {
+            throw new IllegalArgumentException("No se pudo validar la cabecera binaria de la imagen");
+        }
+        throw new IllegalArgumentException("El contenido binario de la imagen no es valido");
     }
 }

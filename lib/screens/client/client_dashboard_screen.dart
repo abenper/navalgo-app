@@ -49,6 +49,7 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
       }
       setState(() {
         _budgets = budgets;
+        _isLoading = false;
       });
     } catch (error) {
       if (!mounted) {
@@ -56,13 +57,8 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
       }
       setState(() {
         _error = '$error';
+        _isLoading = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 

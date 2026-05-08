@@ -14,10 +14,12 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/media")
 public class MediaProxyController {
+    private static final Pattern SINGLE_RANGE_PATTERN = Pattern.compile("^bytes=\\d*-\\d*$");
 
     private final MediaProxyService mediaProxyService;
 
@@ -30,6 +32,7 @@ public class MediaProxyController {
     public ResponseEntity<InputStreamResource> proxy(
             @RequestParam("url") String fileUrl,
             @RequestHeader(value = HttpHeaders.RANGE, required = false) String rangeHeader) {
+        validateRangeHeader(rangeHeader);
 
         MediaProxyService.MediaStream media = mediaProxyService.loadFromPublicUrl(fileUrl, rangeHeader);
 
@@ -47,7 +50,8 @@ public class MediaProxyController {
         ResponseEntity.BodyBuilder responseBuilder = ResponseEntity
                 .status(isRangeRequest ? HttpStatus.PARTIAL_CONTENT : HttpStatus.OK)
                 .header(HttpHeaders.ACCEPT_RANGES, "bytes")
-                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePublic())
+                .header("X-Content-Type-Options", "nosniff")
+                .cacheControl(CacheControl.maxAge(Duration.ZERO).cachePrivate().mustRevalidate().noTransform())
                 .contentType(contentType);
 
         if (media.contentLength() != null && media.contentLength() > 0) {
@@ -59,5 +63,15 @@ public class MediaProxyController {
         }
 
         return responseBuilder.body(new InputStreamResource(media.stream()));
+    }
+
+    private void validateRangeHeader(String rangeHeader) {
+        if (rangeHeader == null || rangeHeader.isBlank()) {
+            return;
+        }
+        String normalized = rangeHeader.trim();
+        if (normalized.length() > 64 || !SINGLE_RANGE_PATTERN.matcher(normalized).matches()) {
+            throw new IllegalArgumentException("La cabecera Range no es valida");
+        }
     }
 }

@@ -16,12 +16,14 @@ public class RequestIdFilter extends OncePerRequestFilter {
 
     public static final String REQUEST_ID_HEADER = "X-Request-ID";
     public static final String REQUEST_ID_ATTRIBUTE = "requestId";
+    private static final int MAX_REQUEST_ID_LENGTH = 80;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String requestId = request.getHeader(REQUEST_ID_HEADER);
+        requestId = sanitizeRequestId(requestId);
         if (requestId == null || requestId.isBlank()) {
             requestId = UUID.randomUUID().toString();
         }
@@ -35,5 +37,21 @@ public class RequestIdFilter extends OncePerRequestFilter {
         } finally {
             MDC.remove(REQUEST_ID_ATTRIBUTE);
         }
+    }
+
+    private String sanitizeRequestId(String requestId) {
+        if (requestId == null) {
+            return null;
+        }
+        String sanitized = requestId.trim()
+                .replaceAll("[\\r\\n\\t]", "")
+                .replaceAll("[^A-Za-z0-9._:-]", "");
+        if (sanitized.isBlank()) {
+            return null;
+        }
+        if (sanitized.length() > MAX_REQUEST_ID_LENGTH) {
+            return sanitized.substring(0, MAX_REQUEST_ID_LENGTH);
+        }
+        return sanitized;
     }
 }

@@ -1,16 +1,13 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/user.dart';
 import '../services/auth_service.dart';
-import '../services/network/api_client.dart';
 
 class SessionViewModel extends ChangeNotifier {
   static const _rememberMeKey = 'remember_me';
   static const _rememberedEmailKey = 'remembered_email';
-  static const _userSessionKey = 'user_session';
+  static const _legacyUserSessionKey = 'user_session';
   static const _sessionStartedAtKey = 'session_started_at';
   static const _maxSessionAge = Duration(days: 30);
 
@@ -51,11 +48,10 @@ class SessionViewModel extends ChangeNotifier {
       return;
     }
 
-    _user = _rememberMeEnabled ? _restorePersistedUser(prefs) : null;
+    _user = null;
+    await _clearLegacyUserSnapshot(prefs);
 
-    if (_user == null) {
-      await prefs.remove(_userSessionKey);
-    } else if (ApiClient.isJwtExpired(_user!.token ?? '')) {
+    if (_rememberMeEnabled) {
       final refreshed = await _tryRefreshStoredSession(prefs);
       if (!refreshed) {
         _pendingNotice = 'Tu sesión ha expirado. Inicia sesión de nuevo.';
@@ -83,7 +79,6 @@ class SessionViewModel extends ChangeNotifier {
         _sessionStartedAtKey,
         DateTime.now().millisecondsSinceEpoch,
       );
-      await prefs.setString(_userSessionKey, jsonEncode(user.toJson()));
     } else {
       await _clearPersistedSession(prefs, clearRememberedEmail: false);
     }
@@ -143,44 +138,15 @@ class SessionViewModel extends ChangeNotifier {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_rememberedEmailKey, user.email);
-    if (_rememberMeEnabled) {
-      await prefs.setString(_userSessionKey, jsonEncode(user.toJson()));
-    } else {
-      await prefs.remove(_userSessionKey);
-    }
-
     _rememberedEmail = user.email;
     notifyListeners();
-  }
-
-  User? _restorePersistedUser(SharedPreferences prefs) {
-    final rawUser = prefs.getString(_userSessionKey);
-    if (rawUser == null || rawUser.isEmpty) {
-      return null;
-    }
-
-    try {
-      final decoded = jsonDecode(rawUser);
-      if (decoded is! Map<String, dynamic>) {
-        return null;
-      }
-
-      final user = User.fromJson(decoded);
-      if ((user.token ?? '').isEmpty) {
-        return null;
-      }
-
-      return user;
-    } catch (_) {
-      return null;
-    }
   }
 
   Future<void> _clearPersistedSession(
     SharedPreferences prefs, {
     required bool clearRememberedEmail,
   }) async {
-    await prefs.remove(_userSessionKey);
+    await _clearLegacyUserSnapshot(prefs);
     await prefs.remove(_sessionStartedAtKey);
     if (clearRememberedEmail) {
       await prefs.setBool(_rememberMeKey, false);
@@ -199,16 +165,14 @@ class SessionViewModel extends ChangeNotifier {
       _user = refreshedUser;
       _pendingNotice = null;
       await prefs.setString(_rememberedEmailKey, refreshedUser.email);
-      if (_rememberMeEnabled) {
-        await prefs.setString(
-          _userSessionKey,
-          jsonEncode(refreshedUser.toJson()),
-        );
-      }
       _rememberedEmail = refreshedUser.email;
       return true;
     } catch (_) {
       return false;
     }
+  }
+
+  Future<void> _clearLegacyUserSnapshot(SharedPreferences prefs) async {
+    await prefs.remove(_legacyUserSessionKey);
   }
 }

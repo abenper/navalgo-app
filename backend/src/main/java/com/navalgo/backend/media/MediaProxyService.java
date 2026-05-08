@@ -9,18 +9,30 @@ import software.amazon.awssdk.services.s3.model.GetObjectResponse;
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class MediaProxyService {
 
     private final S3Client s3Client;
     private final MediaProperties mediaProperties;
+    private final Set<String> allowedPrefixes;
 
     public MediaProxyService(S3Client s3Client, MediaProperties mediaProperties) {
         this.s3Client = s3Client;
         this.mediaProperties = mediaProperties;
+        this.allowedPrefixes = Arrays.stream(
+                        (mediaProperties.proxyAllowedPrefixes() == null ? "" : mediaProperties.proxyAllowedPrefixes())
+                                .split(",")
+                )
+                .map(String::trim)
+                .filter(prefix -> !prefix.isEmpty())
+                .map(prefix -> prefix.endsWith("/") ? prefix : prefix + "/")
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     public MediaStream loadFromPublicUrl(String fileUrl) {
@@ -86,8 +98,26 @@ public class MediaProxyService {
         if (objectKey.isBlank()) {
             throw new IllegalArgumentException("La URL del archivo no contiene una clave valida");
         }
+        if (objectKey.contains("\\") || objectKey.contains("..")) {
+            throw new IllegalArgumentException("La clave del archivo no es valida");
+        }
+        if (!isAllowedObjectKey(objectKey)) {
+            throw new IllegalArgumentException("Ese archivo no esta autorizado para ser servido por el proxy");
+        }
 
         return objectKey;
+    }
+
+    private boolean isAllowedObjectKey(String objectKey) {
+        if (allowedPrefixes.isEmpty()) {
+            return false;
+        }
+        for (String prefix : allowedPrefixes) {
+            if (objectKey.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String normalizeScheme(String scheme) {

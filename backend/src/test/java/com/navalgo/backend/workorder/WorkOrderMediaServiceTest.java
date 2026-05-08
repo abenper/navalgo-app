@@ -48,7 +48,8 @@ class WorkOrderMediaServiceTest {
                         "navalgo-media",
                         "key",
                         "secret",
-                        "https://media.naval-go.com"
+                        "https://media.naval-go.com",
+                        "usuarios/,adjuntos-partes/,presupuestos/"
                 ),
                 workerRepository,
                 uploadValidationService
@@ -85,7 +86,8 @@ class WorkOrderMediaServiceTest {
                         "navalgo-media",
                         "key",
                         "secret",
-                        "https://media.naval-go.com"
+                        "https://media.naval-go.com",
+                        "usuarios/,adjuntos-partes/,presupuestos/"
                 ),
                 workerRepository,
                 uploadValidationService

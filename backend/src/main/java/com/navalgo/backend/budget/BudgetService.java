@@ -16,9 +16,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -46,9 +48,7 @@ public class BudgetService {
     }
 
     public List<BudgetDto> findAll() {
-        return budgetRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(this::toDto)
-                .toList();
+        return toDtos(budgetRepository.findAllByOrderByCreatedAtDesc());
     }
 
     public List<BudgetDto> findVisibleBudgets(String currentUserEmail) {
@@ -62,9 +62,7 @@ public class BudgetService {
         if (current.getOwner() == null || current.getOwner().getId() == null) {
             return List.of();
         }
-        return budgetRepository.findByOwnerIdOrderByCreatedAtDesc(current.getOwner().getId()).stream()
-                .map(this::toDto)
-                .toList();
+        return toDtos(budgetRepository.findByOwnerIdOrderByCreatedAtDesc(current.getOwner().getId()));
     }
 
     @Transactional
@@ -201,9 +199,10 @@ public class BudgetService {
         if (ownerEmail == null || ownerEmail.isBlank()) {
             throw new IllegalArgumentException("El cliente no tiene correo electronico para enviar el presupuesto");
         }
-        boolean clientHasAccount = workerRepository.findByOwner_Id(budget.getOwner().getId())
-                .filter(worker -> worker.getRole() == Role.CLIENT)
-                .isPresent();
+        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_Id(
+                Role.CLIENT,
+                budget.getOwner().getId()
+        );
         resendEmailService.sendBudgetNotification(
                 budget.getOwner().getDisplayName(),
                 ownerEmail,
@@ -287,9 +286,34 @@ public class BudgetService {
     }
 
     private BudgetDto toDto(Budget budget) {
-        boolean clientHasAccount = workerRepository.findByOwner_Id(budget.getOwner().getId())
-                .filter(worker -> worker.getRole() == Role.CLIENT)
-                .isPresent();
+        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_Id(
+                Role.CLIENT,
+                budget.getOwner().getId()
+        );
+        return toDto(budget, clientHasAccount);
+    }
+
+    private List<BudgetDto> toDtos(List<Budget> budgets) {
+        if (budgets.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> ownerIds = budgets.stream()
+                .map(budget -> budget.getOwner().getId())
+                .collect(java.util.stream.Collectors.toSet());
+        Set<Long> clientOwnerIds = findClientOwnerIds(ownerIds);
+        return budgets.stream()
+                .map(budget -> toDto(budget, clientOwnerIds.contains(budget.getOwner().getId())))
+                .toList();
+    }
+
+    private Set<Long> findClientOwnerIds(Collection<Long> ownerIds) {
+        if (ownerIds.isEmpty()) {
+            return Set.of();
+        }
+        return workerRepository.findOwnerIdsByRoleAndOwnerIdIn(Role.CLIENT, ownerIds);
+    }
+
+    private BudgetDto toDto(Budget budget, boolean clientHasAccount) {
         return new BudgetDto(
                 budget.getId(),
                 budget.getOwner().getId(),

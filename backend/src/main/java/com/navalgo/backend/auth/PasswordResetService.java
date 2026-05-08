@@ -24,6 +24,7 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
     private final ResendEmailService resendEmailService;
+    private final LoginAttemptService loginAttemptService;
     private final String frontendBaseUrl;
     private final long passwordResetTtlMinutes;
 
@@ -33,6 +34,7 @@ public class PasswordResetService {
                                 PasswordEncoder passwordEncoder,
                                 RefreshTokenService refreshTokenService,
                                 ResendEmailService resendEmailService,
+                                LoginAttemptService loginAttemptService,
                                 @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl,
                                 @Value("${app.auth.password-reset-ttl-minutes:30}") long passwordResetTtlMinutes) {
         this.workerRepository = workerRepository;
@@ -41,17 +43,22 @@ public class PasswordResetService {
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
         this.resendEmailService = resendEmailService;
+        this.loginAttemptService = loginAttemptService;
         this.frontendBaseUrl = frontendBaseUrl;
         this.passwordResetTtlMinutes = passwordResetTtlMinutes;
     }
 
     @Transactional
-    public void requestReset(String email) {
+    public void requestReset(String email, String clientIp) {
         if (email == null || email.isBlank()) {
             return;
         }
 
-        workerRepository.findByEmailIgnoreCase(email.trim()).ifPresent(worker -> {
+        String normalizedEmail = email.trim().toLowerCase();
+        loginAttemptService.checkPasswordResetAllowed(normalizedEmail, clientIp);
+        loginAttemptService.recordPasswordResetAttempt(normalizedEmail, clientIp);
+
+        workerRepository.findByEmailIgnoreCase(normalizedEmail).ifPresent(worker -> {
             passwordResetTokenRepository.deleteByWorker_Id(worker.getId());
             String rawToken = secureTokenSupport.generateUrlSafeToken(32);
             PasswordResetToken token = new PasswordResetToken();

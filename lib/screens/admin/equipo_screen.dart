@@ -52,9 +52,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadScreenData();
-    });
+    _loadScreenData();
   }
 
   @override
@@ -86,10 +84,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
     final sessionViewModel = context.read<SessionViewModel>();
     final timeTrackingService = context.read<TimeTrackingService>();
 
-    await workersViewModel.loadWorkers();
-
     final token = sessionViewModel.token;
     if (token == null) {
+      await workersViewModel.loadWorkers();
       if (mounted) {
         setState(() {
           _pendingAdjustmentCountByWorker = <int, int>{};
@@ -99,10 +96,16 @@ class _EquipoScreenState extends State<EquipoScreen> {
     }
 
     try {
-      final pendingRequests = await timeTrackingService.getAdjustmentRequests(
+      final pendingRequestsFuture = timeTrackingService.getAdjustmentRequests(
         token,
         status: 'PENDING',
       );
+      final loadWorkersFuture = workersViewModel.loadWorkers();
+      await Future.wait<dynamic>([
+        pendingRequestsFuture,
+        loadWorkersFuture,
+      ]);
+      final pendingRequests = await pendingRequestsFuture;
       if (!mounted) {
         return;
       }

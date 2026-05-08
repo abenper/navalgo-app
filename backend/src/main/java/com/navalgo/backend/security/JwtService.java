@@ -17,14 +17,17 @@ public class JwtService {
 
     private final SecretKey key;
     private final long expirationMs;
+    private final String issuer;
 
     public JwtService(@Value("${app.jwt.secret}") String secret,
-                      @Value("${app.jwt.expiration-ms}") long expirationMs) {
+                      @Value("${app.jwt.expiration-ms}") long expirationMs,
+                      @Value("${app.jwt.issuer:navalgo-backend}") String issuer) {
         if (secret == null || secret.isBlank() || secret.length() < 32) {
             throw new IllegalStateException("APP_JWT_SECRET must be at least 32 characters long");
         }
         this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
         this.expirationMs = expirationMs;
+        this.issuer = issuer;
     }
 
     public String generateToken(String username, Map<String, Object> claims) {
@@ -34,6 +37,7 @@ public class JwtService {
         return Jwts.builder()
                 .claims(claims)
                 .subject(username)
+                .issuer(issuer)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(key)
@@ -55,6 +59,7 @@ public class JwtService {
 
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
+                .requireIssuer(issuer)
                 .verifyWith(key)
                 .build()
                 .parseSignedClaims(token)

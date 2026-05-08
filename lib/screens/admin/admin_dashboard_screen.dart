@@ -52,9 +52,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final leaveService = context.read<LeaveService>();
       final timeTrackingService = context.read<TimeTrackingService>();
 
-      await workOrdersVm.loadWorkOrders();
-      final leaves = await leaveService.getLeaveRequests(token);
-      final todaySummary = await timeTrackingService.getTodaySummary(token);
+      final loadWorkOrdersFuture = workOrdersVm.loadWorkOrders();
+      final leavesFuture = leaveService.getLeaveRequests(token);
+      final todaySummaryFuture = timeTrackingService.getTodaySummary(token);
+      await Future.wait<dynamic>([
+        loadWorkOrdersFuture,
+        leavesFuture,
+        todaySummaryFuture,
+      ]);
+      final leaves = await leavesFuture;
+      final todaySummary = await todaySummaryFuture;
 
       final now = DateTime.now();
       final approvedToday = leaves.where((item) {
@@ -87,6 +94,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             .where((item) => item.status == 'PENDING')
             .length;
         _approvedLeavesToday = approvedToday;
+        _isLoading = false;
       });
     } catch (e) {
       if (!mounted) {
@@ -94,13 +102,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       }
       setState(() {
         _error = e.toString();
+        _isLoading = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 

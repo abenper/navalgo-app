@@ -30,11 +30,13 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtFilter;
     private final RequestIdFilter requestIdFilter;
     private final List<String> allowedOrigins;
+    private final boolean exposeSwagger;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtFilter,
             RequestIdFilter requestIdFilter,
-            @Value("${app.security.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}") String allowedOriginsCsv
+            @Value("${app.security.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}") String allowedOriginsCsv,
+            @Value("${app.security.swagger.public:false}") boolean exposeSwagger
     ) {
         this.jwtFilter = jwtFilter;
         this.requestIdFilter = requestIdFilter;
@@ -42,6 +44,7 @@ public class SecurityConfig {
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
                 .collect(Collectors.toList());
+        this.exposeSwagger = exposeSwagger;
     }
 
     @Bean
@@ -50,11 +53,16 @@ public class SecurityConfig {
                 .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                    .requestMatchers("/api/auth/**", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/health").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
-                        .anyRequest().authenticated()
-                )
+                .authorizeHttpRequests(auth -> {
+                    auth.requestMatchers("/api/auth/**", "/actuator/health").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/health").permitAll();
+                    if (exposeSwagger) {
+                        auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
+                    } else {
+                        auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").denyAll();
+                    }
+                    auth.anyRequest().authenticated();
+                })
                 .headers(headers -> {
                     headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'none'; frame-ancestors 'none'; form-action 'self'"));
                     headers.referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER));

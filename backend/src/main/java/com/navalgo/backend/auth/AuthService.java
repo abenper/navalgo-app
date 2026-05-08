@@ -15,6 +15,7 @@ import java.util.Map;
 @Service
 @Transactional(readOnly = true)
 public class AuthService {
+    private static final String DUMMY_PASSWORD_HASH = "$2a$12$0dHO2xE8GZFODdgNpTiFquy2cuglRez2oJ6TP2PzefRg2fzGEylh6";
 
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
@@ -48,7 +49,13 @@ public class AuthService {
         loginAttemptService.checkAllowed(request.email(), clientIp);
 
         Worker worker = workerRepository.findByEmailIgnoreCase(request.email())
-                .orElseThrow(InvalidCredentialsException::new);
+                .orElse(null);
+
+        if (worker == null) {
+            passwordEncoder.matches(request.password(), DUMMY_PASSWORD_HASH);
+            loginAttemptService.recordFailure(request.email(), clientIp);
+            throw new InvalidCredentialsException();
+        }
 
         if (!passwordEncoder.matches(request.password(), worker.getPasswordHash())) {
             loginAttemptService.recordFailure(request.email(), clientIp);

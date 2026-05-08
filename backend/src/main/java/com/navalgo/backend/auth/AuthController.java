@@ -82,8 +82,9 @@ public class AuthController {
     }
 
     @PostMapping("/clients/signup")
-    public ResponseEntity<Void> signupClient(@RequestBody @Valid ClientSignupRequest request) {
-        clientAccountService.signup(request);
+    public ResponseEntity<Void> signupClient(@RequestBody @Valid ClientSignupRequest request,
+                                             HttpServletRequest httpRequest) {
+        clientAccountService.signup(request, extractClientIp(httpRequest));
         return ResponseEntity.noContent().build();
     }
 
@@ -99,8 +100,9 @@ public class AuthController {
     }
 
     @PostMapping("/password-reset/request")
-    public ResponseEntity<Void> requestPasswordReset(@RequestBody @Valid RequestPasswordResetRequest request) {
-        passwordResetService.requestReset(request.email());
+    public ResponseEntity<Void> requestPasswordReset(@RequestBody @Valid RequestPasswordResetRequest request,
+                                                     HttpServletRequest httpRequest) {
+        passwordResetService.requestReset(request.email(), extractClientIp(httpRequest));
         return ResponseEntity.noContent().build();
     }
 

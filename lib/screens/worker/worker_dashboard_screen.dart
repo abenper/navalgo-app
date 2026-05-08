@@ -62,15 +62,28 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       final workOrdersVm = context.read<WorkOrdersViewModel>();
       final budgetService = context.read<BudgetService>();
 
-      final balance = await leaveService.getLeaveBalance(
+      final balanceFuture = leaveService.getLeaveBalance(
         token,
         workerId: workerId,
       );
+      final entriesFuture = timeService.getByWorker(token, workerId: workerId);
+      final workOrdersFuture = canSeeParts
+          ? workOrdersVm.loadWorkOrders(workerId: workerId)
+          : Future<void>.value();
+      final budgetsFuture = isCommercial
+          ? budgetService.getBudgets(token)
+          : Future<List<Budget>>.value(const <Budget>[]);
+      await Future.wait<dynamic>([
+        balanceFuture,
+        entriesFuture,
+        workOrdersFuture,
+        budgetsFuture,
+      ]);
+      final balance = await balanceFuture;
 
       var myTasks = 0;
       var urgentTasks = 0;
       if (canSeeParts) {
-        await workOrdersVm.loadWorkOrders(workerId: workerId);
         final myWorkOrders = workOrdersVm.workOrders;
         myTasks = myWorkOrders
             .where(
@@ -92,7 +105,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       var pendingBudgetResponses = 0;
       var recentBudgetLabels = <String>[];
       if (isCommercial) {
-        final budgets = await budgetService.getBudgets(token);
+        final budgets = await budgetsFuture;
         totalBudgets = budgets.length;
         pendingBudgetResponses = budgets
             .where((budget) => budget.status == 'SENT')
@@ -103,7 +116,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             .toList(growable: false);
       }
 
-      final entries = await timeService.getByWorker(token, workerId: workerId);
+      final entries = await entriesFuture;
       final now = DateTime.now();
       final todayEntries = entries.where((entry) {
         final d = entry.clockIn.toLocal();
@@ -131,6 +144,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         _totalBudgets = totalBudgets;
         _pendingBudgetResponses = pendingBudgetResponses;
         _recentBudgetLabels = recentBudgetLabels;
+        _isLoading = false;
       });
     } catch (e) {
       if (!mounted) {
@@ -138,13 +152,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       }
       setState(() {
         _error = e.toString();
+        _isLoading = false;
       });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
     }
   }
 
