@@ -1,70 +1,71 @@
-# 🚀 Deployment al Servidor (VPS)
+# Deployment en VPS
 
-## Primera vez (Setup inicial)
+## Arquitectura recomendada
+
+Usa el mismo Nginx de la VPS para servir tres entradas distintas:
+
+- `https://naval-go.com`: web comercial estática
+- `https://app.naval-go.com`: app Flutter web
+- `https://api.naval-go.com`: backend Spring Boot
+
+Los enlaces de invitación, reseteo de contraseña y verificación de cuenta deben apuntar a `app.naval-go.com`, por eso el backend ya queda preparado con ese valor por defecto.
+
+## Primera vez
 
 ```bash
-# 1. Clona el repositorio
 git clone https://github.com/abenper/navalgo-app.git
 cd navalgo-app/backend
-
-# 2. Copia el archivo de ejemplo
 cp .env.example .env
-
-# 3. Genera un secret JWT fuerte
 openssl rand -base64 48
+```
 
-# 4. Edita .env y actualiza:
-nano .env
-#   - APP_JWT_SECRET (pega el secret generado arriba)
-#   - SPRING_DATASOURCE_PASSWORD (password real de PostgreSQL)
-#   - APP_FRONTEND_BASE_URL (ej: https://naval-go.com)
-#   - APP_EMAIL_ENABLED=true
-#   - APP_EMAIL_RESEND_API_KEY
+Edita `.env` y revisa al menos:
 
-# 5. Da permisos de ejecución al script
+- `APP_JWT_SECRET`
+- `SPRING_DATASOURCE_PASSWORD`
+- `APP_FRONTEND_BASE_URL=https://app.naval-go.com`
+- `APP_SECURITY_CORS_ALLOWED_ORIGINS=https://app.naval-go.com,https://naval-go.com,https://www.naval-go.com`
+- `APP_EMAIL_ENABLED=true`
+- `APP_EMAIL_RESEND_API_KEY`
+
+Después despliega el backend:
+
+```bash
 chmod +x deploy.sh
-
-# 6. Despliega
 ./deploy.sh
 ```
 
-## Deployments posteriores (actualizaciones)
+## Despliegues posteriores
 
 ```bash
-# Ejecuta el script que hace todo automáticamente
 cd /ruta/a/navalgo-app/backend
 ./deploy.sh
 ```
 
-El script `deploy.sh` hace automáticamente:
-- ✅ Fuerza descarga limpia desde GitHub
-- ✅ Limpia artefactos de compilación anterior
-- ✅ Valida que existan secretos configurados
-- ✅ Reconstruye y despliega el contenedor Docker
+El script:
 
-En produccion, el `docker-compose.yml` deja el puerto `8080` ligado a `127.0.0.1` por defecto para que la entrada publica sea Nginx (`80/443`).
-Si necesitas acceso directo temporal por `IP:8080`, define `BACKEND_BIND_ADDRESS=0.0.0.0` en `.env` antes de desplegar.
+- descarga cambios
+- limpia artefactos previos
+- valida secretos
+- reconstruye y levanta el contenedor
 
 ## Comandos útiles
 
 ```bash
-# Ver logs del backend
 docker compose logs -f backend
-
-# Reiniciar el servicio
 docker compose restart backend
-
-# Detener
 docker compose down
-
-# Verificar que está funcionando
-curl http://localhost:8080/api/health
+curl http://127.0.0.1:8080/actuator/health
 ```
 
-Si en los logs ves `Invalid character found in method name [0x16 0x03 ...]`, no suele ser una caida del backend: normalmente es trafico HTTPS entrando por error al puerto HTTP `8080`.
+## Notas
 
-## ⚠️ Seguridad
+- En producción, `docker-compose.yml` expone `8080` solo en `127.0.0.1`.
+- Si necesitas abrirlo temporalmente por IP, define `BACKEND_BIND_ADDRESS=0.0.0.0` en `.env`.
+- Si ves `Invalid character found in method name [0x16 0x03 ...]`, suele ser tráfico HTTPS entrando por error al puerto HTTP `8080`.
 
-- **NUNCA** subas el archivo `.env` a GitHub
-- Usa secretos fuertes (mínimo 64 caracteres para JWT)
-- Mantén las credenciales de PostgreSQL seguras
+## Seguridad
+
+- No subas `.env` al repositorio.
+- Usa un secreto JWT largo y aleatorio.
+- Mantén PostgreSQL restringido a la VPS y con backups.

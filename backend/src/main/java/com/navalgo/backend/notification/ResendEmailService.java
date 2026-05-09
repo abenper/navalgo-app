@@ -39,7 +39,7 @@ public class ResendEmailService {
             @Value("${app.email.resend.api-url:https://api.resend.com/emails}") String apiUrl,
             @Value("${app.email.from:Naval-GO <notificaciones@naval-go.com>}") String fromAddress,
             @Value("${app.email.reply-to:}") String replyToAddress,
-            @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl
+            @Value("${app.frontend.base-url:https://app.naval-go.com}") String frontendBaseUrl
     ) {
         this.objectMapper = objectMapper;
         this.httpClient = HttpClient.newBuilder()
@@ -433,7 +433,7 @@ public class ResendEmailService {
 
     private String normalizeFrontendBaseUrl() {
         if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) {
-            return "https://naval-go.com";
+            return "https://app.naval-go.com";
         }
         return frontendBaseUrl.trim();
     }

@@ -1,29 +1,22 @@
-# Deploy en VPS DigitalOcean (backend + HTTPS + Managed DB)
+# Deploy en VPS DigitalOcean
 
-Este flujo asume Ubuntu 22.04/24.04 en tu VPS.
+Esta guía deja montados backend, app Flutter y web comercial con un solo Nginx.
 
-## 1) Que IP usar
+## 1. DNS
 
-- `104.248.22.99` es la IP publica normal del droplet.
-- `143.244.206.168` es una Reserved IP (Floating IP) para failover.
+Crea estos registros apuntando a la IP activa de la VPS:
 
-Si la Reserved IP esta asignada al droplet, usa esa en DNS (recomendado para futuro).
-Si no esta asignada, usa la publica normal.
+- `naval-go.com`
+- `www.naval-go.com`
+- `app.naval-go.com`
+- `api.naval-go.com`
 
-Comprobacion rapida desde el VPS:
-
-```bash
-curl -4 ifconfig.me
-```
-
-La que te devuelva es la IP de salida activa del servidor.
-
-## 2) Preparar servidor
+## 2. Preparar el servidor
 
 ```bash
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y ca-certificates curl gnupg nginx ufw git
+sudo apt install -y ca-certificates curl gnupg nginx ufw git rsync
 ```
 
 Firewall:
@@ -36,7 +29,7 @@ sudo ufw --force enable
 sudo ufw status
 ```
 
-## 3) Instalar Docker + Compose plugin
+## 3. Instalar Docker y Compose
 
 ```bash
 sudo install -m 0755 -d /etc/apt/keyrings
@@ -50,9 +43,9 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 sudo usermod -aG docker $USER
 ```
 
-Cierra sesion SSH y vuelve a entrar para aplicar el grupo docker.
+Sal y vuelve a entrar en la sesión SSH para aplicar el grupo Docker.
 
-## 4) Subir codigo
+## 4. Subir el proyecto
 
 ```bash
 cd /opt
@@ -60,117 +53,124 @@ sudo mkdir -p navalgo
 sudo chown -R $USER:$USER navalgo
 cd navalgo
 
-# Opcion A: clonar repo
+# Opción A
 # git clone <tu-repo> .
 
-# Opcion B: subir por scp/rsync desde tu equipo
+# Opción B
+# subir por scp o rsync
 ```
 
-## 5) Configurar variables seguras
+## 5. Preparar directorios públicos
 
-Edita `backend/docker-compose.yml` y cambia al menos:
+```bash
+sudo mkdir -p /var/www/naval-go-site
+sudo mkdir -p /var/www/naval-go-app
+sudo chown -R $USER:$USER /var/www/naval-go-site /var/www/naval-go-app
+```
 
-- `POSTGRES_PASSWORD`
+## 6. Configurar backend
+
+En `backend/.env` revisa al menos:
+
+- `SPRING_DATASOURCE_URL`
+- `SPRING_DATASOURCE_USERNAME`
 - `SPRING_DATASOURCE_PASSWORD`
-- `APP_JWT_SECRET` (largo y aleatorio, minimo 32-64 caracteres)
+- `APP_JWT_SECRET`
+- `APP_FRONTEND_BASE_URL=https://app.naval-go.com`
+- `APP_SECURITY_CORS_ALLOWED_ORIGINS=https://app.naval-go.com,https://naval-go.com,https://www.naval-go.com`
+- `APP_EMAIL_ENABLED=true`
+- `APP_EMAIL_RESEND_API_KEY`
 
-## 6) Managed PostgreSQL (DigitalOcean)
-
-1. En DigitalOcean, copia estos datos del cluster Managed DB:
-   - Host
-   - Port (normalmente `25060`)
-   - Database (normalmente `defaultdb`)
-   - User (normalmente `doadmin`)
-   - Password
-
-2. En `backend/docker-compose.yml`, configura:
-   - `SPRING_DATASOURCE_URL=jdbc:postgresql://<HOST>:25060/defaultdb?sslmode=require`
-   - `SPRING_DATASOURCE_USERNAME=doadmin`
-   - `SPRING_DATASOURCE_PASSWORD=<PASSWORD>`
-
-3. Importa el esquema una sola vez en Managed DB:
-
-```bash
-psql "host=<HOST> port=25060 dbname=defaultdb user=doadmin sslmode=require" -f navalgo_backend_postgres.sql
-```
-
-Si la base de produccion ya existe y solo vas a subir una nueva version del backend, aplica la migracion idempotente antes de levantar contenedores:
-
-```bash
-psql "host=<HOST> port=25060 dbname=defaultdb user=doadmin sslmode=require" -f navalgo_backend_postgres_migration.sql
-```
-
-## 7) Levantar backend
+Levanta el backend:
 
 ```bash
 cd /opt/navalgo/backend
 docker compose up -d --build
 docker compose ps
-docker compose logs -f backend
-```
-
-Por defecto el compose publica `8080` solo en `127.0.0.1` para que Nginx sea la unica entrada publica del backend. Si necesitas exponerlo temporalmente por IP, define `BACKEND_BIND_ADDRESS=0.0.0.0` en `.env` y vuelve a desplegar.
-
-Prueba local en VPS:
-
-```bash
 curl http://127.0.0.1:8080/actuator/health
 ```
 
-## 8) Nginx reverse proxy (dominio recomendado)
+## 7. Construir la app Flutter web
 
-1. Crea un DNS A record:
-   - `api.tudominio.com` -> IP activa del VPS (publica o reserved asignada)
-
-2. Instala config:
+Desde tu máquina o desde el servidor, genera el build apuntando al backend:
 
 ```bash
-sudo cp /opt/navalgo/backend/deploy/nginx-navalgo.conf /etc/nginx/sites-available/navalgo
-sudo sed -i 's/api.tudominio.com/api.TU_DOMINIO_REAL.com/g' /etc/nginx/sites-available/navalgo
-sudo ln -s /etc/nginx/sites-available/navalgo /etc/nginx/sites-enabled/navalgo
+flutter build web --release --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=https://api.naval-go.com/api
+```
+
+Publica la app:
+
+```bash
+rsync -av --delete build/web/ /var/www/naval-go-app/
+```
+
+## 8. Publicar la web comercial
+
+La landing está en `marketing_site/`.
+
+```bash
+rsync -av --delete marketing_site/ /var/www/naval-go-site/
+```
+
+## 9. Configurar Nginx
+
+Instala las plantillas del repositorio:
+
+```bash
+sudo cp /opt/navalgo/backend/deploy/nginx-navalgo-site.conf /etc/nginx/sites-available/navalgo-site
+sudo cp /opt/navalgo/backend/deploy/nginx-navalgo-app.conf /etc/nginx/sites-available/navalgo-app
+sudo cp /opt/navalgo/backend/deploy/nginx-navalgo.conf /etc/nginx/sites-available/navalgo-api
+
+sudo ln -s /etc/nginx/sites-available/navalgo-site /etc/nginx/sites-enabled/navalgo-site
+sudo ln -s /etc/nginx/sites-available/navalgo-app /etc/nginx/sites-enabled/navalgo-app
+sudo ln -s /etc/nginx/sites-available/navalgo-api /etc/nginx/sites-enabled/navalgo-api
+
 sudo nginx -t
 sudo systemctl reload nginx
 ```
 
-## 9) HTTPS con Let's Encrypt
+## 10. Activar HTTPS
 
 ```bash
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d api.TU_DOMINIO_REAL.com
+sudo certbot --nginx -d naval-go.com -d www.naval-go.com
+sudo certbot --nginx -d app.naval-go.com
+sudo certbot --nginx -d api.naval-go.com
 ```
 
-Comprueba renovacion automatica:
+Comprueba la renovación:
 
 ```bash
 systemctl status certbot.timer
 ```
 
-## 10) Conectar app Flutter
+## 11. Verificación final
 
-Lanza tu app apuntando al backend:
+Comprueba:
+
+- `https://naval-go.com`
+- `https://app.naval-go.com`
+- `https://api.naval-go.com/actuator/health`
+- `https://api.naval-go.com/swagger-ui/index.html`
+
+## 12. Actualizaciones futuras
+
+Cuando cambie la app:
 
 ```bash
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=https://api.TU_DOMINIO_REAL.com/api
+flutter build web --release --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=https://api.naval-go.com/api
+rsync -av --delete build/web/ /var/www/naval-go-app/
 ```
 
-Si aun no tienes dominio:
+Cuando cambie la web comercial:
 
 ```bash
-BACKEND_BIND_ADDRESS=0.0.0.0 docker compose up -d
-flutter run --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=http://104.248.22.99:8080/api
+rsync -av --delete marketing_site/ /var/www/naval-go-site/
 ```
 
-No uses `https://IP:8080`: ese puerto habla HTTP plano. Si necesitas HTTPS, publícalo por Nginx en `443`.
+Cuando cambie el backend:
 
-## 11) Verificacion final
-
-- Swagger: `https://api.TU_DOMINIO_REAL.com/swagger-ui/index.html`
-- Health: `https://api.TU_DOMINIO_REAL.com/actuator/health`
-- Login backend: `POST /api/auth/login`
-
-## 12) Recomendaciones de seguridad extra
-
-- En Managed DB, activa "Trusted Sources" y permite solo tu VPS.
-- Rotar credenciales y secreto JWT periodicamente.
-- Activar backups diarios de PostgreSQL.
-- Mantener servidor actualizado mensualmente.
+```bash
+cd /opt/navalgo/backend
+./deploy.sh
+```

@@ -1,17 +1,36 @@
-# navalgo
+# NavalGO
 
-A new Flutter project.
+NavalGO es una plataforma de gestión naval para partes de trabajo, flota, evidencias, fichajes, presupuestos y cierre firmado de operativas.
 
-## Getting Started
+## Estructura
 
-This project is a starting point for a Flutter application.
+- `lib/`: app Flutter
+- `backend/`: API Spring Boot y despliegue
+- `marketing_site/`: web comercial estática para `naval-go.com`
+- `web/`: shell web de Flutter para `app.naval-go.com`
 
-A few resources to get you started if this is your first Flutter project:
+## Arquitectura recomendada
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- `naval-go.com`: web comercial
+- `app.naval-go.com`: app Flutter web
+- `api.naval-go.com`: backend
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Despliegue
+
+La guía principal está en:
+
+- `backend/DEPLOYMENT.md`
+- `backend/VPS_DEPLOY.md`
+
+## Desarrollo Flutter
+
+```bash
+flutter pub get
+flutter run
+```
+
+## Build web
+
+```bash
+flutter build web --release --dart-define=USE_MOCK_API=false --dart-define=API_BASE_URL=https://api.naval-go.com/api
+```

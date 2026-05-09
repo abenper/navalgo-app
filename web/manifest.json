@@ -1,11 +1,11 @@
 {
-    "name": "navalgo",
-    "short_name": "navalgo",
+    "name": "NavalGO App",
+    "short_name": "NavalGO",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0C3342",
+    "theme_color": "#0C3342",
+    "description": "Acceso seguro a NavalGO para gestionar partes, flota, fichajes, evidencias y firmas.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

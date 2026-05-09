@@ -35,7 +35,7 @@ public class PasswordResetService {
                                 RefreshTokenService refreshTokenService,
                                 ResendEmailService resendEmailService,
                                 LoginAttemptService loginAttemptService,
-                                @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl,
+                                @Value("${app.frontend.base-url:https://app.naval-go.com}") String frontendBaseUrl,
                                 @Value("${app.auth.password-reset-ttl-minutes:30}") long passwordResetTtlMinutes) {
         this.workerRepository = workerRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;

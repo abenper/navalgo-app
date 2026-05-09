@@ -35,7 +35,7 @@ public class RegistrationInvitationService {
             RefreshTokenService refreshTokenService,
             ResendEmailService resendEmailService,
             SecureTokenSupport secureTokenSupport,
-            @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl,
+            @Value("${app.frontend.base-url:https://app.naval-go.com}") String frontendBaseUrl,
             @Value("${app.auth.registration-invitation-ttl-hours:72}") long invitationTtlHours
     ) {
         this.invitationRepository = invitationRepository;

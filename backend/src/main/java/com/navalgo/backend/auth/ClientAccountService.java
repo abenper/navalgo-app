@@ -43,7 +43,7 @@ public class ClientAccountService {
                                 SecureTokenSupport secureTokenSupport,
                                 ResendEmailService resendEmailService,
                                 LoginAttemptService loginAttemptService,
-                                @Value("${app.frontend.base-url:https://naval-go.com}") String frontendBaseUrl,
+                                @Value("${app.frontend.base-url:https://app.naval-go.com}") String frontendBaseUrl,
                                 @Value("${app.auth.email-verification-ttl-hours:48}") long emailVerificationTtlHours) {
         this.workerRepository = workerRepository;
         this.ownerRepository = ownerRepository;
