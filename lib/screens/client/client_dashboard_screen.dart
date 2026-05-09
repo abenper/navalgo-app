@@ -69,7 +69,9 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
     final pendingBudgets = _budgets
         .where((budget) => budget.status == 'SENT')
         .toList(growable: false);
-    final featuredBudget = pendingBudgets.isNotEmpty ? pendingBudgets.first : null;
+    final featuredBudget = pendingBudgets.isNotEmpty
+        ? pendingBudgets.first
+        : null;
 
     return Scaffold(
       body: RefreshIndicator(
@@ -119,7 +121,7 @@ class _ClientDashboardScreenState extends State<ClientDashboardScreen> {
               LayoutBuilder(
                 builder: (context, constraints) {
                   final crossAxisCount = constraints.maxWidth >= 900 ? 3 : 1;
-                  final childAspectRatio = crossAxisCount == 3 ? 1.75 : 2.8;
+                  final childAspectRatio = crossAxisCount == 3 ? 1.75 : 1.45;
                   return GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -211,9 +213,9 @@ class _PendingBudgetHero extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             budget.title,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: NavalgoColors.deepSea,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.headlineSmall?.copyWith(color: NavalgoColors.deepSea),
           ),
           const SizedBox(height: 8),
           Text(

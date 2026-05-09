@@ -25,8 +25,11 @@ class NavalgoPageIntro extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return LayoutBuilder(
       builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
         final stackTrailing =
             trailing != null && constraints.maxWidth < stackTrailingBreakpoint;
+        final horizontalPadding = compact ? 20.0 : 28.0;
+        final verticalPadding = compact ? 22.0 : 28.0;
         final introContent = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -62,10 +65,13 @@ class NavalgoPageIntro extends StatelessWidget {
 
         return Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(28),
+          padding: EdgeInsets.symmetric(
+            horizontal: horizontalPadding,
+            vertical: verticalPadding,
+          ),
           decoration: BoxDecoration(
             gradient: NavalgoColors.heroGradient,
-            borderRadius: BorderRadius.circular(28),
+            borderRadius: BorderRadius.circular(compact ? 24 : 28),
             boxShadow: [
               BoxShadow(
                 color: NavalgoColors.deepSea.withValues(alpha: 0.2),
@@ -114,23 +120,41 @@ class NavalgoSectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: textTheme.headlineSmall),
-              if (subtitle != null) ...[
-                const SizedBox(height: 6),
-                Text(subtitle!, style: textTheme.bodyMedium),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackAction = action != null && constraints.maxWidth < 680;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: textTheme.headlineSmall),
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 6),
+                        Text(subtitle!, style: textTheme.bodyMedium),
+                      ],
+                    ],
+                  ),
+                ),
+                if (action != null && !stackAction) ...[
+                  const SizedBox(width: 12),
+                  action!,
+                ],
               ],
+            ),
+            if (action != null && stackAction) ...[
+              const SizedBox(height: 12),
+              SizedBox(width: double.infinity, child: action!),
             ],
-          ),
-        ),
-        if (action != null) ...[const SizedBox(width: 12), action!],
-      ],
+          ],
+        );
+      },
     );
   }
 }
@@ -750,28 +774,55 @@ class NavalgoConfirmDialog extends StatelessWidget {
         ),
       ],
       child: NavalgoPanel(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: accent),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyLarge?.copyWith(color: NavalgoColors.deepSea),
-              ),
-            ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final stackContent = constraints.maxWidth < 360;
+
+            return stackContent
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(icon, color: accent),
+                      ),
+                      const SizedBox(height: 14),
+                      Text(
+                        message,
+                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: NavalgoColors.deepSea,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Icon(icon, color: accent),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          message,
+                          style: Theme.of(context).textTheme.bodyLarge
+                              ?.copyWith(color: NavalgoColors.deepSea),
+                        ),
+                      ),
+                    ],
+                  );
+          },
         ),
       ),
     );

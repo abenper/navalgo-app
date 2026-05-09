@@ -43,7 +43,8 @@ Future<bool?> openWorkOrderDetailsScreen(
 }) {
   return Navigator.of(context).push<bool>(
     MaterialPageRoute(
-      builder: (_) => _WorkOrderDetailsSheet(initialWorkOrder: initialWorkOrder),
+      builder: (_) =>
+          _WorkOrderDetailsSheet(initialWorkOrder: initialWorkOrder),
     ),
   );
 }
@@ -856,6 +857,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   bool get _hasClientSignature =>
       _workOrder.clientSignatureUrl != null &&
       _workOrder.clientSignatureUrl!.isNotEmpty;
+  bool get _canDownloadEvidenceActa =>
+      _isAdmin && _attachments.isNotEmpty && _isSigned;
   bool get _canSign => (_isWorker || _isAdmin) && !_isSigned;
   bool get _canManageClientSignature => _isWorker || _isAdmin;
   bool get _canCaptureMedia => !_isClosedWorkOrder && !_isSigned;
@@ -1424,9 +1427,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     ),
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
-                    errorBuilder: (_, _, _) => const Center(
-                      child: Text('No se pudo cargar la firma'),
-                    ),
+                    errorBuilder: (_, _, _) =>
+                        const Center(child: Text('No se pudo cargar la firma')),
                   ),
                 ),
               ),
@@ -1536,9 +1538,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             children: [
               Text(
                 'Avances del trabajo',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
               const SizedBox(height: 4),
               Text(
@@ -1566,11 +1568,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                       icon: const Icon(Icons.videocam_outlined, size: 18),
                       label: const Text('V?deo'),
                     ),
-                  if (_isAdmin && _attachments.isNotEmpty && _hasClientSignature)
+                  if (_canDownloadEvidenceActa)
                     OutlinedButton.icon(
                       onPressed: _busy ? null : _downloadEvidenceReport,
                       icon: const Icon(Icons.picture_as_pdf_outlined, size: 18),
-                      label: const Text('Informe probatorio'),
+                      label: const Text('Acta de integridad'),
                     ),
                 ],
               ),
@@ -1673,9 +1675,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     ),
                     fit: BoxFit.contain,
                     filterQuality: FilterQuality.high,
-                    errorBuilder: (_, _, _) => const Center(
-                      child: Text('No se pudo cargar la firma'),
-                    ),
+                    errorBuilder: (_, _, _) =>
+                        const Center(child: Text('No se pudo cargar la firma')),
                   ),
                 ),
               ),
@@ -1770,14 +1771,14 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       if (!mounted) {
         return;
       }
-      AppToast.success(context, 'Informe probatorio descargado.');
+      AppToast.success(context, 'Acta de integridad descargada.');
     } catch (error) {
       if (!mounted) {
         return;
       }
       AppToast.error(
         context,
-        'No se pudo descargar el informe probatorio: $error',
+        'No se pudo descargar el acta de integridad: $error',
       );
     } finally {
       if (mounted) {
@@ -2908,7 +2909,9 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
 
   List<WorkOrderAttachmentItem> _resolveAttachments(WorkOrder workOrder) {
     if (workOrder.attachments.isNotEmpty) {
-      final attachments = List<WorkOrderAttachmentItem>.of(workOrder.attachments);
+      final attachments = List<WorkOrderAttachmentItem>.of(
+        workOrder.attachments,
+      );
       attachments.sort((a, b) {
         final aCaptured = a.capturedAt;
         final bCaptured = b.capturedAt;
@@ -2990,7 +2993,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     }
   }
 
-  String _normalizeCapturedMediaFileName(String rawName, {required String fallback}) {
+  String _normalizeCapturedMediaFileName(
+    String rawName, {
+    required String fallback,
+  }) {
     final trimmed = rawName.trim();
     if (trimmed.isEmpty) {
       return fallback;

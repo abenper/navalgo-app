@@ -210,7 +210,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                           ? 1.58
                           : (crossAxisCount == 3
                                 ? 1.72
-                                : (crossAxisCount == 2 ? 1.95 : 2.5));
+                                : (crossAxisCount == 2 ? 1.7 : 1.45));
 
                       return GridView(
                         shrinkWrap: true,

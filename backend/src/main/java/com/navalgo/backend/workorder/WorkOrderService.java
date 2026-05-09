@@ -1101,17 +1101,22 @@ public class WorkOrderService {
                 .orElseThrow(() -> new EntityNotFoundException("Parte no encontrado"));
         Worker current = requireWorkerByEmail(currentUserEmail);
         if (!isAdmin(current)) {
-            throw new AccessDeniedException("Solo un administrador puede descargar el informe probatorio");
+            throw new AccessDeniedException("Solo un administrador puede descargar el acta de integridad");
         }
         if (workOrder.getAttachments() == null || workOrder.getAttachments().isEmpty()) {
-            throw new IllegalArgumentException("Este parte no tiene adjuntos para generar un informe probatorio");
+            throw new IllegalArgumentException("Este parte no tiene adjuntos para generar el acta de integridad");
         }
-        if (workOrder.getClientSignatureUrl() == null || workOrder.getClientSignatureUrl().isBlank()) {
-            throw new IllegalArgumentException("El informe probatorio solo se puede descargar cuando el parte está firmado");
+        if (workOrder.getSignedAt() == null) {
+            throw new IllegalArgumentException("El acta de integridad solo se puede descargar cuando el parte está firmado");
+        }
+        if (workOrder.getEvidenceSealedAt() == null
+                || workOrder.getEvidenceManifestHash() == null || workOrder.getEvidenceManifestHash().isBlank()
+                || workOrder.getEvidenceServerSignature() == null || workOrder.getEvidenceServerSignature().isBlank()) {
+            throw new IllegalArgumentException("El acta de integridad solo está disponible cuando la evidencia del parte ya ha sido sellada");
         }
         byte[] pdfBytes = workOrderEvidencePdfService.buildReport(workOrder);
         return new WorkOrderEvidenceReport(
-                "parte_" + workOrder.getId() + "_informe_probatorio.pdf",
+                "parte_" + workOrder.getId() + "_acta_integridad_evidencias.pdf",
                 pdfBytes
         );
     }

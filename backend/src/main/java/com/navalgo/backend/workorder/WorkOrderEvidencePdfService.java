@@ -27,145 +27,321 @@ import java.util.Locale;
 @Service
 public class WorkOrderEvidencePdfService {
 
-    private static final float MARGIN = 46f;
-    private static final float FONT_SIZE = 10.5f;
-    private static final float HEADER_FONT_SIZE = 18f;
-    private static final float SECTION_FONT_SIZE = 12f;
-    private static final float LEADING = 14f;
-    private static final float LOGO_MAX_WIDTH = 120f;
-    private static final float LOGO_MAX_HEIGHT = 40f;
-    private static final Color HEADER_COLOR = new Color(0, 82, 155);
-    private static final Color SUBTITLE_COLOR = new Color(90, 90, 90);
+    private static final float MARGIN = 44f;
+    private static final float LOGO_MAX_WIDTH = 132f;
+    private static final float LOGO_MAX_HEIGHT = 42f;
+
     private static final PDType1Font BODY_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
-    private static final PDType1Font HEADER_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
-    private static final PDType1Font SECTION_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+    private static final PDType1Font BODY_BOLD_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
+    private static final PDType1Font BODY_ITALIC_FONT = new PDType1Font(Standard14Fonts.FontName.HELVETICA_OBLIQUE);
+
+    private static final Color INK = new Color(11, 31, 42);
+    private static final Color DEEP_SEA = new Color(16, 54, 69);
+    private static final Color TIDE = new Color(20, 85, 104);
+    private static final Color HARBOR = new Color(28, 114, 130);
+    private static final Color STORM = new Color(96, 119, 132);
+    private static final Color CORAL = new Color(214, 109, 74);
+
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss z")
             .withZone(ZoneId.systemDefault());
 
     public byte[] buildReport(WorkOrder workOrder) {
         try (PDDocument document = new PDDocument()) {
-            List<String> lines = buildLines(workOrder);
+            List<DocLine> lines = buildLines(workOrder);
             writeLines(document, lines, workOrder);
             ByteArrayOutputStream output = new ByteArrayOutputStream();
             document.save(output);
             return output.toByteArray();
         } catch (IOException exception) {
-            throw new IllegalStateException("No se pudo generar el informe probatorio PDF", exception);
+            throw new IllegalStateException("No se pudo generar el acta de integridad PDF", exception);
         }
     }
 
-    private List<String> buildLines(WorkOrder workOrder) {
-        List<String> lines = new ArrayList<>();
-        lines.add("Informe probatorio de adjuntos del parte");
-        lines.add("");
-        lines.add("Este documento resume la cadena de custodia de los archivos multimedia asociados al parte.");
-        lines.add("Incluye autor de la subida, tiempos, geolocalizacion informada, huellas SHA-256 y sellos HMAC del servidor.");
-        lines.add("");
-        lines.add("Datos del parte");
-        lines.add("ID: " + safe(workOrder.getId()));
-        lines.add("Titulo: " + safe(workOrder.getTitle()));
-        lines.add("Estado: " + safe(workOrder.getStatus()));
-        lines.add("Prioridad: " + safe(workOrder.getPriority()));
-        lines.add("Propietario: " + (workOrder.getOwner() != null ? safe(workOrder.getOwner().getDisplayName()) : "N/D"));
-        lines.add("Embarcacion: " + (workOrder.getVessel() != null ? safe(workOrder.getVessel().getName()) : "N/D"));
-        lines.add("Creado: " + formatInstant(workOrder.getCreatedAt()));
-        lines.add("Firmado: " + formatInstant(workOrder.getSignedAt()));
-        lines.add("Firmado por: " + (workOrder.getSignedByWorker() != null ? safe(workOrder.getSignedByWorker().getFullName()) : "N/D"));
-        lines.add("Firma cliente: " + formatInstant(workOrder.getClientSignedAt()));
-        lines.add("Sellado final de evidencia: " + formatInstant(workOrder.getEvidenceSealedAt()));
-        lines.add("Hash manifiesto del parte: " + safe(workOrder.getEvidenceManifestHash()));
-        lines.add("Firma HMAC del servidor: " + safe(workOrder.getEvidenceServerSignature()));
-        lines.add("");
-        lines.add("Advertencia de integridad");
-        lines.add("El proceso de guardado y verificación de evidencias asegura la trazabilidad completa de cada imagen.");
-        lines.add("La foto se captura en la aplicación, se marca con metadatos de ubicación y se protege con un hash SHA-256.");
-        lines.add("Ese hash se incorpora al parte junto con la firma HMAC del servidor, creando un registro inmutable.");
-        lines.add("Cuando el parte se firma y se sella, el documento queda bloqueado para que ninguna foto ni metadato puedan cambiarse.");
-        lines.add("Por eso, si el hash de la foto presentada coincide exactamente con el hash de este informe, la imagen permanece intacta. Si alguien modifica la foto, el hash dejaría de coincidir y se detectaría inmediatamente.");
-        lines.add("");
-        lines.add("Adjuntos");
+    private List<DocLine> buildLines(WorkOrder workOrder) {
+        List<DocLine> lines = new ArrayList<>();
+
+        lines.add(kicker("USO INTERNO ADMINISTRATIVO"));
+        lines.add(body(
+                "Este documento resume la cadena de custodia técnica de las evidencias del parte. " +
+                        "No se limita a listar archivos: describe qué datos quedaron sellados, " +
+                        "qué hash se calculó sobre cada binario y qué firma HMAC emitió el servidor."
+        ));
+        lines.add(body(
+                "La clave secreta empleada para las firmas HMAC nunca se incorpora al PDF ni se expone al cliente. " +
+                        "Permanece únicamente en el backend para que la verificación dependa del servidor."
+        ));
+
+        lines.add(section("1. Qué acredita esta acta"));
+        lines.add(body(
+                "Acredita que, en el momento del sellado final del parte, existía un conjunto concreto de adjuntos, " +
+                        "con unos metadatos concretos y con unos resúmenes criptográficos concretos."
+        ));
+        lines.add(body(
+                "Si posteriormente alguien sustituyera un archivo, alterara sus bytes, cambiara fechas, geolocalización, " +
+                        "usuario de subida, ruta de almacenamiento o cualquier otro dato sellado, el resultado dejaría de coincidir " +
+                        "con los hash y firmas consignados aquí."
+        ));
+
+        lines.add(section("2. Guía de lectura de campos"));
+        lines.add(subsection("2.1 Campos de sellado del parte"));
+        addFieldExplanation(lines, "ID del parte",
+                "Identificador interno único del parte dentro del sistema.");
+        addFieldExplanation(lines, "Título",
+                "Descripción corta con la que se identifica operativamente el parte.");
+        addFieldExplanation(lines, "Estado",
+                "Situación funcional del parte en el momento del sellado.");
+        addFieldExplanation(lines, "Prioridad",
+                "Nivel operativo asignado al parte para su gestión.");
+        addFieldExplanation(lines, "Propietario",
+                "Cliente o entidad titular asociada al parte.");
+        addFieldExplanation(lines, "Embarcación",
+                "Unidad naval vinculada al trabajo, si existe.");
+        addFieldExplanation(lines, "Creado",
+                "Fecha y hora de alta del parte en la plataforma.");
+        addFieldExplanation(lines, "Firmado",
+                "Fecha y hora en la que el parte quedó firmado y pasó a estado cerrado.");
+        addFieldExplanation(lines, "Firmado por",
+                "Usuario responsable del cierre del parte en el sistema.");
+        addFieldExplanation(lines, "Firma de cliente",
+                "Momento en el que se registró la firma de cliente, si existe. Este dato forma parte del contexto auditado del parte.");
+        addFieldExplanation(lines, "Sellado final de evidencia",
+                "Instante exacto en el que el backend cerró el manifiesto técnico del parte y dejó la evidencia bloqueada.");
+        addFieldExplanation(lines, "Hash del manifiesto sellado",
+                "SHA-256 calculado sobre el manifiesto completo del parte en el instante del sellado. " +
+                        "El manifiesto incluye datos del parte y el payload firmado de todos los adjuntos, ordenados de forma estable.");
+        addFieldExplanation(lines, "Firma HMAC del sellado",
+                "HMAC-SHA256 calculada por el servidor sobre el mismo manifiesto sellado, usando una clave secreta que no sale del backend.");
+
+        lines.add(subsection("2.2 Campos de cada adjunto"));
+        addFieldExplanation(lines, "ID interno",
+                "Identificador único del adjunto dentro del parte.");
+        addFieldExplanation(lines, "Nombre original",
+                "Nombre del archivo informado en el momento de la subida.");
+        addFieldExplanation(lines, "Tipo",
+                "Clasificación funcional del adjunto, por ejemplo imagen o vídeo.");
+        addFieldExplanation(lines, "MIME",
+                "Tipo de contenido técnico detectado o almacenado para el fichero.");
+        addFieldExplanation(lines, "URL pública",
+                "Ruta pública desde la que se sirve el adjunto almacenado.");
+        addFieldExplanation(lines, "Clave de almacenamiento",
+                "Ruta interna o clave del objeto persistido en almacenamiento. Se usa para identificar qué binario concreto quedó sellado.");
+        addFieldExplanation(lines, "Tamaño en bytes",
+                "Peso exacto del archivo final sellado.");
+        addFieldExplanation(lines, "Hash SHA-256 del archivo",
+                "Resumen criptográfico calculado sobre los bytes exactos del archivo final almacenado. " +
+                        "Si cambia un solo byte, el hash resultante cambia por completo.");
+        addFieldExplanation(lines, "Firma HMAC del adjunto",
+                "HMAC-SHA256 emitida por el servidor sobre el payload técnico del adjunto. " +
+                        "No firma solo la imagen: firma también sus metadatos sellados.");
+        addFieldExplanation(lines, "Capturado",
+                "Marca temporal informada por la captura del adjunto.");
+        addFieldExplanation(lines, "Subido en servidor",
+                "Marca temporal en la que el backend recibió y registró el adjunto.");
+        addFieldExplanation(lines, "GPS",
+                "Coordenadas asociadas al adjunto en el momento de la captura o subida, si fueron informadas.");
+        addFieldExplanation(lines, "Marca de agua aplicada",
+                "Indica si el backend generó el archivo final con superposición visible de contexto operativo.");
+        addFieldExplanation(lines, "Audio eliminado",
+                "Indica si el backend eliminó la pista de audio del vídeo antes de almacenar la evidencia final.");
+        addFieldExplanation(lines, "IP de subida / User-Agent",
+                "Contexto técnico de recepción en backend para reforzar trazabilidad de origen.");
+        addFieldExplanation(lines, "Usuario que adjuntó / Email / ID del usuario",
+                "Identidad interna del usuario que originó la subida, si quedó registrada.");
+
+        lines.add(section("3. Cómo garantiza el sistema la integridad"));
+        lines.add(subsection("3.1 Hash del binario final almacenado"));
+        lines.add(body(
+                "El backend calcula un SHA-256 sobre los bytes exactos del archivo final que queda almacenado. " +
+                        "Ese valor no es decorativo: representa el contenido binario real, byte a byte."
+        ));
+        lines.add(body(
+                "Si la imagen o el vídeo se modifican más tarde, aunque el cambio sea mínimo, el hash ya no coincide con el consignado en esta acta."
+        ));
+
+        lines.add(subsection("3.2 Firma HMAC de cada adjunto"));
+        lines.add(body(
+                "Después del hash del archivo, el backend calcula una firma HMAC-SHA256 sobre un payload ordenado del adjunto. " +
+                        "Ese payload incluye, entre otros, los siguientes campos:"
+        ));
+        lines.add(bullet(
+                "workOrderId, attachmentId, fileUrl, storageObjectKey, fileType, contentType, originalFileName, " +
+                        "sha256Hex, fileSizeBytes, capturedAt, uploadedAt, latitude, longitude, watermarked, audioRemoved, " +
+                        "uploadIp, uploadUserAgent, uploadedByWorkerId y uploadedByWorkerEmail."
+        ));
+        lines.add(body(
+                "Esto significa que no solo queda protegido el binario: también queda protegida la relación entre el binario y sus metadatos sellados."
+        ));
+
+        lines.add(subsection("3.3 Hash y firma del manifiesto completo"));
+        lines.add(body(
+                "Cuando el parte se cierra, el backend construye un manifiesto completo y ordenado con los datos del parte " +
+                        "y con el payload firmado de todos los adjuntos."
+        ));
+        lines.add(body(
+                "Sobre ese manifiesto calcula dos valores distintos:"
+        ));
+        lines.add(bullet("Un SHA-256 del manifiesto completo, que identifica el estado exacto del conjunto sellado."));
+        lines.add(bullet("Una firma HMAC-SHA256 del mismo manifiesto, emitida por el servidor con su clave secreta."));
+
+        lines.add(subsection("3.4 Bloqueo posterior al sellado"));
+        lines.add(body(
+                "Una vez firmado y sellado, el backend deja de admitir cambios sobre la evidencia del parte. " +
+                        "No se pueden añadir, sustituir ni borrar adjuntos sin romper la coherencia del sellado."
+        ));
+        lines.add(body(
+                "Por eso, la garantía no descansa en una nota visual del PDF. Descansa en dos mecanismos acumulativos: " +
+                        "los hash SHA-256 de los binarios y las firmas HMAC emitidas por el servidor sobre los datos sellados."
+        ));
+
+        lines.add(section("4. Resumen del parte sellado"));
+        addDataField(lines, "ID del parte", safe(workOrder.getId()));
+        addDataField(lines, "Título", safe(workOrder.getTitle()));
+        addDataField(lines, "Estado", safe(workOrder.getStatus()));
+        addDataField(lines, "Prioridad", safe(workOrder.getPriority()));
+        addDataField(lines, "Propietario", workOrder.getOwner() != null ? safe(workOrder.getOwner().getDisplayName()) : "N/D");
+        addDataField(lines, "Embarcación", workOrder.getVessel() != null ? safe(workOrder.getVessel().getName()) : "N/D");
+        addDataField(lines, "Creado", formatInstant(workOrder.getCreatedAt()));
+        addDataField(lines, "Firmado", formatInstant(workOrder.getSignedAt()));
+        addDataField(lines, "Firmado por", workOrder.getSignedByWorker() != null ? safe(workOrder.getSignedByWorker().getFullName()) : "N/D");
+        addDataField(lines, "Firma de cliente", formatInstant(workOrder.getClientSignedAt()));
+        addDataField(lines, "Sellado final de evidencia", formatInstant(workOrder.getEvidenceSealedAt()));
+        addDataField(lines, "Hash del manifiesto sellado", safe(workOrder.getEvidenceManifestHash()));
+        addDataField(lines, "Firma HMAC del sellado", safe(workOrder.getEvidenceServerSignature()));
+
+        lines.add(section("5. Evidencias incluidas en el sellado"));
 
         List<WorkOrderAttachment> attachments = workOrder.getAttachments().stream()
                 .sorted(Comparator
                         .comparing(WorkOrderAttachment::getUploadedAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                        .thenComparing(WorkOrderAttachment::getId, Comparator.nullsLast(Comparator.naturalOrder())))
+                        .thenComparing(WorkOrderAttachment::getId, Comparator.nullsLast(Comparator.naturalOrder()))
+                        .thenComparing(WorkOrderAttachment::getFileUrl, Comparator.nullsLast(String::compareTo)))
                 .toList();
 
         int index = 1;
         for (WorkOrderAttachment attachment : attachments) {
-            lines.add("");
-            lines.add("Adjunto " + index++);
-            lines.add("ID: " + safe(attachment.getId()));
-            lines.add("Nombre original: " + safe(attachment.getOriginalFileName()));
-            lines.add("Tipo: " + safe(attachment.getFileType()));
-            lines.add("MIME: " + safe(attachment.getContentType()));
-            lines.add("URL publica: " + safe(attachment.getFileUrl()));
-            lines.add("Clave de almacenamiento: " + safe(attachment.getStorageObjectKey()));
-            lines.add("Tamano en bytes: " + safe(attachment.getFileSizeBytes()));
-            lines.add("Hash SHA-256: " + safe(attachment.getSha256Hex()));
-            lines.add("Firma HMAC del servidor: " + safe(attachment.getServerSignature()));
-            lines.add("Subido en servidor: " + formatInstant(attachment.getUploadedAt()));
-            lines.add("Capturado: " + formatInstant(attachment.getCapturedAt()));
-            lines.add("GPS: " + formatGps(attachment.getLatitude(), attachment.getLongitude()));
-            lines.add("Marca de agua aplicada: " + boolLabel(attachment.isWatermarked()));
-            lines.add("Audio eliminado: " + boolLabel(attachment.isAudioRemoved()));
-            lines.add("IP de subida: " + safe(attachment.getUploadIp()));
-            lines.add("User-Agent de subida: " + safe(attachment.getUploadUserAgent()));
+            lines.add(subsection("Adjunto " + index++));
+            addDataField(lines, "ID interno", safe(attachment.getId()));
+            addDataField(lines, "Nombre original", safe(attachment.getOriginalFileName()));
+            addDataField(lines, "Tipo", safe(attachment.getFileType()));
+            addDataField(lines, "MIME", safe(attachment.getContentType()));
+            addDataField(lines, "URL pública", safe(attachment.getFileUrl()));
+            addDataField(lines, "Clave de almacenamiento", safe(attachment.getStorageObjectKey()));
+            addDataField(lines, "Tamaño en bytes", safe(attachment.getFileSizeBytes()));
+            addDataField(lines, "Hash SHA-256 del archivo", safe(attachment.getSha256Hex()));
+            addDataField(lines, "Firma HMAC del adjunto", safe(attachment.getServerSignature()));
+            addDataField(lines, "Subido en servidor", formatInstant(attachment.getUploadedAt()));
+            addDataField(lines, "Capturado", formatInstant(attachment.getCapturedAt()));
+            addDataField(lines, "GPS", formatGps(attachment.getLatitude(), attachment.getLongitude()));
+            addDataField(lines, "Marca de agua aplicada", boolLabel(attachment.isWatermarked()));
+            addDataField(lines, "Audio eliminado", boolLabel(attachment.isAudioRemoved()));
+            addDataField(lines, "IP de subida", safe(attachment.getUploadIp()));
+            addDataField(lines, "User-Agent de subida", safe(attachment.getUploadUserAgent()));
             if (attachment.getUploadedByWorker() != null) {
-                lines.add("Usuario que adjunto: " + safe(attachment.getUploadedByWorker().getFullName()));
-                lines.add("Email del usuario: " + safe(attachment.getUploadedByWorker().getEmail()));
-                lines.add("ID del usuario: " + safe(attachment.getUploadedByWorker().getId()));
+                addDataField(lines, "Usuario que adjuntó", safe(attachment.getUploadedByWorker().getFullName()));
+                addDataField(lines, "Email del usuario", safe(attachment.getUploadedByWorker().getEmail()));
+                addDataField(lines, "ID del usuario", safe(attachment.getUploadedByWorker().getId()));
             } else {
-                lines.add("Usuario que adjunto: N/D");
+                addDataField(lines, "Usuario que adjuntó", "N/D");
             }
         }
+
+        lines.add(section("6. Criterio de lectura forense"));
+        lines.add(body(
+                "La coincidencia de un archivo con esta acta no se decide por nombre ni por apariencia visual. " +
+                        "Se decide comparando el SHA-256 del binario y verificando, en backend, que las firmas HMAC del adjunto y del manifiesto " +
+                        "siguen siendo válidas para el conjunto de datos sellado."
+        ));
+        lines.add(body(
+                "Si cualquiera de esos valores deja de coincidir, debe considerarse que la evidencia presentada no es exactamente la que quedó sellada."
+        ));
+
         return lines;
     }
 
-    private void writeLines(PDDocument document, List<String> lines, WorkOrder workOrder) throws IOException {
+    private void addFieldExplanation(List<DocLine> lines, String label, String description) {
+        lines.add(labelLine(label));
+        lines.add(valueLine(description));
+    }
+
+    private void addDataField(List<DocLine> lines, String label, String value) {
+        lines.add(labelLine(label));
+        lines.add(valueLine(value));
+    }
+
+    private DocLine kicker(String text) {
+        return new DocLine(text, BODY_BOLD_FONT, 10.5f, CORAL, 4f, 14f, 0f);
+    }
+
+    private DocLine section(String text) {
+        return new DocLine(text, BODY_BOLD_FONT, 13f, DEEP_SEA, 14f, 16f, 0f);
+    }
+
+    private DocLine subsection(String text) {
+        return new DocLine(text, BODY_BOLD_FONT, 11.5f, TIDE, 10f, 15f, 0f);
+    }
+
+    private DocLine body(String text) {
+        return new DocLine(text, BODY_FONT, 10.4f, INK, 4f, 14f, 0f);
+    }
+
+    private DocLine bullet(String text) {
+        return new DocLine("- " + text, BODY_FONT, 10.4f, INK, 2f, 14f, 10f);
+    }
+
+    private DocLine labelLine(String text) {
+        return new DocLine(text, BODY_BOLD_FONT, 10.4f, HARBOR, 6f, 13f, 0f);
+    }
+
+    private DocLine valueLine(String text) {
+        return new DocLine(text, BODY_FONT, 10.2f, INK, 0f, 14f, 10f);
+    }
+
+    private void writeLines(PDDocument document, List<DocLine> lines, WorkOrder workOrder) throws IOException {
+        PageCursor pageCursor = openPage(document, workOrder);
+        float availableWidth = pageCursor.page().getMediaBox().getWidth() - (MARGIN * 2);
+
+        for (DocLine line : lines) {
+            List<String> wrappedLines = wrapLine(
+                    line.text(),
+                    line.font(),
+                    line.fontSize(),
+                    availableWidth - line.indent()
+            );
+            float requiredHeight = line.topSpacing() + (wrappedLines.size() * line.lineHeight());
+            if (pageCursor.y() - requiredHeight <= MARGIN) {
+                pageCursor.contentStream().close();
+                pageCursor = openPage(document, workOrder);
+            }
+
+            float y = pageCursor.y() - line.topSpacing();
+            for (String wrapped : wrappedLines) {
+                if (!wrapped.isBlank()) {
+                    pageCursor.contentStream().beginText();
+                    pageCursor.contentStream().setFont(line.font(), line.fontSize());
+                    pageCursor.contentStream().setNonStrokingColor(line.color());
+                    pageCursor.contentStream().newLineAtOffset(MARGIN + line.indent(), y);
+                    pageCursor.contentStream().showText(wrapped);
+                    pageCursor.contentStream().endText();
+                }
+                y -= line.lineHeight();
+            }
+            pageCursor = pageCursor.withY(y);
+        }
+
+        pageCursor.contentStream().close();
+    }
+
+    private PageCursor openPage(PDDocument document, WorkOrder workOrder) throws IOException {
         PDPage page = new PDPage(PDRectangle.A4);
         document.addPage(page);
         PDPageContentStream contentStream = new PDPageContentStream(document, page);
-        float width = page.getMediaBox().getWidth() - (MARGIN * 2);
         float y = renderPageHeader(document, page, contentStream, workOrder);
-
-        contentStream.setFont(BODY_FONT, FONT_SIZE);
-        contentStream.setNonStrokingColor(Color.BLACK);
-        contentStream.beginText();
-        contentStream.newLineAtOffset(MARGIN, y);
-
-        for (String line : lines) {
-            boolean heading = isSectionHeading(line);
-            PDType1Font font = heading ? SECTION_FONT : BODY_FONT;
-            float fontSize = heading ? SECTION_FONT_SIZE : FONT_SIZE;
-            List<String> wrappedLines = wrapLine(line, font, fontSize, width);
-            for (String wrapped : wrappedLines) {
-                if (y <= MARGIN) {
-                    contentStream.endText();
-                    contentStream.close();
-                    page = new PDPage(PDRectangle.A4);
-                    document.addPage(page);
-                    contentStream = new PDPageContentStream(document, page);
-                    y = renderPageHeader(document, page, contentStream, workOrder);
-                    contentStream.setFont(BODY_FONT, FONT_SIZE);
-                    contentStream.setNonStrokingColor(Color.BLACK);
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(MARGIN, y);
-                }
-                contentStream.setFont(font, fontSize);
-                contentStream.showText(wrapped);
-                contentStream.newLineAtOffset(0, -LEADING);
-                y -= LEADING;
-            }
-        }
-
-        contentStream.endText();
-        contentStream.close();
+        return new PageCursor(page, contentStream, y);
     }
 
     private List<String> wrapLine(String line, PDType1Font font, float fontSize, float maxWidth) throws IOException {
         if (line == null || line.isBlank()) {
-            return List.of(" ");
+            return List.of("");
         }
 
         List<String> result = new ArrayList<>();
@@ -184,7 +360,7 @@ public class WorkOrderEvidencePdfService {
         if (!current.isEmpty()) {
             result.add(current.toString());
         }
-        return result.isEmpty() ? List.of(" ") : result;
+        return result.isEmpty() ? List.of("") : result;
     }
 
     private float renderPageHeader(PDDocument document, PDPage page, PDPageContentStream contentStream, WorkOrder workOrder) throws IOException {
@@ -204,27 +380,28 @@ public class WorkOrderEvidencePdfService {
             contentStream.drawImage(logo, MARGIN, y - logoHeight, logoWidth, logoHeight);
         }
 
-        float titleX = MARGIN + logoWidth + (logoWidth > 0 ? 12f : 0f);
-        float titleY = y - 10f;
+        float titleX = MARGIN + logoWidth + (logoWidth > 0 ? 14f : 0f);
+        float titleY = y - 8f;
+
         contentStream.beginText();
-        contentStream.setFont(HEADER_FONT, HEADER_FONT_SIZE);
-        contentStream.setNonStrokingColor(HEADER_COLOR);
+        contentStream.setFont(BODY_BOLD_FONT, 18f);
+        contentStream.setNonStrokingColor(DEEP_SEA);
         contentStream.newLineAtOffset(titleX, titleY);
-        contentStream.showText("Informe probatorio");
-        contentStream.newLineAtOffset(0, -HEADER_FONT_SIZE - 4f);
-        contentStream.setFont(BODY_FONT, FONT_SIZE);
-        contentStream.setNonStrokingColor(SUBTITLE_COLOR);
-        contentStream.showText("Documento oficial de evidencia del parte firmado");
+        contentStream.showText("Acta de integridad y cadena de custodia");
+        contentStream.newLineAtOffset(0, -20f);
+        contentStream.setFont(BODY_ITALIC_FONT, 10.2f);
+        contentStream.setNonStrokingColor(STORM);
+        contentStream.showText("Parte " + safe(workOrder.getId()) + " - Evidencia sellada por backend");
         contentStream.endText();
 
-        float lineY = y - Math.max(logoHeight, HEADER_FONT_SIZE + 18f) - 12f;
-        contentStream.setStrokingColor(HEADER_COLOR);
-        contentStream.setLineWidth(1f);
+        float lineY = y - Math.max(logoHeight, 40f) - 10f;
+        contentStream.setStrokingColor(HARBOR);
+        contentStream.setLineWidth(1.2f);
         contentStream.moveTo(MARGIN, lineY);
         contentStream.lineTo(pageWidth - MARGIN, lineY);
         contentStream.stroke();
 
-        return lineY - 18f;
+        return lineY - 16f;
     }
 
     private PDImageXObject loadHeaderLogo(PDDocument document) throws IOException {
@@ -240,10 +417,6 @@ public class WorkOrderEvidencePdfService {
         }
     }
 
-    private boolean isSectionHeading(String line) {
-        return line != null && (line.equals("Datos del parte") || line.equals("Advertencia de integridad") || line.equals("Adjuntos") || line.startsWith("Adjunto "));
-    }
-
     private String formatInstant(Instant instant) {
         return instant == null ? "N/D" : DATE_TIME_FORMATTER.format(instant);
     }
@@ -256,7 +429,7 @@ public class WorkOrderEvidencePdfService {
     }
 
     private String boolLabel(boolean value) {
-        return value ? "Si" : "No";
+        return value ? "Sí" : "No";
     }
 
     private String safe(Object value) {
@@ -265,5 +438,26 @@ public class WorkOrderEvidencePdfService {
         }
         String raw = value.toString().trim();
         return raw.isEmpty() ? "N/D" : raw;
+    }
+
+    private record DocLine(
+            String text,
+            PDType1Font font,
+            float fontSize,
+            Color color,
+            float topSpacing,
+            float lineHeight,
+            float indent
+    ) {
+    }
+
+    private record PageCursor(
+            PDPage page,
+            PDPageContentStream contentStream,
+            float y
+    ) {
+        private PageCursor withY(float newY) {
+            return new PageCursor(page, contentStream, newY);
+        }
     }
 }

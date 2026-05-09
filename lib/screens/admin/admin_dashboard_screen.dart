@@ -131,7 +131,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       : (constraints.maxWidth >= 560 ? 2 : 1);
                   final childAspectRatio = crossAxisCount == 4
                       ? 1.56
-                      : (crossAxisCount == 2 ? 1.9 : 2.45);
+                      : (crossAxisCount == 2 ? 1.65 : 1.45);
                   return GridView(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),

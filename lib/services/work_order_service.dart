@@ -197,18 +197,19 @@ class WorkOrderService {
         throw sessionError;
       }
       throw Exception(
-        'Error descargando informe probatorio (${response.statusCode})',
+        'Error descargando el acta de integridad (${response.statusCode})',
       );
     }
 
     if (!kIsWeb) {
       throw UnsupportedError(
-        'La descarga directa del informe probatorio solo está disponible en web.',
+        'La descarga directa del acta de integridad solo está disponible en web.',
       );
     }
 
-    final fileName = _extractFileName(response.headers['content-disposition']) ??
-        'informe_probatorio_parte_$workOrderId.pdf';
+    final fileName =
+        _extractFileName(response.headers['content-disposition']) ??
+        'acta_integridad_parte_$workOrderId.pdf';
     await downloadFileBytes(
       Uint8List.fromList(response.bodyBytes),
       fileName: fileName,
@@ -234,9 +235,9 @@ class WorkOrderService {
     if (contentDisposition == null || contentDisposition.isEmpty) {
       return null;
     }
-    final match = RegExp(r'filename=\"?([^\";]+)\"?').firstMatch(
-      contentDisposition,
-    );
+    final match = RegExp(
+      r'filename=\"?([^\";]+)\"?',
+    ).firstMatch(contentDisposition);
     return match?.group(1);
   }
 }

@@ -73,10 +73,7 @@ class _ClientBudgetsScreenState extends State<ClientBudgetsScreen> {
       AppToast.error(context, 'No se pudo abrir el presupuesto.');
       return;
     }
-    final opened = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened && mounted) {
       AppToast.error(context, 'No se pudo abrir el presupuesto.');
     }
@@ -96,8 +93,8 @@ class _ClientBudgetsScreenState extends State<ClientBudgetsScreen> {
           title: Text(
             isAccept ? 'Aceptar presupuesto' : 'Rechazar presupuesto',
           ),
-          content: SizedBox(
-            width: 420,
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -284,27 +281,44 @@ class _ClientBudgetCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final stackHeader = constraints.maxWidth < 420;
+              final content = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    budget.title,
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${budget.vesselName} · $amountLabel',
+                    style: Theme.of(context).textTheme.bodyLarge,
+                  ),
+                ],
+              );
+
+              if (stackHeader) {
+                return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      budget.title,
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${budget.vesselName} · $amountLabel',
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
+                    content,
+                    const SizedBox(height: 12),
+                    _StatusChip(status: budget.status),
                   ],
-                ),
-              ),
-              _StatusChip(status: budget.status),
-            ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: content),
+                  const SizedBox(width: 12),
+                  _StatusChip(status: budget.status),
+                ],
+              );
+            },
           ),
           if (budget.description != null && budget.description!.isNotEmpty) ...[
             const SizedBox(height: 12),

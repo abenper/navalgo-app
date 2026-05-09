@@ -69,6 +69,15 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
     );
   }
 
+  void _selectTab(int index) {
+    if (_selectedIndex == index) {
+      return;
+    }
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = context.select<SessionViewModel, String?>(
@@ -103,60 +112,124 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
       const ClientBudgetsScreen(),
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: NavalgoColors.mist,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(_icons[_selectedIndex], color: NavalgoColors.tide),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 390;
+        final showSectionBadge = constraints.maxWidth >= 360;
+        final useRail = constraints.maxWidth >= 960;
+
+        return Scaffold(
+          appBar: AppBar(
+            toolbarHeight: compact ? 64 : 72,
+            titleSpacing: compact ? 8 : 14,
+            title: Row(
+              children: [
+                if (showSectionBadge) ...[
+                  Container(
+                    width: compact ? 40 : 42,
+                    height: compact ? 40 : 42,
+                    decoration: BoxDecoration(
+                      color: NavalgoColors.mist,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(
+                      _icons[_selectedIndex],
+                      color: NavalgoColors.tide,
+                      size: compact ? 20 : 24,
+                    ),
+                  ),
+                  SizedBox(width: compact ? 8 : 12),
+                ],
+                Expanded(
+                  child: Text(
+                    _titles[_selectedIndex],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 12),
-            Text(_titles[_selectedIndex]),
-          ],
-        ),
-        actions: [
-          IconButton(
-            onPressed: _logout,
-            icon: const Icon(Icons.logout_rounded),
-            tooltip: 'Cerrar sesion',
+            actions: [
+              IconButton(
+                onPressed: _logout,
+                icon: const Icon(Icons.logout_rounded),
+                tooltip: 'Cerrar sesion',
+              ),
+            ],
           ),
-        ],
-      ),
-      body: Container(
-        decoration: const BoxDecoration(gradient: NavalgoColors.pageGradient),
-        child: screens[_selectedIndex],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Inicio',
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: NavalgoColors.pageGradient,
+            ),
+            child: useRail
+                ? Row(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 12, 16),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: NavalgoColors.railGradient,
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(color: NavalgoColors.border),
+                          ),
+                          child: SizedBox(
+                            width: 128,
+                            child: NavigationRail(
+                              selectedIndex: _selectedIndex,
+                              onDestinationSelected: _selectTab,
+                              labelType: NavigationRailLabelType.all,
+                              minWidth: 128,
+                              destinations: const [
+                                NavigationRailDestination(
+                                  icon: Icon(Icons.dashboard_outlined),
+                                  selectedIcon: Icon(Icons.dashboard),
+                                  label: Text('Inicio'),
+                                ),
+                                NavigationRailDestination(
+                                  icon: Icon(Icons.directions_boat_outlined),
+                                  selectedIcon: Icon(Icons.directions_boat),
+                                  label: Text('Flota'),
+                                ),
+                                NavigationRailDestination(
+                                  icon: Icon(Icons.request_quote_outlined),
+                                  selectedIcon: Icon(Icons.request_quote),
+                                  label: Text('Presupuestos'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      Expanded(child: screens[_selectedIndex]),
+                    ],
+                  )
+                : screens[_selectedIndex],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.directions_boat_outlined),
-            selectedIcon: Icon(Icons.directions_boat),
-            label: 'Flota',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.request_quote_outlined),
-            selectedIcon: Icon(Icons.request_quote),
-            label: 'Presupuestos',
-          ),
-        ],
-      ),
+          bottomNavigationBar: useRail
+              ? null
+              : NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: _selectTab,
+                  destinations: const [
+                    NavigationDestination(
+                      icon: Icon(Icons.dashboard_outlined),
+                      selectedIcon: Icon(Icons.dashboard),
+                      label: 'Inicio',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.directions_boat_outlined),
+                      selectedIcon: Icon(Icons.directions_boat),
+                      label: 'Flota',
+                    ),
+                    NavigationDestination(
+                      icon: Icon(Icons.request_quote_outlined),
+                      selectedIcon: Icon(Icons.request_quote),
+                      label: 'Presupuestos',
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 }
@@ -174,50 +247,60 @@ class _ClientPlaceholderScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680),
-          child: Container(
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(color: NavalgoColors.border),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: NavalgoColors.tide.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Icon(icon, color: NavalgoColors.tide, size: 30),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 420;
+        return Center(
+          child: Padding(
+            padding: EdgeInsets.all(compact ? 16 : 24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 680),
+              child: Container(
+                padding: EdgeInsets.all(compact ? 20 : 28),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(compact ? 24 : 28),
+                  border: Border.all(color: NavalgoColors.border),
                 ),
-                const SizedBox(height: 18),
-                Text(
-                  title,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: NavalgoColors.deepSea,
-                    fontWeight: FontWeight.w800,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: compact ? 56 : 64,
+                      height: compact ? 56 : 64,
+                      decoration: BoxDecoration(
+                        color: NavalgoColors.tide.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Icon(
+                        icon,
+                        color: NavalgoColors.tide,
+                        size: compact ? 28 : 30,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      title,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(
+                            color: NavalgoColors.deepSea,
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      body,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  body,
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

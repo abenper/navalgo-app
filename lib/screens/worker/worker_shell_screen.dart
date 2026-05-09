@@ -147,7 +147,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       case 'PARTES':
         return 1;
       case 'FICHAJES':
-        return 4;
+        return 2;
       case 'AUSENCIAS':
         return 3;
       default:
@@ -176,22 +176,43 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Notificaciones',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const Spacer(),
-                        TextButton(
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final stackHeader = constraints.maxWidth < 420;
+                        final actionButton = TextButton(
                           onPressed: notificationsVm.unreadCount == 0
                               ? null
                               : () async {
                                   await notificationsVm.markAllAsRead();
                                 },
                           child: const Text('Marcar todas como leídas'),
-                        ),
-                      ],
+                        );
+
+                        if (stackHeader) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Notificaciones',
+                                style: Theme.of(context).textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: 8),
+                              actionButton,
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            Text(
+                              'Notificaciones',
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const Spacer(),
+                            actionButton,
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                     Expanded(
@@ -268,26 +289,31 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     );
     final width = MediaQuery.of(context).size.width;
     final showName = width >= 1080;
+    final compact = width < 390;
+    final showSectionBadge = width >= 360;
     final textTheme = Theme.of(context).textTheme;
 
     return AppBar(
-      toolbarHeight: 72,
-      titleSpacing: 14,
+      toolbarHeight: compact ? 64 : 72,
+      titleSpacing: compact ? 8 : 14,
       title: Row(
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: NavalgoColors.mist,
-              borderRadius: BorderRadius.circular(14),
+          if (showSectionBadge) ...[
+            Container(
+              width: compact ? 40 : 44,
+              height: compact ? 40 : 44,
+              decoration: BoxDecoration(
+                color: NavalgoColors.mist,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(
+                _sectionIcons[_selectedIndex],
+                color: NavalgoColors.tide,
+                size: compact ? 20 : 24,
+              ),
             ),
-            child: Icon(
-              _sectionIcons[_selectedIndex],
-              color: NavalgoColors.tide,
-            ),
-          ),
-          const SizedBox(width: 12),
+            SizedBox(width: compact ? 8 : 12),
+          ],
           Expanded(
             child: Text(
               _titles[_selectedIndex],
@@ -300,12 +326,13 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       ),
       actions: [
         Padding(
-          padding: const EdgeInsets.only(right: 10),
+          padding: EdgeInsets.only(right: compact ? 6 : 10),
           child: Row(
             children: [
               _buildHeaderActionButton(
                 tooltip: 'Notificaciones',
                 onTap: _openNotifications,
+                compact: compact,
                 child: Stack(
                   clipBehavior: Clip.none,
                   children: [
@@ -343,7 +370,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                   borderRadius: BorderRadius.circular(999),
                   onTap: _openAccountMenu,
                   child: Container(
-                    height: 48,
+                    height: compact ? 42 : 48,
                     padding: EdgeInsets.symmetric(
                       horizontal: showName ? 10 : 6,
                       vertical: 4,
@@ -356,7 +383,11 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildAvatarWidget(photoUrl),
+                        _buildAvatarWidget(
+                          photoUrl,
+                          radius: compact ? 14 : 16,
+                          iconSize: compact ? 18 : 20,
+                        ),
                         if (showName) ...[
                           const SizedBox(width: 10),
                           ConstrainedBox(
@@ -388,7 +419,9 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     required String tooltip,
     required VoidCallback onTap,
     required Widget child,
+    bool compact = false,
   }) {
+    final size = compact ? 42.0 : 48.0;
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -397,8 +430,8 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
           borderRadius: BorderRadius.circular(16),
           onTap: onTap,
           child: Container(
-            width: 48,
-            height: 48,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
@@ -629,7 +662,9 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     final currentRole = context.select<SessionViewModel, String?>(
       (session) => session.user?.role,
     );
-    if (currentRole == 'ADMIN' || currentRole == 'COMERCIAL' || currentRole == 'CLIENT') {
+    if (currentRole == 'ADMIN' ||
+        currentRole == 'COMERCIAL' ||
+        currentRole == 'CLIENT') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (currentRole != null) {
           _redirectForRole(currentRole);
@@ -640,7 +675,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        if (constraints.maxWidth >= 600) {
+        if (constraints.maxWidth >= 720) {
           return Scaffold(
             appBar: _buildAppBar(context),
             body: Container(
