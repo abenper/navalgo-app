@@ -96,11 +96,11 @@ public class BudgetController {
         String finalVesselName = vesselName != null ? vesselName : "Embarcacion pendiente";
 
         if (ownerId != null) {
-            Owner owner = ownerRepository.findById(ownerId)
+            Owner owner = ownerRepository.findByIdAndArchivedFalse(ownerId)
                     .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
             finalOwnerName = owner.getDisplayName();
             if (vesselId != null) {
-                Vessel vessel = vesselRepository.findById(vesselId)
+                Vessel vessel = vesselRepository.findByIdAndArchivedFalse(vesselId)
                         .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
                 if (!vessel.getOwner().getId().equals(owner.getId())) {
                     throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");

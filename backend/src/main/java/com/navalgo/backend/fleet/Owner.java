@@ -2,6 +2,7 @@ package com.navalgo.backend.fleet;
 
 import com.navalgo.backend.company.Company;
 import jakarta.persistence.*;
+import java.time.Instant;
 
 @Entity
 @Table(name = "owners")
@@ -27,6 +28,12 @@ public class Owner {
     @ManyToOne(fetch = FetchType.LAZY)
     private Company company;
 
+    @Column(nullable = false)
+    private boolean archived = false;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -47,4 +54,10 @@ public class Owner {
 
     public Company getCompany() { return company; }
     public void setCompany(Company company) { this.company = company; }
+
+    public boolean isArchived() { return archived; }
+    public void setArchived(boolean archived) { this.archived = archived; }
+
+    public Instant getArchivedAt() { return archivedAt; }
+    public void setArchivedAt(Instant archivedAt) { this.archivedAt = archivedAt; }
 }

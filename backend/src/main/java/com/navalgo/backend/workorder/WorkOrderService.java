@@ -125,12 +125,12 @@ public class WorkOrderService {
         if (!isAdmin(current)) {
             throw new AccessDeniedException("Solo un administrador puede crear partes");
         }
-        Owner owner = ownerRepository.findById(request.ownerId())
+        Owner owner = ownerRepository.findByIdAndArchivedFalse(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         Vessel vessel = null;
         if (request.vesselId() != null) {
-            vessel = vesselRepository.findById(request.vesselId())
+            vessel = vesselRepository.findByIdAndArchivedFalse(request.vesselId())
                     .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
         }
 
@@ -296,13 +296,13 @@ public class WorkOrderService {
         }
 
         if (request.ownerId() != null) {
-            Owner owner = ownerRepository.findById(request.ownerId())
+            Owner owner = ownerRepository.findByIdAndArchivedFalse(request.ownerId())
                     .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
             workOrder.setOwner(owner);
         }
 
         if (request.vesselId() != null) {
-            Vessel vessel = vesselRepository.findById(request.vesselId())
+            Vessel vessel = vesselRepository.findByIdAndArchivedFalse(request.vesselId())
                     .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
             workOrder.setVessel(vessel);
         }

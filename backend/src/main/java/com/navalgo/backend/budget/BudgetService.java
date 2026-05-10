@@ -232,7 +232,7 @@ public class BudgetService {
         Worker current = requireActiveWorker(currentUserEmail);
         Budget budget = budgetRepository.findById(budgetId)
                 .orElseThrow(() -> new EntityNotFoundException("Presupuesto no encontrado"));
-        Vessel vessel = vesselRepository.findById(request.vesselId())
+        Vessel vessel = vesselRepository.findByIdAndArchivedFalse(request.vesselId())
                 .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
 
         if (!vessel.getOwner().getId().equals(budget.getOwner().getId())) {
@@ -449,7 +449,7 @@ public class BudgetService {
                                              String newClientName) {
         Owner owner;
         if (ownerId != null) {
-            owner = ownerRepository.findById(ownerId)
+            owner = ownerRepository.findByIdAndArchivedFalse(ownerId)
                     .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
 
             String normalizedContactEmail = inputSanitizer.email(contactEmail);
@@ -563,7 +563,7 @@ public class BudgetService {
 
     private Vessel findOrCreatePlaceholderVessel(Owner owner) {
         Long ownerId = owner.getId();
-        return vesselRepository.findByOwnerId(ownerId).stream()
+        return vesselRepository.findByOwnerIdAndArchivedFalse(ownerId).stream()
                 .filter(this::isPlaceholderVessel)
                 .findFirst()
                 .orElseGet(() -> {
@@ -585,21 +585,22 @@ public class BudgetService {
 
     private void ensureOwnerEmailAvailable(String email, Long ownerId) {
         boolean exists = ownerId == null
-                ? ownerRepository.existsByEmailIgnoreCase(email)
-                : ownerRepository.existsByEmailIgnoreCaseAndIdNot(email, ownerId);
+                ? ownerRepository.existsByEmailIgnoreCaseAndArchivedFalse(email)
+                : ownerRepository.existsByEmailIgnoreCaseAndIdNotAndArchivedFalse(email, ownerId);
         if (exists) {
             throw new IllegalArgumentException("Ya existe un cliente con ese correo electronico");
         }
     }
 
     private Optional<Owner> resolveOwnerByEmail(String email) {
-        Optional<Owner> ownerByEmail = ownerRepository.findByEmailIgnoreCase(email);
+        Optional<Owner> ownerByEmail = ownerRepository.findByEmailIgnoreCaseAndArchivedFalse(email);
         if (ownerByEmail.isPresent()) {
             return ownerByEmail;
         }
         return workerRepository.findByEmailIgnoreCase(email)
+                .filter(Worker::isActive)
                 .map(Worker::getOwner)
-                .filter(owner -> owner != null && owner.getId() != null);
+                .filter(owner -> owner != null && owner.getId() != null && !owner.isArchived());
     }
 
     private BudgetDto toDto(Budget budget) {

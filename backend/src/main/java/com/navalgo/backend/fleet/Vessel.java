@@ -2,6 +2,7 @@ package com.navalgo.backend.fleet;
 
 import jakarta.persistence.*;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -45,6 +46,12 @@ public class Vessel {
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private Owner owner;
+
+    @Column(nullable = false)
+    private boolean archived = false;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -166,6 +173,12 @@ public class Vessel {
 
     public Owner getOwner() { return owner; }
     public void setOwner(Owner owner) { this.owner = owner; }
+
+    public boolean isArchived() { return archived; }
+    public void setArchived(boolean archived) { this.archived = archived; }
+
+    public Instant getArchivedAt() { return archivedAt; }
+    public void setArchivedAt(Instant archivedAt) { this.archivedAt = archivedAt; }
 
     private List<String> parseLabels(String rawValue) {
         if (rawValue == null || rawValue.isBlank()) {

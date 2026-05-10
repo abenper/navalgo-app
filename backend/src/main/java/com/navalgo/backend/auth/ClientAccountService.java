@@ -78,7 +78,7 @@ public class ClientAccountService {
 
         cleanupInactiveClientAccountByEmail(email);
 
-        Owner owner = ownerRepository.findByEmailIgnoreCase(email)
+        Owner owner = ownerRepository.findByEmailIgnoreCaseAndArchivedFalse(email)
                 .orElseGet(() -> createOwner(fullName, email, phone));
 
         cleanupInactiveClientAccountByOwner(owner.getId());

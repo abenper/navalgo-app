@@ -17,6 +17,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -58,7 +59,7 @@ public class FleetController {
     @GetMapping("/owners")
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<List<OwnerDto>> listOwners() {
-        return ResponseEntity.ok(ownerRepository.findAll().stream().map(OwnerDto::from).toList());
+        return ResponseEntity.ok(ownerRepository.findAllByArchivedFalseOrderByDisplayNameAsc().stream().map(OwnerDto::from).toList());
     }
 
     @PostMapping("/owners")
@@ -73,7 +74,7 @@ public class FleetController {
     @Transactional
     public ResponseEntity<OwnerDto> updateOwner(@PathVariable Long id,
                                                 @RequestBody @Valid UpdateOwnerRequest request) {
-        Owner owner = ownerRepository.findById(id)
+        Owner owner = ownerRepository.findByIdAndArchivedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         owner.setType(request.type());
@@ -99,18 +100,23 @@ public class FleetController {
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<Void> deleteOwner(@PathVariable Long id) {
-        Owner owner = ownerRepository.findById(id)
+        Owner owner = ownerRepository.findByIdAndArchivedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
-        if (!vesselRepository.findByOwnerId(id).isEmpty()) {
-            throw new IllegalArgumentException("No se puede borrar un propietario con embarcaciones asociadas");
-        }
-        if (workOrderRepository.existsByOwnerId(id)) {
-            throw new IllegalArgumentException("No se puede borrar un propietario con partes asociados");
-        }
-        if (budgetRepository.existsByOwnerId(id)) {
-            throw new IllegalArgumentException("No se puede borrar un propietario con presupuestos asociados");
+
+        List<Vessel> activeVessels = vesselRepository.findByOwnerIdAndArchivedFalse(id);
+        boolean hasOwnerHistory = workOrderRepository.existsByOwnerId(id) || budgetRepository.existsByOwnerId(id);
+        boolean anyVesselHasHistory = activeVessels.stream().anyMatch(vessel ->
+                workOrderRepository.existsByVesselId(vessel.getId()) || budgetRepository.existsByVesselId(vessel.getId())
+        );
+
+        if (hasOwnerHistory || anyVesselHasHistory) {
+            archiveOwner(owner, activeVessels);
+            return ResponseEntity.noContent().build();
         }
 
+        for (Vessel vessel : activeVessels) {
+            vesselRepository.delete(vessel);
+        }
         workerRepository.findByOwner_Id(id).ifPresent(workerRepository::delete);
         ownerRepository.delete(owner);
         return ResponseEntity.noContent().build();
@@ -137,8 +143,8 @@ public class FleetController {
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<VesselDto>> listVessels(@RequestParam(required = false) Long ownerId) {
         List<Vessel> vessels = ownerId == null
-                ? vesselRepository.findAll()
-                : vesselRepository.findByOwnerId(ownerId);
+                ? vesselRepository.findAllByArchivedFalseOrderByNameAsc()
+                : vesselRepository.findByOwnerIdAndArchivedFalseOrderByNameAsc(ownerId);
         return ResponseEntity.ok(vessels.stream().map(VesselDto::from).toList());
     }
 
@@ -154,10 +160,10 @@ public class FleetController {
     @Transactional
     public ResponseEntity<VesselDto> updateVessel(@PathVariable Long id,
                                                   @RequestBody @Valid UpdateVesselRequest request) {
-        Vessel vessel = vesselRepository.findById(id)
+        Vessel vessel = vesselRepository.findByIdAndArchivedFalse(id)
                 .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
 
-        Owner owner = ownerRepository.findById(request.ownerId())
+        Owner owner = ownerRepository.findByIdAndArchivedFalse(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
@@ -200,13 +206,13 @@ public class FleetController {
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     @Transactional
     public ResponseEntity<Void> deleteVessel(@PathVariable Long id) {
-        if (!vesselRepository.existsById(id)) {
-            throw new EntityNotFoundException("Embarcacion no encontrada");
+        Vessel vessel = vesselRepository.findByIdAndArchivedFalse(id)
+                .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+        if (workOrderRepository.existsByVesselId(id) || budgetRepository.existsByVesselId(id)) {
+            archiveVessel(vessel);
+            return ResponseEntity.noContent().build();
         }
-        if (workOrderRepository.existsByVesselId(id)) {
-            throw new IllegalArgumentException("No se puede borrar una embarcacion con partes asociados");
-        }
-        vesselRepository.deleteById(id);
+        vesselRepository.delete(vessel);
         return ResponseEntity.noContent().build();
     }
 
@@ -312,7 +318,7 @@ public class FleetController {
     }
 
     private Vessel buildVesselFromCreateRequest(Vessel vessel, CreateVesselRequest request) {
-        Owner owner = ownerRepository.findById(request.ownerId())
+        Owner owner = ownerRepository.findByIdAndArchivedFalse(request.ownerId())
                 .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
 
         List<String> engineLabels = normalizeEngineLabels(request.engineLabels(), request.engineCount());
@@ -465,10 +471,33 @@ public class FleetController {
 
     private void ensureOwnerEmailAvailable(String email, Long ownerId) {
         boolean exists = ownerId == null
-                ? ownerRepository.existsByEmailIgnoreCase(email)
-                : ownerRepository.existsByEmailIgnoreCaseAndIdNot(email, ownerId);
+                ? ownerRepository.existsByEmailIgnoreCaseAndArchivedFalse(email)
+                : ownerRepository.existsByEmailIgnoreCaseAndIdNotAndArchivedFalse(email, ownerId);
         if (exists) {
             throw new IllegalArgumentException("Ya existe un cliente con ese correo electronico");
         }
+    }
+
+    private void archiveOwner(Owner owner, List<Vessel> activeVessels) {
+        owner.setArchived(true);
+        owner.setArchivedAt(Instant.now());
+        ownerRepository.save(owner);
+
+        for (Vessel vessel : activeVessels) {
+            archiveVessel(vessel);
+        }
+
+        workerRepository.findByOwner_Id(owner.getId()).ifPresent(worker -> {
+            if (worker.getRole() == com.navalgo.backend.common.Role.CLIENT) {
+                worker.setActive(false);
+                workerRepository.save(worker);
+            }
+        });
+    }
+
+    private void archiveVessel(Vessel vessel) {
+        vessel.setArchived(true);
+        vessel.setArchivedAt(Instant.now());
+        vesselRepository.save(vessel);
     }
 }

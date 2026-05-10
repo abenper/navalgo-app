@@ -22,6 +22,31 @@ ALTER TABLE vessels
 ALTER TABLE vessels
     ADD COLUMN IF NOT EXISTS gearbox_serial_numbers VARCHAR(1000);
 
+ALTER TABLE owners
+    ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE owners
+    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE vessels
+    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE;
+
+ALTER TABLE vessels
+    DROP CONSTRAINT IF EXISTS vessels_registration_number_key;
+
+CREATE INDEX IF NOT EXISTS idx_owners_archived
+    ON owners(archived);
+
+CREATE INDEX IF NOT EXISTS idx_vessels_archived
+    ON vessels(archived);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_vessels_registration_number_active
+    ON vessels(LOWER(registration_number))
+    WHERE archived = FALSE;
+
 ALTER TABLE work_orders
     ADD COLUMN IF NOT EXISTS client_signature_url VARCHAR(2000);
 
