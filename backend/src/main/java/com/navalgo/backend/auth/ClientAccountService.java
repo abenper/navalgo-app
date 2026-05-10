@@ -5,6 +5,8 @@ import com.navalgo.backend.common.Role;
 import com.navalgo.backend.fleet.Owner;
 import com.navalgo.backend.fleet.OwnerRepository;
 import com.navalgo.backend.fleet.OwnerType;
+import com.navalgo.backend.fleet.Vessel;
+import com.navalgo.backend.fleet.VesselRepository;
 import com.navalgo.backend.notification.ResendEmailService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
@@ -26,6 +28,7 @@ public class ClientAccountService {
 
     private final WorkerRepository workerRepository;
     private final OwnerRepository ownerRepository;
+    private final VesselRepository vesselRepository;
     private final PasswordEncoder passwordEncoder;
     private final InputSanitizer inputSanitizer;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
@@ -37,6 +40,7 @@ public class ClientAccountService {
 
     public ClientAccountService(WorkerRepository workerRepository,
                                 OwnerRepository ownerRepository,
+                                VesselRepository vesselRepository,
                                 PasswordEncoder passwordEncoder,
                                 InputSanitizer inputSanitizer,
                                 EmailVerificationTokenRepository emailVerificationTokenRepository,
@@ -47,6 +51,7 @@ public class ClientAccountService {
                                 @Value("${app.auth.email-verification-ttl-hours:48}") long emailVerificationTtlHours) {
         this.workerRepository = workerRepository;
         this.ownerRepository = ownerRepository;
+        this.vesselRepository = vesselRepository;
         this.passwordEncoder = passwordEncoder;
         this.inputSanitizer = inputSanitizer;
         this.emailVerificationTokenRepository = emailVerificationTokenRepository;
@@ -93,6 +98,13 @@ public class ClientAccountService {
         worker.setEmailVerified(false);
         worker.setOwner(owner);
         Worker saved = workerRepository.save(worker);
+
+        maybeCreateVessel(
+                owner,
+                request.vesselName(),
+                request.vesselRegistrationNumber(),
+                request.vesselModel()
+        );
 
         issueVerification(saved);
     }
@@ -175,6 +187,24 @@ public class ClientAccountService {
         owner.setEmail(email);
         owner.setPhone(phone);
         return ownerRepository.save(owner);
+    }
+
+    private void maybeCreateVessel(Owner owner,
+                                   String rawVesselName,
+                                   String rawRegistrationNumber,
+                                   String rawModel) {
+        String vesselName = inputSanitizer.optionalText(rawVesselName, 255);
+        String registrationNumber = inputSanitizer.optionalText(rawRegistrationNumber, 255);
+        if (vesselName == null || vesselName.isBlank() || registrationNumber == null || registrationNumber.isBlank()) {
+            return;
+        }
+
+        Vessel vessel = new Vessel();
+        vessel.setOwner(owner);
+        vessel.setName(vesselName);
+        vessel.setRegistrationNumber(registrationNumber);
+        vessel.setModel(inputSanitizer.optionalText(rawModel, 255));
+        vesselRepository.save(vessel);
     }
 
     private String buildPublicUrl(String screen, String token) {

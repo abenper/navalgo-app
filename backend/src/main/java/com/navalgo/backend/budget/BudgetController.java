@@ -54,6 +54,14 @@ public class BudgetController {
         return ResponseEntity.ok(budgetService.updateStatus(id, request, authentication.getName()));
     }
 
+    @PatchMapping("/{id}/vessel")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','CLIENT')")
+    public ResponseEntity<BudgetDto> assignVessel(@PathVariable Long id,
+                                                  @RequestBody @Valid AssignBudgetVesselRequest request,
+                                                  Authentication authentication) {
+        return ResponseEntity.ok(budgetService.assignVessel(id, request, authentication.getName()));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<Void> delete(@PathVariable Long id,
@@ -70,18 +78,20 @@ public class BudgetController {
                                                                @RequestParam(required = false) String ownerName,
                                                                @RequestParam(required = false) String vesselName) {
         String finalOwnerName = ownerName != null ? ownerName : "Cliente Pendiente";
-        String finalVesselName = vesselName != null ? vesselName : "Embarcacion General";
+        String finalVesselName = vesselName != null ? vesselName : "Embarcacion pendiente";
 
-        if (ownerId != null && vesselId != null) {
+        if (ownerId != null) {
             Owner owner = ownerRepository.findById(ownerId)
                     .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
-            Vessel vessel = vesselRepository.findById(vesselId)
-                    .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
-            if (!vessel.getOwner().getId().equals(owner.getId())) {
-                throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
-            }
             finalOwnerName = owner.getDisplayName();
-            finalVesselName = vessel.getName();
+            if (vesselId != null) {
+                Vessel vessel = vesselRepository.findById(vesselId)
+                        .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+                if (!vessel.getOwner().getId().equals(owner.getId())) {
+                    throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
+                }
+                finalVesselName = vessel.getName();
+            }
         }
 
         return ResponseEntity.ok(

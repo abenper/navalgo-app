@@ -84,21 +84,26 @@ public class BudgetService {
         Owner owner;
         Vessel vessel;
 
-        if (request.ownerId() != null && request.vesselId() != null) {
+        if (request.ownerId() != null) {
             owner = ownerRepository.findById(request.ownerId())
                     .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
-            vessel = vesselRepository.findById(request.vesselId())
-                    .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
-
-            if (!vessel.getOwner().getId().equals(owner.getId())) {
-                throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
-            }
 
             String normalizedContactEmail = inputSanitizer.email(request.contactEmail());
             if (normalizedContactEmail != null && !normalizedContactEmail.isBlank()) {
                 ensureOwnerEmailAvailable(normalizedContactEmail, owner.getId());
                 owner.setEmail(normalizedContactEmail);
                 owner = ownerRepository.save(owner);
+            }
+
+            if (request.vesselId() != null) {
+                vessel = vesselRepository.findById(request.vesselId())
+                        .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+
+                if (!vessel.getOwner().getId().equals(owner.getId())) {
+                    throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
+                }
+            } else {
+                vessel = findOrCreatePlaceholderVessel(owner);
             }
         } else {
             String email = inputSanitizer.email(request.contactEmail());
@@ -119,25 +124,7 @@ public class BudgetService {
                 return ownerRepository.save(newOwner);
             });
 
-            String vName = request.newVesselName();
-            if (vName == null || vName.isBlank()) {
-                vName = "Embarcacion General";
-            }
-            final String finalVName = vName;
-            final Owner finalOwner = owner;
-            final Long finalOwnerId = owner.getId();
-            vessel = vesselRepository.findByOwnerId(finalOwnerId).stream()
-                    .filter(v -> v.getName().equalsIgnoreCase(finalVName))
-                    .findFirst()
-                    .orElseGet(() -> {
-                        Vessel newVessel = new Vessel();
-                        newVessel.setOwner(finalOwner);
-                        newVessel.setName(finalVName);
-                        newVessel.setRegistrationNumber(
-                                buildPlaceholderRegistrationNumber(finalOwnerId, finalVName)
-                        );
-                        return vesselRepository.save(newVessel);
-                    });
+            vessel = findOrCreatePlaceholderVessel(owner);
         }
 
         Budget budget = new Budget();
@@ -153,6 +140,31 @@ public class BudgetService {
         budget.setCreatedAt(Instant.now());
         budget.setUpdatedAt(Instant.now());
 
+        return toDto(budgetRepository.save(budget));
+    }
+
+    @Transactional
+    public BudgetDto assignVessel(Long budgetId,
+                                  AssignBudgetVesselRequest request,
+                                  String currentUserEmail) {
+        Worker current = requireActiveWorker(currentUserEmail);
+        Budget budget = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new EntityNotFoundException("Presupuesto no encontrado"));
+        Vessel vessel = vesselRepository.findById(request.vesselId())
+                .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
+
+        if (!vessel.getOwner().getId().equals(budget.getOwner().getId())) {
+            throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a este cliente");
+        }
+
+        if (current.getRole() == Role.CLIENT) {
+            ensureClientOwnsBudget(current, budget);
+        } else if (current.getRole() != Role.ADMIN && current.getRole() != Role.COMERCIAL) {
+            throw new AccessDeniedException("No tienes permiso para actualizar la embarcacion del presupuesto");
+        }
+
+        budget.setVessel(vessel);
+        budget.setUpdatedAt(Instant.now());
         return toDto(budgetRepository.save(budget));
     }
 
@@ -228,7 +240,6 @@ public class BudgetService {
                 budget.getVessel().getName(),
                 budget.getAmount(),
                 budget.getCurrency(),
-                budget.getPdfUrl(),
                 clientHasAccount
         );
     }
@@ -348,6 +359,28 @@ public class BudgetService {
             suffix = suffix.substring(suffix.length() - 6);
         }
         return "TMP-" + ownerPart + "-" + baseName + "-" + suffix;
+    }
+
+    private Vessel findOrCreatePlaceholderVessel(Owner owner) {
+        Long ownerId = owner.getId();
+        return vesselRepository.findByOwnerId(ownerId).stream()
+                .filter(this::isPlaceholderVessel)
+                .findFirst()
+                .orElseGet(() -> {
+                    Vessel placeholder = new Vessel();
+                    placeholder.setOwner(owner);
+                    placeholder.setName("Embarcacion pendiente de registrar");
+                    placeholder.setRegistrationNumber(
+                            buildPlaceholderRegistrationNumber(ownerId, "PENDIENTE")
+                    );
+                    return vesselRepository.save(placeholder);
+                });
+    }
+
+    private boolean isPlaceholderVessel(Vessel vessel) {
+        String registrationNumber = vessel.getRegistrationNumber();
+        return registrationNumber != null
+                && registrationNumber.toUpperCase(Locale.ROOT).startsWith("TMP-");
     }
 
     private void ensureOwnerEmailAvailable(String email, Long ownerId) {

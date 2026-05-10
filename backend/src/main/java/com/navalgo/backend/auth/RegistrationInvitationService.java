@@ -1,5 +1,9 @@
 package com.navalgo.backend.auth;
 
+import com.navalgo.backend.common.InputSanitizer;
+import com.navalgo.backend.fleet.Owner;
+import com.navalgo.backend.fleet.Vessel;
+import com.navalgo.backend.fleet.VesselRepository;
 import com.navalgo.backend.notification.ResendEmailService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
@@ -25,6 +29,8 @@ public class RegistrationInvitationService {
     private final RefreshTokenService refreshTokenService;
     private final ResendEmailService resendEmailService;
     private final SecureTokenSupport secureTokenSupport;
+    private final InputSanitizer inputSanitizer;
+    private final VesselRepository vesselRepository;
     private final String frontendBaseUrl;
     private final long invitationTtlHours;
 
@@ -35,6 +41,8 @@ public class RegistrationInvitationService {
             RefreshTokenService refreshTokenService,
             ResendEmailService resendEmailService,
             SecureTokenSupport secureTokenSupport,
+            InputSanitizer inputSanitizer,
+            VesselRepository vesselRepository,
             @Value("${app.frontend.base-url:https://app.naval-go.com}") String frontendBaseUrl,
             @Value("${app.auth.registration-invitation-ttl-hours:72}") long invitationTtlHours
     ) {
@@ -44,6 +52,8 @@ public class RegistrationInvitationService {
         this.refreshTokenService = refreshTokenService;
         this.resendEmailService = resendEmailService;
         this.secureTokenSupport = secureTokenSupport;
+        this.inputSanitizer = inputSanitizer;
+        this.vesselRepository = vesselRepository;
         this.frontendBaseUrl = frontendBaseUrl;
         this.invitationTtlHours = invitationTtlHours;
     }
@@ -91,6 +101,13 @@ public class RegistrationInvitationService {
         worker.setMustChangePassword(false);
         worker.setEmailVerified(true);
         workerRepository.save(worker);
+
+        maybeCreateVessel(
+                worker.getOwner(),
+                request.vesselName(),
+                request.vesselRegistrationNumber(),
+                request.vesselModel()
+        );
 
         invitation.setConsumedAt(Instant.now());
         invitationRepository.save(invitation);
@@ -144,5 +161,26 @@ public class RegistrationInvitationService {
         }
 
         return hasUpper && hasLower && hasDigit && hasSymbol;
+    }
+
+    private void maybeCreateVessel(Owner owner,
+                                   String rawVesselName,
+                                   String rawRegistrationNumber,
+                                   String rawModel) {
+        if (owner == null || owner.getId() == null) {
+            return;
+        }
+        String vesselName = inputSanitizer.optionalText(rawVesselName, 255);
+        String registrationNumber = inputSanitizer.optionalText(rawRegistrationNumber, 255);
+        if (vesselName == null || vesselName.isBlank() || registrationNumber == null || registrationNumber.isBlank()) {
+            return;
+        }
+
+        Vessel vessel = new Vessel();
+        vessel.setOwner(owner);
+        vessel.setName(vesselName);
+        vessel.setRegistrationNumber(registrationNumber);
+        vessel.setModel(inputSanitizer.optionalText(rawModel, 255));
+        vesselRepository.save(vessel);
     }
 }

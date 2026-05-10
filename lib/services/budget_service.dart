@@ -23,10 +23,7 @@ class BudgetService {
     if (data is! List) {
       return <Budget>[];
     }
-    return data
-        .whereType<Map<String, dynamic>>()
-        .map(Budget.fromJson)
-        .toList();
+    return data.whereType<Map<String, dynamic>>().map(Budget.fromJson).toList();
   }
 
   Future<Budget> createBudget(
@@ -69,10 +66,7 @@ class BudgetService {
     );
   }
 
-  Future<void> deleteBudget(
-    String token, {
-    required int budgetId,
-  }) async {
+  Future<void> deleteBudget(String token, {required int budgetId}) async {
     await _apiClient.delete(
       '/budgets/$budgetId',
       headers: {'Authorization': 'Bearer $token'},
@@ -88,10 +82,20 @@ class BudgetService {
     final data = await _apiClient.patch(
       '/budgets/$budgetId/status',
       headers: {'Authorization': 'Bearer $token'},
-      body: {
-        'status': status,
-        'clientObservations': clientObservations,
-      },
+      body: {'status': status, 'clientObservations': clientObservations},
+    );
+    return Budget.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Budget> assignBudgetVessel(
+    String token, {
+    required int budgetId,
+    required int vesselId,
+  }) async {
+    final data = await _apiClient.patch(
+      '/budgets/$budgetId/vessel',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {'vesselId': vesselId},
     );
     return Budget.fromJson(data as Map<String, dynamic>);
   }
@@ -111,7 +115,7 @@ class BudgetService {
     final uri = Uri.parse('${ApiConfig.baseUrl}/budgets/uploads');
     final request = http.MultipartRequest('POST', uri)
       ..headers['Authorization'] = 'Bearer $token';
-      
+
     if (ownerId != null) request.fields['ownerId'] = '$ownerId';
     if (vesselId != null) request.fields['vesselId'] = '$vesselId';
     if (ownerName != null) request.fields['ownerName'] = ownerName;

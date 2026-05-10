@@ -13,14 +13,16 @@ import 'client_dashboard_screen.dart';
 import 'client_vessels_screen.dart';
 
 class ClientShellScreen extends StatefulWidget {
-  const ClientShellScreen({super.key});
+  const ClientShellScreen({super.key, this.initialIndex = 0});
+
+  final int initialIndex;
 
   @override
   State<ClientShellScreen> createState() => _ClientShellScreenState();
 }
 
 class _ClientShellScreenState extends State<ClientShellScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
   static const _titles = ['Inicio', 'Flota', 'Presupuestos'];
   static const _icons = [
@@ -28,6 +30,12 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
     Icons.directions_boat_outlined,
     Icons.request_quote_outlined,
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex.clamp(0, _titles.length - 1);
+  }
 
   void _redirectForRole(String role) {
     if (!mounted) {

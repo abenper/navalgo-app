@@ -5,6 +5,9 @@ import jakarta.validation.constraints.Size;
 
 public record CompleteRegistrationRequest(
         @NotBlank String token,
-        @NotBlank @Size(min = 12, max = 128) String password
+        @NotBlank @Size(min = 12, max = 128) String password,
+        @Size(max = 255) String vesselName,
+        @Size(max = 255) String vesselRegistrationNumber,
+        @Size(max = 255) String vesselModel
 ) {
 }

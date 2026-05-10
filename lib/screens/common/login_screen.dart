@@ -221,8 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _describePasswordChangeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ??
-          'No se pudo cambiar la contrase\u00F1a.';
+      return error.serverMessage ?? 'No se pudo cambiar la contrase\u00F1a.';
     }
     final message = error.toString();
     if (message.startsWith('Exception: ')) {
@@ -242,7 +241,10 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     } else if (role == 'CLIENT') {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ClientShellScreen()),
+        MaterialPageRoute(
+          builder: (_) =>
+              ClientShellScreen(initialIndex: _resolveClientInitialIndex()),
+        ),
       );
     } else {
       Navigator.of(context).pushReplacement(
@@ -252,7 +254,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showLoginFeedback(String message) {
-    final isCredentialsError = message.contains('incorrectos') ||
+    final isCredentialsError =
+        message.contains('incorrectos') ||
         message.contains('desactivada') ||
         message.contains('confirmar');
     if (isCredentialsError) {
@@ -359,8 +362,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     autofillHints: const [AutofillHints.password],
                     enableSuggestions: false,
                     autocorrect: false,
-                    onSubmitted: (_) =>
-                        loginViewModel.isLoading ? null : _submit(loginViewModel),
+                    onSubmitted: (_) => loginViewModel.isLoading
+                        ? null
+                        : _submit(loginViewModel),
                     decoration: InputDecoration(
                       labelText: 'Contrase\u00F1a',
                       prefixIcon: const Icon(Icons.lock_outline_rounded),
@@ -474,4 +478,12 @@ class _BrandMark extends StatelessWidget {
       ),
     );
   }
+}
+
+int _resolveClientInitialIndex() {
+  final screen = Uri.base.queryParameters['screen'];
+  if (screen == 'client-budgets') {
+    return 2;
+  }
+  return 0;
 }

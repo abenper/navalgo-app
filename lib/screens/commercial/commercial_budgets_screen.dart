@@ -622,10 +622,8 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   final _descriptionCtrl = TextEditingController();
   final _contactEmailCtrl = TextEditingController();
   final _newClientNameCtrl = TextEditingController();
-  final _newVesselNameCtrl = TextEditingController();
 
   int? _ownerId;
-  int? _vesselId;
   PlatformFile? _pickedFile;
   List<int>? _pickedFileBytes;
 
@@ -633,7 +631,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   void initState() {
     super.initState();
     _ownerId = null;
-    _vesselId = null;
     _contactEmailCtrl.text = '';
     _searchCtrl.addListener(_handleSearchChanged);
   }
@@ -646,7 +643,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     _descriptionCtrl.dispose();
     _contactEmailCtrl.dispose();
     _newClientNameCtrl.dispose();
-    _newVesselNameCtrl.dispose();
     super.dispose();
   }
 
@@ -673,20 +669,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       ];
       return haystacks.any((value) => value.toLowerCase().contains(query));
     }).toList();
-  }
-
-  List<Vessel> get _availableVessels =>
-      widget.vessels.where((vessel) => vessel.ownerId == _ownerId).toList();
-
-  void _syncVesselSelection() {
-    final availableVessels = _availableVessels;
-    if (_ownerId == null || availableVessels.isEmpty) {
-      _vesselId = null;
-      return;
-    }
-    if (!availableVessels.any((vessel) => vessel.id == _vesselId)) {
-      _vesselId = availableVessels.first.id;
-    }
   }
 
   Future<void> _pickPdf() async {
@@ -720,7 +702,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   }
 
   void _submit() {
-    _syncVesselSelection();
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -742,36 +723,16 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       );
       return;
     }
-    if (_ownerId != null && _availableVessels.isNotEmpty && _vesselId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selecciona una embarcación para ese cliente.'),
-        ),
-      );
-      return;
-    }
-    if ((_ownerId == null || _availableVessels.isEmpty) &&
-        _newVesselNameCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Indica el nombre de la embarcación para ese correo.'),
-        ),
-      );
-      return;
-    }
-
     Navigator.of(context).pop(
       _BudgetDraft(
         ownerId: _ownerId,
-        vesselId: _vesselId,
+        vesselId: null,
         contactEmail: contactEmail,
         newClientName:
             _ownerId == null && _newClientNameCtrl.text.trim().isNotEmpty
             ? _newClientNameCtrl.text.trim()
             : null,
-        newVesselName: _newVesselNameCtrl.text.trim().isEmpty
-            ? null
-            : _newVesselNameCtrl.text.trim(),
+        newVesselName: null,
         title: _titleCtrl.text.trim(),
         description: _descriptionCtrl.text.trim().isEmpty
             ? null
@@ -787,13 +748,8 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   @override
   Widget build(BuildContext context) {
     final filteredOwners = _filteredOwners;
-    final availableVessels = _availableVessels;
     final selectedOwnerId = filteredOwners.any((owner) => owner.id == _ownerId)
         ? _ownerId
-        : null;
-    final selectedVesselId =
-        availableVessels.any((vessel) => vessel.id == _vesselId)
-        ? _vesselId
         : null;
     final screenSize = MediaQuery.of(context).size;
     final maxDialogWidth = screenSize.width * 0.92;
@@ -828,7 +784,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                         onPressed: () {
                           setState(() {
                             _ownerId = null;
-                            _vesselId = null;
                             _searchCtrl.clear();
                           });
                         },
@@ -866,7 +821,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                       setState(() {
                         _ownerId = value;
                         if (value == null) {
-                          _vesselId = null;
                           return;
                         }
                         final selectedOwner = widget.owners.where(
@@ -878,76 +832,19 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                         if (_contactEmailCtrl.text.trim().isEmpty) {
                           _contactEmailCtrl.text = owner?.email ?? '';
                         }
-                        _syncVesselSelection();
-                        if (_availableVessels.isNotEmpty) {
-                          _newVesselNameCtrl.clear();
-                        }
                       });
                     },
                   ),
                   if (_ownerId != null) ...[
                     const SizedBox(height: 12),
-                    if (availableVessels.isNotEmpty)
-                      DropdownButtonFormField<int>(
-                        key: ValueKey(
-                          'vessel-${selectedVesselId ?? 'none'}-${availableVessels.length}',
-                        ),
-                        initialValue: selectedVesselId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Embarcación',
-                          hintText: 'Selecciona una embarcación existente',
-                        ),
-                        items: availableVessels
-                            .map(
-                              (vessel) => DropdownMenuItem<int>(
-                                value: vessel.id,
-                                child: Text(
-                                  vessel.name,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _vesselId = value;
-                          });
-                        },
-                        validator: (_) {
-                          if (_vesselId == null) {
-                            return 'Selecciona una embarcación';
-                          }
-                          return null;
-                        },
-                      )
-                    else ...[
-                      NavalgoPanel(
-                        child: Text(
-                          'Este cliente todavía no tiene embarcaciones registradas. Puedes preparar el presupuesto y, al abrirlo, el cliente tendrá que crear su embarcación para mantener el seguimiento.',
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: NavalgoColors.deepSea),
+                    NavalgoPanel(
+                      child: Text(
+                        'La embarcación no se asigna desde comercial. El cliente la elegirá o la registrará al entrar en NavalGO antes de abrir el presupuesto.',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: NavalgoColors.deepSea,
                         ),
                       ),
-                      const SizedBox(height: 12),
-                      TextFormField(
-                        controller: _newVesselNameCtrl,
-                        decoration: const InputDecoration(
-                          labelText: 'Embarcación de referencia',
-                          hintText:
-                              'Nombre que verá el cliente en el presupuesto',
-                        ),
-                        validator: (value) {
-                          if (_ownerId != null &&
-                              availableVessels.isEmpty &&
-                              (value == null || value.trim().isEmpty)) {
-                            return 'Indica la embarcación de referencia';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
+                    ),
                   ] else ...[
                     const SizedBox(height: 12),
                     TextFormField(
@@ -957,22 +854,6 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                         hintText:
                             'Opcional: si no existe aún, se tomará del correo',
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextFormField(
-                      controller: _newVesselNameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Embarcación',
-                        hintText:
-                            'Nombre de la embarcación asociada al presupuesto',
-                      ),
-                      validator: (value) {
-                        if (_ownerId == null &&
-                            (value == null || value.trim().isEmpty)) {
-                          return 'Indica la embarcación';
-                        }
-                        return null;
-                      },
                     ),
                   ],
                   const SizedBox(height: 12),
@@ -1033,7 +914,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                       _searchCtrl.text.trim().isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(
-                      'No hemos encontrado ese cliente. Puedes seguir solo con el correo y la embarcación, y el sistema resolverá la cuenta automáticamente.',
+                      'No hemos encontrado ese cliente. Puedes seguir solo con el correo y el sistema resolverá la cuenta automáticamente. La embarcación la registrará el cliente al entrar.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: NavalgoColors.coral,
                       ),

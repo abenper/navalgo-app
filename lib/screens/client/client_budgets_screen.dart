@@ -1,13 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/budget.dart';
+import '../../models/vessel.dart';
 import '../../services/budget_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
+import '../../utils/browser_file_download.dart' as browser_file;
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import '../../widgets/pdf_preview.dart';
 import 'client_vessels_screen.dart';
 
 class ClientBudgetsScreen extends StatefulWidget {
@@ -68,23 +72,209 @@ class _ClientBudgetsScreenState extends State<ClientBudgetsScreen> {
     }
   }
 
-  Future<void> _openBudget(Budget budget) async {
-    final vessel = await ensureClientHasVessel(
-      context,
-      suggestedVesselName: budget.vesselName,
+  bool _hasPendingBudgetVessel(Budget budget) =>
+      budget.vesselName.trim().toLowerCase() ==
+      'embarcacion pendiente de registrar';
+
+  Future<Vessel?> _pickClientVessel(List<Vessel> vessels) {
+    return showDialog<Vessel>(
+      context: context,
+      builder: (dialogContext) {
+        int? selectedVesselId = vessels.first.id;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Selecciona la embarcación'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Este presupuesto aún no está vinculado a una embarcación real. Selecciona cuál corresponde antes de abrirlo.',
+                    ),
+                    const SizedBox(height: 16),
+                    DropdownButtonFormField<int>(
+                      initialValue: selectedVesselId,
+                      isExpanded: true,
+                      items: vessels
+                          .map(
+                            (vessel) => DropdownMenuItem<int>(
+                              value: vessel.id,
+                              child: Text(vessel.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedVesselId = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancelar'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final vessel = vessels
+                        .where((item) => item.id == selectedVesselId)
+                        .first;
+                    Navigator.of(dialogContext).pop(vessel);
+                  },
+                  child: const Text('Continuar'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
-    if (!mounted || vessel == null) {
+  }
+
+  Future<Vessel?> _ensureBudgetVessel(Budget budget) async {
+    final session = context.read<SessionViewModel>();
+    final token = session.token;
+    if (token == null) {
+      return null;
+    }
+
+    if (!_hasPendingBudgetVessel(budget)) {
+      return null;
+    }
+
+    final vessels = await loadClientVessels(context);
+    if (!mounted) {
+      return null;
+    }
+
+    Vessel? selectedVessel;
+    if (vessels.isEmpty) {
+      selectedVessel = await ensureClientHasVessel(context);
+    } else if (vessels.length == 1) {
+      selectedVessel = vessels.first;
+    } else {
+      selectedVessel = await _pickClientVessel(vessels);
+    }
+
+    if (!mounted || selectedVessel == null) {
+      return null;
+    }
+
+    await context.read<BudgetService>().assignBudgetVessel(
+      token,
+      budgetId: budget.id,
+      vesselId: selectedVessel.id,
+    );
+    await _loadData();
+    return selectedVessel;
+  }
+
+  Future<void> _showPdfPreview(
+    String objectUrl,
+    List<int> bytes,
+    String title,
+  ) async {
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        final dialogWidth = MediaQuery.of(context).size.width * 0.92;
+        return AlertDialog(
+          title: const Text('Vista previa de PDF'),
+          content: SizedBox(
+            width: dialogWidth > 900 ? 900 : dialogWidth,
+            height: 640,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 4),
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: PdfPreviewWidget(pdfUrl: objectUrl),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cerrar'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                await browser_file.downloadFileBytes(
+                  Uint8List.fromList(bytes),
+                  fileName: '$title.pdf',
+                  mimeType: 'application/pdf',
+                );
+              },
+              child: const Text('Descargar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openBudget(Budget budget) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
       return;
     }
 
-    final uri = Uri.tryParse(budget.pdfUrl);
-    if (uri == null) {
-      AppToast.error(context, 'No se pudo abrir el presupuesto.');
-      return;
-    }
-    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!opened && mounted) {
-      AppToast.error(context, 'No se pudo abrir el presupuesto.');
+    try {
+      setState(() => _isSaving = true);
+      final assignedVessel = await _ensureBudgetVessel(budget);
+      if (!mounted) {
+        return;
+      }
+      if (_hasPendingBudgetVessel(budget) && assignedVessel == null) {
+        return;
+      }
+      if (!mounted) {
+        return;
+      }
+
+      final bytes = await context.read<BudgetService>().downloadBudgetPdf(
+        token,
+        budget.pdfUrl,
+      );
+      if (!mounted) {
+        return;
+      }
+
+      final objectUrl = browser_file.createObjectUrlFromBytes(
+        Uint8List.fromList(bytes),
+        mimeType: 'application/pdf',
+      );
+      if (objectUrl == null) {
+        throw Exception('No se pudo generar la vista previa del PDF');
+      }
+
+      try {
+        await _showPdfPreview(objectUrl, bytes, budget.title);
+      } finally {
+        browser_file.revokeObjectUrl(objectUrl);
+      }
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo abrir el presupuesto: $error');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

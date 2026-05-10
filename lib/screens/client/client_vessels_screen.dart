@@ -8,6 +8,9 @@ import '../../utils/app_toast.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
 
+bool isPlaceholderClientVessel(Vessel vessel) =>
+    vessel.registrationNumber.trim().toUpperCase().startsWith('TMP-');
+
 Future<List<Vessel>> loadClientVessels(BuildContext context) async {
   final session = context.read<SessionViewModel>();
   final token = session.token;
@@ -15,7 +18,11 @@ Future<List<Vessel>> loadClientVessels(BuildContext context) async {
   if (token == null || ownerId == null) {
     return const <Vessel>[];
   }
-  return context.read<FleetService>().getVessels(token, ownerId: ownerId);
+  final vessels = await context.read<FleetService>().getVessels(
+    token,
+    ownerId: ownerId,
+  );
+  return vessels.where((vessel) => !isPlaceholderClientVessel(vessel)).toList();
 }
 
 Future<Vessel?> ensureClientHasVessel(

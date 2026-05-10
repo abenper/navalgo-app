@@ -85,17 +85,16 @@ public class ResendEmailService {
                                           String vesselName,
                                           BigDecimal amount,
                                           String currency,
-                                          String pdfUrl,
                                           boolean clientHasAccount) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("from", fromAddress);
         payload.put("to", List.of(clientEmail));
         payload.put("subject", sanitizeSubject("Nuevo presupuesto disponible"));
         payload.put("html", buildBudgetNotificationHtml(
-                clientName, clientEmail, budgetTitle, vesselName, amount, currency, pdfUrl, clientHasAccount
+                clientName, clientEmail, budgetTitle, vesselName, amount, currency, clientHasAccount
         ));
         payload.put("text", buildBudgetNotificationText(
-                clientName, clientEmail, budgetTitle, vesselName, amount, currency, pdfUrl, clientHasAccount
+                clientName, clientEmail, budgetTitle, vesselName, amount, currency, clientHasAccount
         ));
         return sendEmail(payload, "No se pudo enviar el email de presupuesto");
     }
@@ -328,16 +327,22 @@ public class ResendEmailService {
                                                String vesselName,
                                                BigDecimal amount,
                                                String currency,
-                                               String pdfUrl,
                                                boolean clientHasAccount) {
         String formattedAmount = formatAmount(amount, currency);
+        String appUrl = buildClientBudgetsUrl();
         String signupUrl = buildClientSignupUrl(clientName, clientEmail);
         String accountHint = clientHasAccount
                 ? """
-                  <p>En breve podras aceptarlo o rechazarlo directamente desde tu area de cliente. Mientras tanto, ya tienes el documento disponible en el enlace anterior.</p>
+                  <p>Entra en tu area de cliente para revisar el presupuesto, abrir el PDF dentro de Naval-GO y descargarlo cuando lo necesites.</p>
+                  <p style="margin:20px 0;">
+                    <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
+                      Abrir Naval-GO
+                    </a>
+                  </p>
                   """
+                        .formatted(escapeHtmlAttribute(appUrl))
                 : """
-                  <p>Tu presupuesto ya te esta esperando en Naval-GO. Si aun no tienes cuenta, entra en la plataforma y pulsa <strong>Crear cuenta</strong> usando este mismo correo: <strong>%s</strong>.</p>
+                  <p>Tu presupuesto ya te esta esperando en Naval-GO. Si aun no tienes cuenta, registrate con este mismo correo: <strong>%s</strong>.</p>
                   <p style="margin:20px 0;">
                     <a href="%s" style="background:#17324d;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
                       Crear cuenta
@@ -351,11 +356,6 @@ public class ResendEmailService {
                   <p>Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion <strong>%s</strong>.</p>
                   <p><strong>%s</strong></p>
                   <p>Importe: <strong>%s</strong></p>
-                  <p style="margin:24px 0;">
-                    <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
-                      Ver PDF del presupuesto
-                    </a>
-                  </p>
                   %s
                   <p>Equipo Naval-GO</p>
                 </div>
@@ -364,7 +364,6 @@ public class ResendEmailService {
                 escapeHtml(vesselName),
                 escapeHtml(budgetTitle),
                 escapeHtml(formattedAmount),
-                escapeHtmlAttribute(pdfUrl),
                 accountHint
         );
     }
@@ -375,14 +374,19 @@ public class ResendEmailService {
                                                String vesselName,
                                                BigDecimal amount,
                                                String currency,
-                                               String pdfUrl,
                                                boolean clientHasAccount) {
+        String appUrl = buildClientBudgetsUrl();
         String signupUrl = buildClientSignupUrl(clientName, clientEmail);
         String accountHint = clientHasAccount
-                ? "En breve podras aceptarlo o rechazarlo directamente desde tu area de cliente."
+                ? """
+                Entra en Naval-GO para revisar el presupuesto, abrir el PDF dentro de la app y descargarlo cuando lo necesites.
+
+                Abrir Naval-GO:
+                %s
+                """.formatted(appUrl)
                 : """
                 Tu presupuesto ya te esta esperando en Naval-GO.
-                Si aun no tienes cuenta, entra en la plataforma y pulsa Crear cuenta usando este mismo correo: %s.
+                Si aun no tienes cuenta, registrate usando este mismo correo: %s.
 
                 Crear cuenta:
                 %s
@@ -394,16 +398,12 @@ public class ResendEmailService {
                 %s
                 Importe: %s
 
-                Ver PDF del presupuesto:
-                %s
-                
                 %s
                 """.formatted(
                 clientName,
                 vesselName,
                 budgetTitle,
                 formatAmount(amount, currency),
-                pdfUrl,
                 accountHint
         );
     }
@@ -494,6 +494,12 @@ public class ResendEmailService {
                 + "screen=create-account"
                 + "&email=" + urlEncode(clientEmail)
                 + "&name=" + urlEncode(clientName);
+    }
+
+    private String buildClientBudgetsUrl() {
+        String baseUrl = normalizeFrontendBaseUrl();
+        String separator = baseUrl.contains("?") ? "&" : "?";
+        return baseUrl + separator + "screen=client-budgets";
     }
 
     private String buildPasswordResetHtml(String accountName, String resetLink) {
