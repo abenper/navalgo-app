@@ -107,6 +107,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
 
     final token = context.read<SessionViewModel>().token;
     final budgetService = context.read<BudgetService>();
+    final fleetService = context.read<FleetService>();
     if (token == null) {
       return;
     }
@@ -116,9 +117,22 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     });
 
     try {
+      var ownerId = draft.ownerId;
+      if (!draft.walkInClient && ownerId == null) {
+        final createdOwner = await fleetService.createOwner(
+          token,
+          type: 'PERSON',
+          displayName: draft.newClientName!.trim(),
+          documentId: draft.habitualDocumentId!.trim(),
+          phone: draft.habitualPhone,
+          email: draft.contactEmail,
+        );
+        ownerId = createdOwner.id;
+      }
+
       final uploaded = await budgetService.uploadBudgetPdf(
         token,
-        ownerId: draft.ownerId,
+        ownerId: ownerId,
         vesselId: draft.vesselId,
         ownerName: draft.newClientName,
         vesselName: draft.newVesselName,
@@ -127,7 +141,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
       );
       await budgetService.createBudget(
         token,
-        ownerId: draft.ownerId,
+        ownerId: ownerId,
         vesselId: draft.vesselId,
         contactEmail: draft.contactEmail,
         newClientName: draft.newClientName,
@@ -225,18 +239,32 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
 
     final token = context.read<SessionViewModel>().token;
     final budgetService = context.read<BudgetService>();
+    final fleetService = context.read<FleetService>();
     if (token == null) {
       return;
     }
 
     try {
+      var ownerId = draft.ownerId;
+      if (!draft.walkInClient && ownerId == null) {
+        final createdOwner = await fleetService.createOwner(
+          token,
+          type: 'PERSON',
+          displayName: draft.newClientName!.trim(),
+          documentId: draft.habitualDocumentId!.trim(),
+          phone: draft.habitualPhone,
+          email: draft.contactEmail,
+        );
+        ownerId = createdOwner.id;
+      }
+
       var pdfUrl = draft.existingPdfUrl ?? budget.pdfUrl;
       if (draft.fileBytes != null &&
           draft.fileBytes!.isNotEmpty &&
           draft.fileName != null) {
         final uploaded = await budgetService.uploadBudgetPdf(
           token,
-          ownerId: draft.ownerId,
+          ownerId: ownerId,
           ownerName: draft.newClientName,
           fileName: draft.fileName!,
           bytes: draft.fileBytes!,
@@ -247,7 +275,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
       await budgetService.updateBudgetDraft(
         token,
         budgetId: budget.id,
-        ownerId: draft.ownerId,
+        ownerId: ownerId,
         contactEmail: draft.contactEmail,
         newClientName: draft.newClientName,
         title: draft.title,
@@ -302,6 +330,8 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
           content: Text(
             budget.ownerEmail == null || budget.ownerEmail!.isEmpty
                 ? 'El cliente no tiene correo para recibir el presupuesto.'
+                : budget.walkInClient
+                ? 'Presupuesto enviado al cliente de paso con acceso directo al PDF.'
                 : budget.clientHasAccount
                 ? 'Presupuesto enviado al cliente por correo.'
                 : 'Presupuesto enviado. El cliente recibirá también la invitación para darse de alta.',
@@ -803,7 +833,9 @@ class _BudgetCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      '${budget.ownerName} - ${budget.vesselName}',
+                      budget.walkInClient
+                          ? '${budget.ownerName} - cliente de paso'
+                          : '${budget.ownerName} - ${budget.vesselName}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: NavalgoColors.storm,
                       ),
@@ -836,7 +868,16 @@ class _BudgetCard extends StatelessWidget {
               ),
             ),
           ],
-          if (!budget.clientHasAccount) ...[
+          if (budget.walkInClient) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Cliente de paso: este presupuesto se enviara por correo sin obligarle a registrarse en Naval-GO.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: NavalgoColors.harbor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ] else if (!budget.clientHasAccount) ...[
             const SizedBox(height: 8),
             Text(
               'Este cliente aún no tiene cuenta. Al enviarlo, recibirá un correo para darse de alta con este mismo email.',
@@ -971,8 +1012,11 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   final _descriptionCtrl = TextEditingController();
   final _contactEmailCtrl = TextEditingController();
   final _newClientNameCtrl = TextEditingController();
+  final _habitualPhoneCtrl = TextEditingController();
+  final _habitualDocumentCtrl = TextEditingController();
 
   int? _ownerId;
+  late bool _walkInClient;
   PlatformFile? _pickedFile;
   List<int>? _pickedFileBytes;
 
@@ -980,20 +1024,35 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   void initState() {
     super.initState();
     _ownerId = widget.initialBudget?.ownerId;
+    _walkInClient = widget.initialBudget?.walkInClient ?? _ownerId == null;
     _titleCtrl.text = widget.initialBudget?.title ?? '';
     _descriptionCtrl.text = widget.initialBudget?.description ?? '';
     _contactEmailCtrl.text = widget.initialBudget?.ownerEmail ?? '';
+    _newClientNameCtrl.text = widget.initialBudget?.ownerName ?? '';
+    if (_ownerId != null) {
+      final matchingOwners = widget.owners.where((item) => item.id == _ownerId);
+      final owner = matchingOwners.isEmpty ? null : matchingOwners.first;
+      if (owner != null) {
+        _newClientNameCtrl.text = owner.displayName;
+        _habitualPhoneCtrl.text = owner.phone ?? '';
+        _habitualDocumentCtrl.text = owner.documentId;
+      }
+    }
     _searchCtrl.addListener(_handleSearchChanged);
+    _contactEmailCtrl.addListener(_handleEmailChanged);
   }
 
   @override
   void dispose() {
     _searchCtrl.removeListener(_handleSearchChanged);
+    _contactEmailCtrl.removeListener(_handleEmailChanged);
     _searchCtrl.dispose();
     _titleCtrl.dispose();
     _descriptionCtrl.dispose();
     _contactEmailCtrl.dispose();
     _newClientNameCtrl.dispose();
+    _habitualPhoneCtrl.dispose();
+    _habitualDocumentCtrl.dispose();
     super.dispose();
   }
 
@@ -1004,6 +1063,34 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     setState(() {
       // Fuerza reconstruccion para aplicar el filtro del combo opcional.
     });
+  }
+
+  void _handleEmailChanged() {
+    if (!mounted || _walkInClient) {
+      return;
+    }
+    final email = _contactEmailCtrl.text.trim().toLowerCase();
+    if (email.isEmpty) {
+      return;
+    }
+    final matchingOwners = widget.owners.where(
+      (item) => (item.email ?? '').trim().toLowerCase() == email,
+    );
+    final owner = matchingOwners.isEmpty ? null : matchingOwners.first;
+    if (owner == null || owner.id == _ownerId) {
+      return;
+    }
+    setState(() {
+      _applyOwner(owner);
+    });
+  }
+
+  void _applyOwner(Owner owner) {
+    _ownerId = owner.id;
+    _newClientNameCtrl.text = owner.displayName;
+    _contactEmailCtrl.text = owner.email ?? '';
+    _habitualPhoneCtrl.text = owner.phone ?? '';
+    _habitualDocumentCtrl.text = owner.documentId;
   }
 
   List<Owner> get _filteredOwners {
@@ -1075,15 +1162,34 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       );
       return;
     }
+    if (!_walkInClient &&
+        _ownerId == null &&
+        (_newClientNameCtrl.text.trim().isEmpty ||
+            _habitualDocumentCtrl.text.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Para un cliente habitual nuevo debes indicar al menos nombre y documento.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).pop(
       _BudgetDraft(
+        walkInClient: _walkInClient,
         ownerId: _ownerId,
         vesselId: null,
         contactEmail: contactEmail,
-        newClientName:
-            _ownerId == null && _newClientNameCtrl.text.trim().isNotEmpty
-            ? _newClientNameCtrl.text.trim()
-            : null,
+        newClientName: _newClientNameCtrl.text.trim().isEmpty
+            ? null
+            : _newClientNameCtrl.text.trim(),
+        habitualPhone: _habitualPhoneCtrl.text.trim().isEmpty
+            ? null
+            : _habitualPhoneCtrl.text.trim(),
+        habitualDocumentId: _habitualDocumentCtrl.text.trim().isEmpty
+            ? null
+            : _habitualDocumentCtrl.text.trim(),
         newVesselName: null,
         title: _titleCtrl.text.trim(),
         description: _descriptionCtrl.text.trim().isEmpty
@@ -1121,6 +1227,45 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment<bool>(
+                        value: true,
+                        icon: Icon(Icons.flash_on_outlined),
+                        label: Text('Cliente de paso'),
+                      ),
+                      ButtonSegment<bool>(
+                        value: false,
+                        icon: Icon(Icons.badge_outlined),
+                        label: Text('Cliente habitual'),
+                      ),
+                    ],
+                    selected: {_walkInClient},
+                    onSelectionChanged: (selection) {
+                      setState(() {
+                        _walkInClient = selection.first;
+                        if (_walkInClient) {
+                          _ownerId = null;
+                          _searchCtrl.clear();
+                          _habitualPhoneCtrl.clear();
+                          _habitualDocumentCtrl.clear();
+                        }
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  NavalgoPanel(
+                    child: Text(
+                      _walkInClient
+                          ? 'Cliente de paso: solo se usará el correo del presupuesto. No se le pedirá registro ni vinculación a una embarcación.'
+                          : 'Cliente habitual: usa un cliente existente o regístralo ahora. Si el correo ya existe, se rellenarán los datos automáticamente.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: NavalgoColors.deepSea,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (!_walkInClient) ...[
                   TextFormField(
                     controller: _searchCtrl,
                     decoration: const InputDecoration(
@@ -1137,11 +1282,13 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                         onPressed: () {
                           setState(() {
                             _ownerId = null;
-                            _searchCtrl.clear();
+                            _newClientNameCtrl.clear();
+                            _habitualPhoneCtrl.clear();
+                            _habitualDocumentCtrl.clear();
                           });
                         },
-                        icon: const Icon(Icons.alternate_email_outlined),
-                        label: const Text('Usar solo correo'),
+                        icon: const Icon(Icons.person_add_alt_1_outlined),
+                        label: const Text('Crear como cliente nuevo'),
                       ),
                     ),
                   ],
@@ -1182,11 +1329,22 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                         final owner = selectedOwner.isEmpty
                             ? null
                             : selectedOwner.first;
-                        _contactEmailCtrl.text = owner?.email ?? '';
+                        if (owner != null) {
+                          _applyOwner(owner);
+                        }
                       });
                     },
                   ),
-                  if (_ownerId != null) ...[
+                  ],
+                  if (_walkInClient) ...[
+                    TextFormField(
+                      controller: _newClientNameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Nombre de contacto',
+                        hintText: 'Opcional para cliente de paso',
+                      ),
+                    ),
+                  ] else if (_ownerId != null) ...[
                     const SizedBox(height: 12),
                     NavalgoPanel(
                       child: Text(
@@ -1202,8 +1360,39 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                       controller: _newClientNameCtrl,
                       decoration: const InputDecoration(
                         labelText: 'Nombre del cliente',
-                        hintText:
-                            'Opcional: si no existe aún, se tomará del correo',
+                        hintText: 'Obligatorio para cliente habitual nuevo',
+                      ),
+                      validator: (value) {
+                        if (_walkInClient || _ownerId != null) {
+                          return null;
+                        }
+                        if ((value ?? '').trim().isEmpty) {
+                          return 'Indica el nombre del cliente';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _habitualDocumentCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Documento / CIF / DNI',
+                      ),
+                      validator: (value) {
+                        if (_walkInClient || _ownerId != null) {
+                          return null;
+                        }
+                        if ((value ?? '').trim().isEmpty) {
+                          return 'Indica el documento del cliente';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: _habitualPhoneCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Teléfono',
                       ),
                     ),
                   ],
@@ -1272,11 +1461,12 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                       ),
                     ),
                   ],
-                  if (filteredOwners.isEmpty &&
+                  if (!_walkInClient &&
+                      filteredOwners.isEmpty &&
                       _searchCtrl.text.trim().isNotEmpty) ...[
                     const SizedBox(height: 12),
                     Text(
-                      'No hemos encontrado ese cliente. Puedes seguir solo con el correo y el sistema resolverá la cuenta automáticamente. La embarcación la registrará el cliente al entrar.',
+                      'No hemos encontrado ese cliente. Si quieres tratarlo como habitual, completa sus datos y se registrará antes de crear el presupuesto.',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: NavalgoColors.coral,
                       ),
@@ -1301,10 +1491,13 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
 
 class _BudgetDraft {
   const _BudgetDraft({
+    required this.walkInClient,
     this.ownerId,
     this.vesselId,
     required this.contactEmail,
     this.newClientName,
+    this.habitualPhone,
+    this.habitualDocumentId,
     this.newVesselName,
     required this.title,
     this.description,
@@ -1315,10 +1508,13 @@ class _BudgetDraft {
     this.existingPdfUrl,
   });
 
+  final bool walkInClient;
   final int? ownerId;
   final int? vesselId;
   final String contactEmail;
   final String? newClientName;
+  final String? habitualPhone;
+  final String? habitualDocumentId;
   final String? newVesselName;
   final String title;
   final String? description;

@@ -85,16 +85,18 @@ public class ResendEmailService {
                                           String vesselName,
                                           BigDecimal amount,
                                           String currency,
-                                          boolean clientHasAccount) {
+                                          boolean clientHasAccount,
+                                          boolean walkInClient,
+                                          String pdfUrl) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("from", fromAddress);
         payload.put("to", List.of(clientEmail));
         payload.put("subject", sanitizeSubject("Nuevo presupuesto disponible"));
         payload.put("html", buildBudgetNotificationHtml(
-                clientName, clientEmail, budgetTitle, vesselName, amount, currency, clientHasAccount
+                clientName, clientEmail, budgetTitle, vesselName, amount, currency, clientHasAccount, walkInClient, pdfUrl
         ));
         payload.put("text", buildBudgetNotificationText(
-                clientName, clientEmail, budgetTitle, vesselName, amount, currency, clientHasAccount
+                clientName, clientEmail, budgetTitle, vesselName, amount, currency, clientHasAccount, walkInClient, pdfUrl
         ));
         return sendEmail(payload, "No se pudo enviar el email de presupuesto");
     }
@@ -327,15 +329,27 @@ public class ResendEmailService {
                                                String vesselName,
                                                BigDecimal amount,
                                                String currency,
-                                               boolean clientHasAccount) {
+                                               boolean clientHasAccount,
+                                               boolean walkInClient,
+                                               String pdfUrl) {
         String formattedAmount = formatAmount(amount, currency);
         String appUrl = buildClientBudgetsUrl();
         String signupUrl = buildClientSignupUrl(clientName, clientEmail);
+        String safePdfUrl = pdfUrl == null ? normalizeFrontendBaseUrl() : pdfUrl.trim();
         String vesselBlock = vesselName == null || vesselName.isBlank()
                 ? "<p>Ya tienes disponible un nuevo presupuesto en Naval-GO.</p>"
                 : "<p>Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion <strong>%s</strong>.</p>"
                 .formatted(escapeHtml(vesselName));
-        String accountHint = clientHasAccount
+        String accountHint = walkInClient
+                ? """
+                  <p>Este presupuesto se ha emitido como cliente de paso, por lo que no necesitas registrarte en Naval-GO para consultarlo.</p>
+                  <p style="margin:20px 0;">
+                    <a href="%s" style="background:#17324d;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
+                      Abrir PDF del presupuesto
+                    </a>
+                  </p>
+                  """.formatted(escapeHtmlAttribute(safePdfUrl))
+                : clientHasAccount
                 ? """
                   <p>Entra en tu area de cliente para revisar el presupuesto, abrir el PDF dentro de Naval-GO y descargarlo cuando lo necesites.</p>
                   <p style="margin:20px 0;">
@@ -378,14 +392,25 @@ public class ResendEmailService {
                                                String vesselName,
                                                BigDecimal amount,
                                                String currency,
-                                               boolean clientHasAccount) {
+                                               boolean clientHasAccount,
+                                               boolean walkInClient,
+                                               String pdfUrl) {
         String appUrl = buildClientBudgetsUrl();
         String signupUrl = buildClientSignupUrl(clientName, clientEmail);
+        String safePdfUrl = pdfUrl == null ? normalizeFrontendBaseUrl() : pdfUrl.trim();
         String vesselLine = vesselName == null || vesselName.isBlank()
                 ? "Ya tienes disponible un nuevo presupuesto en Naval-GO."
                 : "Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion %s."
                 .formatted(vesselName);
-        String accountHint = clientHasAccount
+        String accountHint = walkInClient
+                ? """
+                Cliente de paso:
+                No necesitas registrarte en Naval-GO para consultar este presupuesto.
+
+                Abrir PDF:
+                %s
+                """.formatted(safePdfUrl)
+                : clientHasAccount
                 ? """
                 Entra en Naval-GO para revisar el presupuesto, abrir el PDF dentro de la app y descargarlo cuando lo necesites.
 

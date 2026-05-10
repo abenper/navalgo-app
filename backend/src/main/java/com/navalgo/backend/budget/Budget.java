@@ -16,11 +16,17 @@ public class Budget {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     private Owner owner;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     private Vessel vessel;
+
+    @Column(name = "contact_name", length = 255)
+    private String contactName;
+
+    @Column(name = "contact_email", nullable = false, length = 255)
+    private String contactEmail;
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_worker_id")
@@ -86,6 +92,22 @@ public class Budget {
 
     public void setVessel(Vessel vessel) {
         this.vessel = vessel;
+    }
+
+    public String getContactName() {
+        return contactName;
+    }
+
+    public void setContactName(String contactName) {
+        this.contactName = contactName;
+    }
+
+    public String getContactEmail() {
+        return contactEmail;
+    }
+
+    public void setContactEmail(String contactEmail) {
+        this.contactEmail = contactEmail;
     }
 
     public Worker getCreatedByWorker() {

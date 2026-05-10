@@ -93,6 +93,8 @@ public class BudgetService {
         Budget budget = new Budget();
         budget.setOwner(target.owner());
         budget.setVessel(target.vessel());
+        budget.setContactName(target.contactName());
+        budget.setContactEmail(target.contactEmail());
         budget.setCreatedByWorker(current);
         budget.setOriginBudget(originBudget);
         budget.setTitle(inputSanitizer.requiredText(request.title(), "El titulo del presupuesto", 255));
@@ -135,6 +137,8 @@ public class BudgetService {
         Budget newBudget = new Budget();
         newBudget.setOwner(rejectedBudget.getOwner());
         newBudget.setVessel(rejectedBudget.getVessel());
+        newBudget.setContactName(rejectedBudget.getContactName());
+        newBudget.setContactEmail(rejectedBudget.getContactEmail());
         newBudget.setCreatedByWorker(current);
         newBudget.setOriginBudget(rejectedBudget);
         newBudget.setTitle(rejectedBudget.getTitle());
@@ -184,7 +188,8 @@ public class BudgetService {
         }
 
         Owner previousOwner = budget.getOwner();
-        String previousEmail = previousOwner.getEmail();
+        String previousEmail = budget.getContactEmail();
+        String previousContactName = budget.getContactName();
         String previousTitle = budget.getTitle();
         String previousDescription = budget.getDescription();
         java.math.BigDecimal previousAmount = budget.getAmount();
@@ -199,6 +204,8 @@ public class BudgetService {
 
         budget.setOwner(target.owner());
         budget.setVessel(target.vessel());
+        budget.setContactName(target.contactName());
+        budget.setContactEmail(target.contactEmail());
         budget.setTitle(inputSanitizer.requiredText(request.title(), "El titulo del presupuesto", 255));
         budget.setDescription(inputSanitizer.optionalText(request.description(), 3000));
         budget.setAmount(request.amount());
@@ -214,6 +221,7 @@ public class BudgetService {
                 buildDraftUpdatedNote(
                         previousOwner,
                         previousEmail,
+                        previousContactName,
                         previousTitle,
                         previousDescription,
                         previousAmount,
@@ -243,6 +251,10 @@ public class BudgetService {
             ensureClientOwnsBudget(current, budget);
         } else if (current.getRole() != Role.ADMIN && current.getRole() != Role.COMERCIAL) {
             throw new AccessDeniedException("No tienes permiso para actualizar la embarcacion del presupuesto");
+        }
+
+        if (budget.getOwner() == null) {
+            throw new IllegalArgumentException("Este presupuesto no admite vinculacion de embarcacion porque es de cliente de paso");
         }
 
         budget.setVessel(vessel);
@@ -333,22 +345,25 @@ public class BudgetService {
     }
 
     private void sendBudgetEmail(Budget budget) {
-        String ownerEmail = budget.getOwner().getEmail();
+        String ownerEmail = budget.getContactEmail();
         if (ownerEmail == null || ownerEmail.isBlank()) {
             throw new IllegalArgumentException("El cliente no tiene correo electronico para enviar el presupuesto");
         }
-        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_IdAndActiveTrue(
+        boolean walkInClient = budget.getOwner() == null;
+        boolean clientHasAccount = !walkInClient && workerRepository.existsByRoleAndOwner_IdAndActiveTrue(
                 Role.CLIENT,
                 budget.getOwner().getId()
         );
         resendEmailService.sendBudgetNotification(
-                budget.getOwner().getDisplayName(),
+                resolveBudgetContactName(budget),
                 ownerEmail,
                 budget.getTitle(),
                 resolveBudgetEmailVesselName(budget.getVessel()),
                 budget.getAmount(),
                 budget.getCurrency(),
-                clientHasAccount
+                clientHasAccount,
+                walkInClient,
+                budget.getPdfUrl()
         );
     }
 
@@ -369,8 +384,8 @@ public class BudgetService {
         }
 
         String statusLabel = nextStatus == BudgetStatus.ACCEPTED ? "Aceptado" : "Rechazado";
-        String clientName = budget.getOwner().getDisplayName();
-        String vesselName = budget.getVessel().getName();
+        String clientName = resolveBudgetContactName(budget);
+        String vesselName = resolveBudgetDisplayVesselName(budget);
         String title = "Presupuesto " + statusLabel.toLowerCase(Locale.ROOT);
         String message = buildCommercialDecisionMessage(budget, statusLabel);
 
@@ -405,7 +420,8 @@ public class BudgetService {
     }
 
     private String buildCommercialDecisionMessage(Budget budget, String statusLabel) {
-        String base = budget.getOwner().getDisplayName()
+        String actorName = resolveBudgetContactName(budget);
+        String base = actorName
                 + " ha "
                 + statusLabel.toLowerCase(Locale.ROOT)
                 + " el presupuesto "
@@ -439,7 +455,7 @@ public class BudgetService {
         if (client.getOwner() == null || client.getOwner().getId() == null) {
             throw new AccessDeniedException("Tu cuenta no esta asociada a un cliente valido");
         }
-        if (!client.getOwner().getId().equals(budget.getOwner().getId())) {
+        if (budget.getOwner() == null || !client.getOwner().getId().equals(budget.getOwner().getId())) {
             throw new AccessDeniedException("No puedes responder a presupuestos de otro cliente");
         }
     }
@@ -447,43 +463,35 @@ public class BudgetService {
     private BudgetTarget resolveBudgetTarget(Long ownerId,
                                              String contactEmail,
                                              String newClientName) {
-        Owner owner;
+        Owner owner = null;
+        Vessel vessel = null;
+        String normalizedContactEmail = inputSanitizer.email(contactEmail);
+        String normalizedContactName = inputSanitizer.optionalText(newClientName, 255);
         if (ownerId != null) {
             owner = ownerRepository.findByIdAndArchivedFalse(ownerId)
                     .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
-
-            String normalizedContactEmail = inputSanitizer.email(contactEmail);
             if (normalizedContactEmail != null && !normalizedContactEmail.isBlank()) {
                 ensureOwnerEmailAvailable(normalizedContactEmail, owner.getId());
                 owner.setEmail(normalizedContactEmail);
                 owner = ownerRepository.save(owner);
             }
+            vessel = findOrCreatePlaceholderVessel(owner);
+            normalizedContactName = owner.getDisplayName();
+            normalizedContactEmail = owner.getEmail();
         } else {
-            String email = inputSanitizer.email(contactEmail);
-            if (email == null || email.isBlank()) {
+            if (normalizedContactEmail == null || normalizedContactEmail.isBlank()) {
                 throw new IllegalArgumentException("Debe proporcionar un correo electronico valido");
             }
-
-            owner = resolveOwnerByEmail(email).orElseGet(() -> {
-                String name = newClientName;
-                if (name == null || name.isBlank()) {
-                    name = email.split("@")[0];
-                }
-                Owner newOwner = new Owner();
-                newOwner.setType(OwnerType.PERSON);
-                newOwner.setDisplayName(name);
-                newOwner.setDocumentId("PENDIENTE");
-                newOwner.setEmail(email);
-                return ownerRepository.save(newOwner);
-            });
+            if (normalizedContactName == null || normalizedContactName.isBlank()) {
+                normalizedContactName = normalizedContactEmail.split("@")[0];
+            }
         }
-
-        Vessel vessel = findOrCreatePlaceholderVessel(owner);
-        return new BudgetTarget(owner, vessel);
+        return new BudgetTarget(owner, vessel, normalizedContactName, normalizedContactEmail);
     }
 
     private String buildDraftUpdatedNote(Owner previousOwner,
                                          String previousEmail,
+                                         String previousContactName,
                                          String previousTitle,
                                          String previousDescription,
                                          java.math.BigDecimal previousAmount,
@@ -491,11 +499,16 @@ public class BudgetService {
                                          String previousPdfUrl,
                                          Budget updatedBudget) {
         List<String> changes = new java.util.ArrayList<>();
-        if (!previousOwner.getId().equals(updatedBudget.getOwner().getId())) {
+        if (!java.util.Objects.equals(
+                previousOwner == null ? null : previousOwner.getId(),
+                updatedBudget.getOwner() == null ? null : updatedBudget.getOwner().getId())) {
             changes.add("cliente");
         }
-        if (!java.util.Objects.equals(previousEmail, updatedBudget.getOwner().getEmail())) {
+        if (!java.util.Objects.equals(previousEmail, updatedBudget.getContactEmail())) {
             changes.add("correo");
+        }
+        if (!java.util.Objects.equals(previousContactName, updatedBudget.getContactName())) {
+            changes.add("nombre de contacto");
         }
         if (!java.util.Objects.equals(previousTitle, updatedBudget.getTitle())) {
             changes.add("titulo");
@@ -530,6 +543,32 @@ public class BudgetService {
             return null;
         }
         return vessel.getName();
+    }
+
+    private String resolveBudgetDisplayVesselName(Budget budget) {
+        if (budget.getVessel() == null) {
+            return "Cliente de paso";
+        }
+        String vesselName = resolveBudgetEmailVesselName(budget.getVessel());
+        if (vesselName == null || vesselName.isBlank()) {
+            return "Embarcacion pendiente de registrar";
+        }
+        return vesselName;
+    }
+
+    private String resolveBudgetContactName(Budget budget) {
+        String contactName = inputSanitizer.optionalText(budget.getContactName(), 255);
+        if (contactName != null && !contactName.isBlank()) {
+            return contactName;
+        }
+        if (budget.getOwner() != null) {
+            return budget.getOwner().getDisplayName();
+        }
+        String contactEmail = inputSanitizer.optionalText(budget.getContactEmail(), 255);
+        if (contactEmail != null && contactEmail.contains("@")) {
+            return contactEmail.split("@")[0];
+        }
+        return "Cliente";
     }
 
     private Budget resolveRejectedOriginBudget(Long originBudgetId) {
@@ -604,11 +643,12 @@ public class BudgetService {
     }
 
     private BudgetDto toDto(Budget budget) {
-        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_IdAndActiveTrue(
+        boolean walkInClient = budget.getOwner() == null;
+        boolean clientHasAccount = !walkInClient && workerRepository.existsByRoleAndOwner_IdAndActiveTrue(
                 Role.CLIENT,
                 budget.getOwner().getId()
         );
-        return toDto(budget, clientHasAccount, resolveTimeline(budget));
+        return toDto(budget, walkInClient, clientHasAccount, resolveTimeline(budget));
     }
 
     private List<BudgetDto> toDtos(List<Budget> budgets) {
@@ -616,14 +656,17 @@ public class BudgetService {
             return List.of();
         }
         Set<Long> ownerIds = budgets.stream()
-                .map(budget -> budget.getOwner().getId())
+                .map(Budget::getOwner)
+                .filter(java.util.Objects::nonNull)
+                .map(Owner::getId)
                 .collect(java.util.stream.Collectors.toSet());
         Set<Long> clientOwnerIds = findClientOwnerIds(ownerIds);
         Map<Long, List<BudgetEventDto>> timelineByBudgetId = resolveTimelineMap(budgets);
         return budgets.stream()
                 .map(budget -> toDto(
                         budget,
-                        clientOwnerIds.contains(budget.getOwner().getId()),
+                        budget.getOwner() == null,
+                        budget.getOwner() != null && clientOwnerIds.contains(budget.getOwner().getId()),
                         timelineByBudgetId.getOrDefault(budget.getId(), List.of())
                 ))
                 .toList();
@@ -636,15 +679,19 @@ public class BudgetService {
         return workerRepository.findOwnerIdsByRoleAndOwnerIdIn(Role.CLIENT, ownerIds);
     }
 
-    private BudgetDto toDto(Budget budget, boolean clientHasAccount, List<BudgetEventDto> timeline) {
+    private BudgetDto toDto(Budget budget,
+                            boolean walkInClient,
+                            boolean clientHasAccount,
+                            List<BudgetEventDto> timeline) {
         return new BudgetDto(
                 budget.getId(),
-                budget.getOwner().getId(),
-                budget.getOwner().getDisplayName(),
-                budget.getOwner().getEmail(),
+                budget.getOwner() == null ? null : budget.getOwner().getId(),
+                resolveBudgetContactName(budget),
+                budget.getContactEmail(),
+                walkInClient,
                 clientHasAccount,
-                budget.getVessel().getId(),
-                budget.getVessel().getName(),
+                budget.getVessel() == null ? null : budget.getVessel().getId(),
+                resolveBudgetDisplayVesselName(budget),
                 budget.getCreatedByWorker().getId(),
                 budget.getCreatedByWorker().getFullName(),
                 budget.getOriginBudget() == null ? null : budget.getOriginBudget().getId(),
@@ -745,7 +792,7 @@ public class BudgetService {
             timeline.add(new BudgetEventDto(
                     null,
                     budget.getStatus().name(),
-                    budget.getOwner().getDisplayName(),
+                    resolveBudgetContactName(budget),
                     Role.CLIENT.name(),
                     budget.getClientObservations(),
                     budget.getClientDecidedAt()

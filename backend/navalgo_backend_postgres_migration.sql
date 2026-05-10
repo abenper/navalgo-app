@@ -416,6 +416,31 @@ CREATE INDEX IF NOT EXISTS idx_budget_events_budget_id_created_at
 ALTER TABLE budgets
     ADD COLUMN IF NOT EXISTS origin_budget_id BIGINT;
 
+ALTER TABLE budgets
+    ADD COLUMN IF NOT EXISTS contact_name VARCHAR(255);
+
+ALTER TABLE budgets
+    ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255);
+
+ALTER TABLE budgets
+    ALTER COLUMN owner_id DROP NOT NULL;
+
+ALTER TABLE budgets
+    ALTER COLUMN vessel_id DROP NOT NULL;
+
+UPDATE budgets
+SET contact_name = COALESCE(contact_name, 'Cliente')
+WHERE contact_name IS NULL;
+
+UPDATE budgets
+SET contact_email = COALESCE(contact_email, owners.email)
+FROM owners
+WHERE budgets.owner_id = owners.id
+  AND budgets.contact_email IS NULL;
+
+ALTER TABLE budgets
+    ALTER COLUMN contact_email SET NOT NULL;
+
 DO $$
 BEGIN
     IF NOT EXISTS (

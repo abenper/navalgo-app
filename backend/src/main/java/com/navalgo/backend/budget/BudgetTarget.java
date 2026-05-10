@@ -7,10 +7,14 @@ final class BudgetTarget {
 
     private final Owner owner;
     private final Vessel vessel;
+    private final String contactName;
+    private final String contactEmail;
 
-    BudgetTarget(Owner owner, Vessel vessel) {
+    BudgetTarget(Owner owner, Vessel vessel, String contactName, String contactEmail) {
         this.owner = owner;
         this.vessel = vessel;
+        this.contactName = contactName;
+        this.contactEmail = contactEmail;
     }
 
     Owner owner() {
@@ -19,5 +23,13 @@ final class BudgetTarget {
 
     Vessel vessel() {
         return vessel;
+    }
+
+    String contactName() {
+        return contactName;
+    }
+
+    String contactEmail() {
+        return contactEmail;
     }
 }

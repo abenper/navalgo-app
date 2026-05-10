@@ -4,6 +4,7 @@ class Budget {
     required this.ownerId,
     required this.ownerName,
     required this.ownerEmail,
+    required this.walkInClient,
     required this.clientHasAccount,
     required this.vesselId,
     required this.vesselName,
@@ -26,11 +27,12 @@ class Budget {
   });
 
   final int id;
-  final int ownerId;
+  final int? ownerId;
   final String ownerName;
   final String? ownerEmail;
+  final bool walkInClient;
   final bool clientHasAccount;
-  final int vesselId;
+  final int? vesselId;
   final String vesselName;
   final int createdByWorkerId;
   final String createdByWorkerName;
@@ -60,12 +62,13 @@ class Budget {
     final rawTimeline = json['timeline'];
     return Budget(
       id: (json['id'] as num).toInt(),
-      ownerId: (json['ownerId'] as num).toInt(),
+      ownerId: (json['ownerId'] as num?)?.toInt(),
       ownerName: json['ownerName'] as String,
       ownerEmail: json['ownerEmail'] as String?,
+      walkInClient: json['walkInClient'] as bool? ?? false,
       clientHasAccount: json['clientHasAccount'] as bool? ?? false,
-      vesselId: (json['vesselId'] as num).toInt(),
-      vesselName: json['vesselName'] as String,
+      vesselId: (json['vesselId'] as num?)?.toInt(),
+      vesselName: json['vesselName'] as String? ?? 'Sin embarcacion',
       createdByWorkerId: (json['createdByWorkerId'] as num).toInt(),
       createdByWorkerName: json['createdByWorkerName'] as String,
       originBudgetId: (json['originBudgetId'] as num?)?.toInt(),
