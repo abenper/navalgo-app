@@ -337,7 +337,7 @@ public class BudgetService {
         if (ownerEmail == null || ownerEmail.isBlank()) {
             throw new IllegalArgumentException("El cliente no tiene correo electronico para enviar el presupuesto");
         }
-        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_Id(
+        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_IdAndActiveTrue(
                 Role.CLIENT,
                 budget.getOwner().getId()
         );
@@ -345,7 +345,7 @@ public class BudgetService {
                 budget.getOwner().getDisplayName(),
                 ownerEmail,
                 budget.getTitle(),
-                budget.getVessel().getName(),
+                resolveBudgetEmailVesselName(budget.getVessel()),
                 budget.getAmount(),
                 budget.getCurrency(),
                 clientHasAccount
@@ -525,6 +525,13 @@ public class BudgetService {
         return normalized.toUpperCase(Locale.ROOT);
     }
 
+    private String resolveBudgetEmailVesselName(Vessel vessel) {
+        if (vessel == null || isPlaceholderVessel(vessel)) {
+            return null;
+        }
+        return vessel.getName();
+    }
+
     private Budget resolveRejectedOriginBudget(Long originBudgetId) {
         if (originBudgetId == null) {
             return null;
@@ -596,7 +603,7 @@ public class BudgetService {
     }
 
     private BudgetDto toDto(Budget budget) {
-        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_Id(
+        boolean clientHasAccount = workerRepository.existsByRoleAndOwner_IdAndActiveTrue(
                 Role.CLIENT,
                 budget.getOwner().getId()
         );

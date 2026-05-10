@@ -29,6 +29,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
   bool _isLoading = true;
   bool _isCreating = false;
   String? _error;
+  final TextEditingController _searchCtrl = TextEditingController();
   List<Budget> _budgets = const <Budget>[];
   List<Owner> _owners = const <Owner>[];
   List<Vessel> _vessels = const <Vessel>[];
@@ -36,7 +37,22 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(_handleSearchChanged);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.removeListener(_handleSearchChanged);
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  void _handleSearchChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
   }
 
   Future<void> _loadData() async {
@@ -459,24 +475,52 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     }
   }
 
+  Iterable<Budget> _filterBudgets(Iterable<Budget> budgets) {
+    final query = _searchCtrl.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return budgets;
+    }
+
+    String normalize(String? value) => value?.trim().toLowerCase() ?? '';
+
+    return budgets.where((budget) {
+      final matchingOwners = _owners.where((item) => item.id == budget.ownerId);
+      final owner = matchingOwners.isEmpty ? null : matchingOwners.first;
+      final terms = <String>[
+        normalize(budget.title),
+        normalize(budget.description),
+        normalize(budget.ownerName),
+        normalize(budget.ownerEmail),
+        normalize(budget.vesselName),
+        normalize(budget.status),
+        normalize(owner?.email),
+        normalize(owner?.phone),
+        normalize(owner?.documentId),
+        budget.amount?.toStringAsFixed(2).toLowerCase() ?? '',
+      ];
+      return terms.any((term) => term.contains(query));
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final sentCount = _budgets
+    final visibleBudgets = _filterBudgets(_budgets).toList(growable: false);
+    final sentCount = visibleBudgets
         .where((budget) => budget.status == 'SENT')
         .length;
-    final draftCount = _budgets
+    final draftCount = visibleBudgets
         .where((budget) => budget.status == 'DRAFT')
         .length;
-    final answeredCount = _budgets
+    final answeredCount = visibleBudgets
         .where(
           (budget) =>
               budget.status == 'ACCEPTED' || budget.status == 'REJECTED',
         )
         .length;
-    final draftBudgets = _budgets
+    final draftBudgets = visibleBudgets
         .where((budget) => budget.status == 'DRAFT')
         .toList(growable: false);
-    final otherBudgets = _budgets
+    final otherBudgets = visibleBudgets
         .where((budget) => budget.status != 'DRAFT')
         .toList(growable: false);
 
@@ -546,6 +590,23 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
+                TextField(
+                  controller: _searchCtrl,
+                  decoration: InputDecoration(
+                    labelText: 'Buscar presupuesto',
+                    hintText:
+                        'Cliente, teléfono, correo, embarcación, título...',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: _searchCtrl.text.trim().isEmpty
+                        ? null
+                        : IconButton(
+                            onPressed: () => _searchCtrl.clear(),
+                            icon: const Icon(Icons.close_rounded),
+                            tooltip: 'Limpiar búsqueda',
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 NavalgoSectionHeader(
                   title: 'Listado',
                   subtitle: draftCount > 0
@@ -561,6 +622,12 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                   const NavalgoPanel(
                     child: Text(
                       'A\u00FAn no hay presupuestos creados. Usa el bot\u00F3n de arriba para preparar el primero.',
+                    ),
+                  )
+                else if (visibleBudgets.isEmpty)
+                  NavalgoPanel(
+                    child: Text(
+                      'No hemos encontrado presupuestos que coincidan con "${_searchCtrl.text.trim()}".',
                     ),
                   )
                 else ...[

@@ -76,14 +76,13 @@ public class ClientAccountService {
             throw new IllegalArgumentException("La contrasena debe tener minimo 12 caracteres e incluir mayuscula, minuscula, numero y simbolo");
         }
 
-        if (workerRepository.findByEmailIgnoreCase(email).isPresent()) {
-            throw new IllegalArgumentException("Ya existe una cuenta con ese correo electronico");
-        }
+        cleanupInactiveClientAccountByEmail(email);
 
         Owner owner = ownerRepository.findByEmailIgnoreCase(email)
                 .orElseGet(() -> createOwner(fullName, email, phone));
 
-        workerRepository.findByOwner_Id(owner.getId()).ifPresent(existing -> {
+        cleanupInactiveClientAccountByOwner(owner.getId());
+        workerRepository.findByRoleAndOwner_IdAndActiveTrue(Role.CLIENT, owner.getId()).ifPresent(existing -> {
             throw new IllegalArgumentException("Ese cliente ya tiene una cuenta asociada");
         });
 
@@ -107,6 +106,25 @@ public class ClientAccountService {
         );
 
         issueVerification(saved);
+    }
+
+    private void cleanupInactiveClientAccountByEmail(String email) {
+        workerRepository.findByEmailIgnoreCase(email).ifPresent(existing -> {
+            if (existing.getRole() != Role.CLIENT || existing.isActive()) {
+                throw new IllegalArgumentException("Ya existe una cuenta con ese correo electronico");
+            }
+            emailVerificationTokenRepository.deleteByWorker_Id(existing.getId());
+            workerRepository.delete(existing);
+        });
+    }
+
+    private void cleanupInactiveClientAccountByOwner(Long ownerId) {
+        workerRepository.findByOwner_Id(ownerId).ifPresent(existing -> {
+            if (existing.getRole() == Role.CLIENT && !existing.isActive()) {
+                emailVerificationTokenRepository.deleteByWorker_Id(existing.getId());
+                workerRepository.delete(existing);
+            }
+        });
     }
 
     public EmailVerificationStatusResponse getVerificationStatus(String rawToken) {

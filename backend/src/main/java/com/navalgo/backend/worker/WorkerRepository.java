@@ -13,11 +13,13 @@ import java.util.Set;
 public interface WorkerRepository extends JpaRepository<Worker, Long> {
     Optional<Worker> findByEmailIgnoreCase(String email);
     Optional<Worker> findByOwner_Id(Long ownerId);
+    Optional<Worker> findByRoleAndOwner_IdAndActiveTrue(Role role, Long ownerId);
     List<Worker> findByRoleAndActiveTrue(Role role);
     List<Worker> findByRoleAndActiveTrueOrderByFullNameAsc(Role role);
     List<Worker> findByRoleInAndActiveTrueOrderByFullNameAsc(Collection<Role> roles);
     boolean existsByRoleAndOwner_Id(Role role, Long ownerId);
+    boolean existsByRoleAndOwner_IdAndActiveTrue(Role role, Long ownerId);
 
-    @Query("select w.owner.id from Worker w where w.role = :role and w.owner.id in :ownerIds")
+    @Query("select w.owner.id from Worker w where w.role = :role and w.active = true and w.owner.id in :ownerIds")
     Set<Long> findOwnerIdsByRoleAndOwnerIdIn(@Param("role") Role role, @Param("ownerIds") Collection<Long> ownerIds);
 }

@@ -331,6 +331,10 @@ public class ResendEmailService {
         String formattedAmount = formatAmount(amount, currency);
         String appUrl = buildClientBudgetsUrl();
         String signupUrl = buildClientSignupUrl(clientName, clientEmail);
+        String vesselBlock = vesselName == null || vesselName.isBlank()
+                ? "<p>Ya tienes disponible un nuevo presupuesto en Naval-GO.</p>"
+                : "<p>Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion <strong>%s</strong>.</p>"
+                .formatted(escapeHtml(vesselName));
         String accountHint = clientHasAccount
                 ? """
                   <p>Entra en tu area de cliente para revisar el presupuesto, abrir el PDF dentro de Naval-GO y descargarlo cuando lo necesites.</p>
@@ -353,7 +357,7 @@ public class ResendEmailService {
                 <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
                   <h2 style="margin-bottom:12px;">Nuevo presupuesto disponible</h2>
                   <p>Hola, %s:</p>
-                  <p>Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion <strong>%s</strong>.</p>
+                  %s
                   <p><strong>%s</strong></p>
                   <p>Importe: <strong>%s</strong></p>
                   %s
@@ -361,7 +365,7 @@ public class ResendEmailService {
                 </div>
                 """.formatted(
                 escapeHtml(clientName),
-                escapeHtml(vesselName),
+                vesselBlock,
                 escapeHtml(budgetTitle),
                 escapeHtml(formattedAmount),
                 accountHint
@@ -377,6 +381,10 @@ public class ResendEmailService {
                                                boolean clientHasAccount) {
         String appUrl = buildClientBudgetsUrl();
         String signupUrl = buildClientSignupUrl(clientName, clientEmail);
+        String vesselLine = vesselName == null || vesselName.isBlank()
+                ? "Ya tienes disponible un nuevo presupuesto en Naval-GO."
+                : "Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion %s."
+                .formatted(vesselName);
         String accountHint = clientHasAccount
                 ? """
                 Entra en Naval-GO para revisar el presupuesto, abrir el PDF dentro de la app y descargarlo cuando lo necesites.
@@ -394,14 +402,14 @@ public class ResendEmailService {
         return """
                 Hola, %s:
 
-                Ya tienes disponible un nuevo presupuesto en Naval-GO para la embarcacion %s.
+                %s
                 %s
                 Importe: %s
 
                 %s
                 """.formatted(
                 clientName,
-                vesselName,
+                vesselLine,
                 budgetTitle,
                 formatAmount(amount, currency),
                 accountHint
