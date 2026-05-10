@@ -4,8 +4,11 @@ import com.navalgo.backend.common.Role;
 import com.navalgo.backend.notification.NotificationDeliveryOptions;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
+import com.navalgo.backend.notification.ResendEmailService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,26 +19,31 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 
 @Service
 public class TimeTrackingReminderService {
 
+    private static final Logger log = LoggerFactory.getLogger(TimeTrackingReminderService.class);
     private static final LocalTime FORCE_CLOSE_TIME = LocalTime.of(22, 0);
 
     private final NotificationService notificationService;
     private final TimeEntryRepository timeEntryRepository;
     private final TimeTrackingService timeTrackingService;
     private final WorkerRepository workerRepository;
+    private final ResendEmailService resendEmailService;
 
     public TimeTrackingReminderService(NotificationService notificationService,
                                        TimeEntryRepository timeEntryRepository,
                                        TimeTrackingService timeTrackingService,
-                                       WorkerRepository workerRepository) {
+                                       WorkerRepository workerRepository,
+                                       ResendEmailService resendEmailService) {
         this.notificationService = notificationService;
         this.timeEntryRepository = timeEntryRepository;
         this.timeTrackingService = timeTrackingService;
         this.workerRepository = workerRepository;
+        this.resendEmailService = resendEmailService;
     }
 
     @Transactional
@@ -43,7 +51,9 @@ public class TimeTrackingReminderService {
     public void sendMissingClockInReminders() {
         ZoneId zoneId = ZoneId.systemDefault();
         LocalDate today = LocalDate.now(zoneId);
-        List<Worker> workers = workerRepository.findByRoleAndActiveTrueOrderByFullNameAsc(Role.WORKER);
+        List<Worker> workers = workerRepository.findByRoleInAndActiveTrueOrderByFullNameAsc(
+                EnumSet.of(Role.WORKER, Role.COMERCIAL)
+        );
         List<Worker> updatedWorkers = new ArrayList<>();
 
         for (Worker worker : workers) {
@@ -69,8 +79,9 @@ public class TimeTrackingReminderService {
                     "No has fichado en el dia de hoy.",
                     "FICHAJES",
                     NotificationType.WARNING,
-                    NotificationDeliveryOptions.EMAIL_FALLBACK
+                    NotificationDeliveryOptions.DEFAULT
             );
+            sendDirectReminderEmail(worker, "No has fichado hoy", "No has fichado en el dia de hoy.");
             worker.setLastMissingClockInReminderDate(today);
             updatedWorkers.add(worker);
         }
@@ -200,5 +211,18 @@ public class TimeTrackingReminderService {
 
     private String formatDate(LocalDate date) {
         return String.format("%02d/%02d/%04d", date.getDayOfMonth(), date.getMonthValue(), date.getYear());
+    }
+
+    private void sendDirectReminderEmail(Worker worker, String title, String message) {
+        try {
+            resendEmailService.sendNotificationFallback(
+                    worker.getFullName(),
+                    worker.getEmail(),
+                    title,
+                    message
+            );
+        } catch (RuntimeException exception) {
+            log.warn("No se pudo enviar el email directo de recordatorio de fichaje. workerId={}", worker.getId(), exception);
+        }
     }
 }

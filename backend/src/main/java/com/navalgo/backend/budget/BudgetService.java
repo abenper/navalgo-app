@@ -7,18 +7,25 @@ import com.navalgo.backend.fleet.OwnerRepository;
 import com.navalgo.backend.fleet.OwnerType;
 import com.navalgo.backend.fleet.Vessel;
 import com.navalgo.backend.fleet.VesselRepository;
+import com.navalgo.backend.notification.NotificationService;
+import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.notification.ResendEmailService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -26,25 +33,30 @@ import java.util.Set;
 @Transactional(readOnly = true)
 public class BudgetService {
 
+    private static final Logger log = LoggerFactory.getLogger(BudgetService.class);
+
     private final BudgetRepository budgetRepository;
     private final OwnerRepository ownerRepository;
     private final VesselRepository vesselRepository;
     private final WorkerRepository workerRepository;
     private final InputSanitizer inputSanitizer;
     private final ResendEmailService resendEmailService;
+    private final NotificationService notificationService;
 
     public BudgetService(BudgetRepository budgetRepository,
                          OwnerRepository ownerRepository,
                          VesselRepository vesselRepository,
                          WorkerRepository workerRepository,
                          InputSanitizer inputSanitizer,
-                         ResendEmailService resendEmailService) {
+                         ResendEmailService resendEmailService,
+                         NotificationService notificationService) {
         this.budgetRepository = budgetRepository;
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.workerRepository = workerRepository;
         this.inputSanitizer = inputSanitizer;
         this.resendEmailService = resendEmailService;
+        this.notificationService = notificationService;
     }
 
     public List<BudgetDto> findAll() {
@@ -183,6 +195,12 @@ public class BudgetService {
             budget.setClientDecidedAt(Instant.now());
         }
 
+        if (current.getRole() == Role.CLIENT
+                && previousStatus == BudgetStatus.SENT
+                && (nextStatus == BudgetStatus.ACCEPTED || nextStatus == BudgetStatus.REJECTED)) {
+            notifyCommercialsAboutClientDecision(budget, nextStatus);
+        }
+
         return toDto(budgetRepository.save(budget));
     }
 
@@ -213,6 +231,72 @@ public class BudgetService {
                 budget.getPdfUrl(),
                 clientHasAccount
         );
+    }
+
+    private void notifyCommercialsAboutClientDecision(Budget budget, BudgetStatus nextStatus) {
+        List<Worker> activeCommercials = workerRepository.findByRoleAndActiveTrueOrderByFullNameAsc(Role.COMERCIAL);
+        Map<Long, Worker> recipients = new LinkedHashMap<>();
+        for (Worker worker : activeCommercials) {
+            recipients.put(worker.getId(), worker);
+        }
+
+        Worker creator = budget.getCreatedByWorker();
+        if (creator != null && creator.isActive() && creator.getRole() == Role.ADMIN) {
+            recipients.putIfAbsent(creator.getId(), creator);
+        }
+
+        if (recipients.isEmpty()) {
+            return;
+        }
+
+        String statusLabel = nextStatus == BudgetStatus.ACCEPTED ? "Aceptado" : "Rechazado";
+        String clientName = budget.getOwner().getDisplayName();
+        String vesselName = budget.getVessel().getName();
+        String title = "Presupuesto " + statusLabel.toLowerCase(Locale.ROOT);
+        String message = buildCommercialDecisionMessage(budget, statusLabel);
+
+        notificationService.notifyWorkers(
+                new LinkedHashSet<>(recipients.keySet()),
+                title,
+                message,
+                "PRESUPUESTOS",
+                nextStatus == BudgetStatus.ACCEPTED ? NotificationType.SUCCESS : NotificationType.WARNING
+        );
+
+        for (Worker recipient : recipients.values()) {
+            try {
+                resendEmailService.sendBudgetDecisionNotification(
+                        recipient.getFullName(),
+                        recipient.getEmail(),
+                        clientName,
+                        vesselName,
+                        budget.getTitle(),
+                        statusLabel,
+                        budget.getClientObservations()
+                );
+            } catch (RuntimeException exception) {
+                log.warn(
+                        "No se pudo enviar el email al comercial sobre la decision del presupuesto. budgetId={}, workerId={}",
+                        budget.getId(),
+                        recipient.getId(),
+                        exception
+                );
+            }
+        }
+    }
+
+    private String buildCommercialDecisionMessage(Budget budget, String statusLabel) {
+        String base = budget.getOwner().getDisplayName()
+                + " ha "
+                + statusLabel.toLowerCase(Locale.ROOT)
+                + " el presupuesto "
+                + budget.getTitle()
+                + ".";
+        String observations = inputSanitizer.optionalText(budget.getClientObservations(), 160);
+        if (observations == null || observations.isBlank()) {
+            return base;
+        }
+        return base + " Observaciones: " + observations;
     }
 
     private Worker requireCommercialOrAdmin(String email) {

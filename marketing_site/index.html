@@ -8,7 +8,7 @@
     name="description"
     content="NavalGO centraliza partes de trabajo, flota, fichajes, evidencias y firmas en una sola plataforma pensada para operaciones navales."
   >
-  <meta name="theme-color" content="#0c3342">
+  <meta name="theme-color" content="#0b2f3c">
   <meta name="robots" content="index,follow">
   <link rel="canonical" href="https://naval-go.com/">
   <meta property="og:type" content="website">
@@ -50,101 +50,114 @@
 </head>
 <body>
   <div class="site-shell">
-    <div class="sea-grid" aria-hidden="true"></div>
+    <div class="ambient-grid" aria-hidden="true"></div>
+
     <header class="topbar">
       <a class="brand" href="#inicio" aria-label="NavalGO inicio">
-        <span class="brand-mark">NG</span>
-        <span class="brand-copy">
-          <strong>NavalGO</strong>
-          <span>Operativa naval conectada</span>
+        <span class="brand-lockup">
+          <img
+            class="brand-logo"
+            src="assets/branding/logo_navalgo_horizontal.png"
+            alt="NavalGO"
+            width="183"
+            height="48"
+          >
+          <span class="brand-subtitle">Operativa naval conectada</span>
         </span>
       </a>
+
       <nav class="main-nav" aria-label="Navegación principal">
         <a href="#producto">Producto</a>
         <a href="#seguridad">Seguridad</a>
         <a href="#precios">Precios</a>
-        <a href="#faq">FAQ</a>
       </nav>
+
       <div class="topbar-actions">
-        <a class="ghost-button" href="https://app.naval-go.com">Login</a>
-        <a class="primary-button" href="#precios">Ver planes</a>
+        <a class="primary-button topbar-login" href="https://app.naval-go.com">Login</a>
       </div>
     </header>
 
     <main>
-      <section class="hero" id="inicio">
+      <section class="hero-card" id="inicio">
         <div class="hero-copy">
-          <p class="eyebrow">SOFTWARE DE GESTIÓN NAVAL</p>
-          <h1>Coordina partes, flota y evidencias sin perder el pulso del muelle.</h1>
+          <span class="eyebrow">SOFTWARE DE GESTIÓN NAVAL</span>
+          <h1>Toda la operativa naval en una sola app.</h1>
           <p class="hero-text">
-            NavalGO reúne en un único flujo la creación de partes, la captura de
-            evidencias, el fichaje del equipo y el cierre firmado del trabajo.
-            Diseñado para quienes operan entre oficina, taller, puerto y móvil.
+            Partes, flota, equipo, presupuestos y evidencias en un único acceso bajo NavalGO.
           </p>
-          <div class="hero-actions">
-            <a class="primary-button" href="#precios">Ver precio recomendado</a>
-            <a class="ghost-button" href="https://app.naval-go.com">Entrar en la app</a>
-          </div>
-          <ul class="hero-points" aria-label="Beneficios principales">
-            <li>Partes firmados con evidencias verificables</li>
-            <li>Operativa clara para administración, comercial, cliente y equipo de campo</li>
-            <li>Experiencia mobile-first para trabajar con el pulgar, no con zoom</li>
+
+          <ul class="hero-list" aria-label="Valor principal">
+            <li>Partes con firma y cierre operativo</li>
+            <li>Presupuestos PDF con envío y respuesta del cliente</li>
+            <li>Flota, horas y equipo conectados</li>
+            <li>Notificaciones para trabajo en campo</li>
           </ul>
+
+          <div class="hero-actions">
+            <a class="primary-button primary-button-large" href="#precios">Ver precios</a>
+            <a class="ghost-button ghost-button-large" href="https://app.naval-go.com">Abrir app</a>
+          </div>
+
+          <div class="hero-tag-row">
+            <span>Desde 99 €/mes</span>
+            <span>Acceso por empresa</span>
+          </div>
         </div>
 
-        <div class="hero-visual" aria-label="Vistas de NavalGO en móvil">
-          <div class="radar-glow"></div>
-          <div class="device-stack">
-            <article class="phone phone-front">
-              <div class="phone-notch"></div>
-              <div class="phone-screen">
-                <div class="mock-header">
-                  <span class="mock-badge mock-badge-coral">Hoy</span>
-                  <strong>Partes activos</strong>
-                  <small>Vista móvil operativa</small>
+        <div class="hero-visual" aria-label="Vista principal de NavalGO">
+          <div class="hero-glow"></div>
+
+          <article class="device-card device-card-main">
+            <div class="device-shell">
+              <div class="device-notch"></div>
+              <div class="device-screen">
+                <div class="mock-toolbar">
+                  <span class="mock-chip mock-chip-alert">Hoy</span>
+                  <span class="mock-toolbar-icon"></span>
                 </div>
-                <div class="mock-card">
-                  <div class="mock-card-top">
-                    <strong>Cambio de bomba de achique</strong>
-                    <span class="status-pill status-danger">Urgente</span>
-                  </div>
-                  <p>GC-21 Alborán</p>
-                  <div class="mock-meta">
-                    <span>Puerto de Málaga</span>
-                    <span>08:30</span>
-                  </div>
+                <div class="mock-balance">
+                  <p>Parte activo</p>
+                  <strong>Bomba de achique</strong>
+                  <span>GC-21 Alborán</span>
                 </div>
-                <div class="mock-card">
-                  <div class="mock-card-top">
-                    <strong>Revisión de motor auxiliar</strong>
-                    <span class="status-pill status-ok">Firmado</span>
-                  </div>
-                  <p>Patrullera Costa Sur</p>
-                  <div class="mock-progress">
-                    <span></span>
-                  </div>
-                  <div class="mock-meta">
-                    <span>3 evidencias</span>
-                    <span>1 firma</span>
-                  </div>
+                <div class="mock-stat-grid">
+                  <article>
+                    <span>Inicio</span>
+                    <strong>08:30</strong>
+                  </article>
+                  <article>
+                    <span>Estado</span>
+                    <strong>Urgente</strong>
+                  </article>
                 </div>
-                <div class="mock-footer-nav">
+                <div class="mock-task-card">
+                  <div class="mock-task-head">
+                    <strong>Checklist</strong>
+                    <span class="mock-dot"></span>
+                  </div>
+                  <ul>
+                    <li>Fotos listas</li>
+                    <li>Ubicación ok</li>
+                    <li>Firma pendiente</li>
+                  </ul>
+                </div>
+                <div class="mock-bottom-nav">
                   <span class="active"></span>
                   <span></span>
                   <span></span>
                   <span></span>
                 </div>
               </div>
-            </article>
+            </div>
+          </article>
 
-            <article class="phone phone-back">
-              <div class="phone-notch"></div>
-              <div class="phone-screen">
-                <div class="mock-header mock-header-tight">
-                  <span class="mock-badge mock-badge-gold">Custodia</span>
-                  <strong>Evidencias</strong>
-                </div>
-                <div class="evidence-panel">
+          <article class="device-card device-card-side">
+            <div class="device-shell">
+              <div class="device-notch"></div>
+              <div class="device-screen device-screen-light">
+                <div class="evidence-card">
+                  <span class="mock-chip mock-chip-gold">Custodia</span>
+                  <strong>Evidencia bloqueada</strong>
                   <div class="evidence-photo"></div>
                   <div class="evidence-row">
                     <span>SHA-256</span>
@@ -154,198 +167,181 @@
                     <span>Servidor</span>
                     <strong>HMAC sellada</strong>
                   </div>
-                  <div class="evidence-row">
-                    <span>Estado</span>
-                    <strong>Bloqueado tras firma</strong>
-                  </div>
-                </div>
-                <div class="map-card">
-                  <strong>Captura móvil</strong>
-                  <p>GPS, fecha y usuario vinculados al adjunto.</p>
                 </div>
               </div>
-            </article>
-
-            <aside class="console-card">
-              <p class="console-tag">Panel centralizado</p>
-              <strong>Oficina y campo con la misma trazabilidad</strong>
-              <ul>
-                <li>Firmas y cierres desde la app</li>
-                <li>Control de ausencias y fichajes</li>
-                <li>Flota y propietarios en un mismo sitio</li>
-              </ul>
-            </aside>
-          </div>
+            </div>
+          </article>
         </div>
       </section>
 
-      <section class="signal-strip" aria-label="Resultados clave">
+      <section class="mini-strip" aria-label="Funciones clave">
         <article>
-          <strong>Menos fricción</strong>
-          <span>Un único flujo para crear, firmar y cerrar partes.</span>
+          <strong>Partes</strong>
+          <span>Crear, asignar, firmar y cerrar</span>
         </article>
         <article>
-          <strong>Más trazabilidad</strong>
-          <span>Evidencias, firmas, tiempos y contexto técnico unidos.</span>
+          <strong>Evidencias</strong>
+          <span>Hash, sellado y custodia</span>
         </article>
         <article>
-          <strong>Más claridad</strong>
-          <span>Cada rol ve lo justo para decidir rápido y actuar mejor.</span>
+          <strong>Flota</strong>
+          <span>Barcos, propietarios y horas</span>
+        </article>
+        <article>
+          <strong>Equipo</strong>
+          <span>Fichajes, ausencias y roles</span>
         </article>
       </section>
 
-      <section class="section-block" id="producto">
-        <div class="section-heading">
-          <p class="eyebrow">PRODUCTO</p>
-          <h2>Todo lo que el equipo necesita, sin menús interminables.</h2>
-          <p>
-            La estructura está pensada para que cada usuario vea solo lo que necesita,
-            encuentre enseguida su siguiente acción y complete tareas críticas desde
-            móvil o escritorio con la misma lógica.
-          </p>
+      <section class="section-block product-block" id="producto">
+        <div class="section-heading compact-heading">
+          <span class="eyebrow">QUÉ RESUELVE</span>
+          <h2>Todo el circuito operativo, no solo una parte del trabajo.</h2>
         </div>
 
         <div class="feature-grid">
-          <article class="feature-card feature-card-wide">
-            <span class="feature-icon">01</span>
-            <h3>Partes de trabajo con cierre real</h3>
-            <p>
-              Crea, asigna, firma y deja constancia del trabajo con un flujo natural
-              para administración y operario.
-            </p>
+          <article class="feature-card feature-card-featured">
+            <span class="feature-kicker">01</span>
+            <h3>Partes que se cierran de verdad</h3>
+            <p>Del alta al firmado final con una lógica continua y fácil de seguir.</p>
           </article>
           <article class="feature-card">
-            <span class="feature-icon">02</span>
-            <h3>Adjuntos sellados</h3>
-            <p>Fotos y vídeos con contexto técnico, firma de servidor y acta de integridad.</p>
+            <span class="feature-kicker">02</span>
+            <h3>Evidencias defendibles</h3>
+            <p>Fotos y vídeos con contexto técnico y acta de integridad.</p>
           </article>
           <article class="feature-card">
-            <span class="feature-icon">03</span>
-            <h3>Control de flota</h3>
-            <p>Propietarios, embarcaciones, histórico y estado operativo conectados.</p>
+            <span class="feature-kicker">03</span>
+            <h3>Flota conectada</h3>
+            <p>Propietarios, embarcaciones, configuración y control de horas de motor.</p>
           </article>
           <article class="feature-card">
-            <span class="feature-icon">04</span>
-            <h3>Fichaje y ausencias</h3>
-            <p>Unifica jornada, solicitudes y control de equipo dentro de la misma plataforma.</p>
+            <span class="feature-kicker">04</span>
+            <h3>Trabajo real en móvil</h3>
+            <p>Para operarios que necesitan pulsar rápido, no leer una intranet entera.</p>
           </article>
           <article class="feature-card">
-            <span class="feature-icon">05</span>
+            <span class="feature-kicker">05</span>
+            <h3>Presupuestos con seguimiento</h3>
+            <p>Subida de PDF, envío por correo y respuesta del cliente desde su área.</p>
+          </article>
+          <article class="feature-card">
+            <span class="feature-kicker">06</span>
+            <h3>Equipo y fichajes</h3>
+            <p>Altas, roles, jornada, ausencias y solicitudes dentro del mismo sistema.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="section-block roles-block">
+        <div class="section-heading compact-heading">
+          <span class="eyebrow">POR ROL</span>
+          <h2>Cada perfil ve lo que necesita para trabajar.</h2>
+        </div>
+
+        <div class="roles-grid">
+          <article class="role-card role-card-featured">
+            <span class="role-kicker">ADMIN</span>
+            <h3>Control total</h3>
+            <p>Partes, plantillas, flota, equipo, fichajes, ausencias y actas de integridad.</p>
+          </article>
+          <article class="role-card">
+            <span class="role-kicker">COMERCIAL</span>
             <h3>Presupuestos y seguimiento</h3>
-            <p>Comercial y cliente trabajan sobre la misma base de información.</p>
+            <p>Preparación de propuestas, envío al cliente y contexto de flota compartido.</p>
           </article>
-          <article class="feature-card">
-            <span class="feature-icon">06</span>
-            <h3>Diseño móvil primero</h3>
-            <p>Interfaz pensada para foco, proximidad visual y decisiones rápidas en campo.</p>
+          <article class="role-card">
+            <span class="role-kicker">TRABAJADOR</span>
+            <h3>Operativa de campo</h3>
+            <p>Partes, adjuntos, firma, fichaje, ausencias y notificaciones desde móvil.</p>
           </article>
-        </div>
-      </section>
-
-      <section class="section-block workflow-block">
-        <div class="section-heading">
-          <p class="eyebrow">FLUJO</p>
-          <h2>De la orden al cierre en tres pasos claros.</h2>
-        </div>
-
-        <div class="workflow-grid">
-          <article class="workflow-step">
-            <span>1</span>
-            <h3>Asignas el trabajo</h3>
-            <p>El administrador crea el parte, vincula embarcación y asigna al personal.</p>
-          </article>
-          <article class="workflow-step">
-            <span>2</span>
-            <h3>El equipo ejecuta</h3>
-            <p>Desde móvil registran avances, evidencias, fichajes y firma cuando termina.</p>
-          </article>
-          <article class="workflow-step">
-            <span>3</span>
-            <h3>Queda trazado</h3>
-            <p>La evidencia se sella y la organización conserva un rastro verificable del cierre.</p>
+          <article class="role-card">
+            <span class="role-kicker">CLIENTE</span>
+            <h3>Respuesta rápida</h3>
+            <p>Consulta de presupuestos, apertura de PDF y aceptación o rechazo con observaciones.</p>
           </article>
         </div>
       </section>
 
-      <section class="section-block principles-block">
-        <div class="section-heading">
-          <p class="eyebrow">EXPERIENCIA</p>
-          <h2>Diseñada para trabajar rápido sin saturar la atención.</h2>
-          <p>
-            La web comercial y la app comparten un principio simple: menos ruido,
-            acciones principales muy visibles y agrupación lógica para que el usuario
-            no tenga que pensar dos veces dónde pulsar.
-          </p>
+      <section class="section-block modules-block">
+        <div class="section-heading compact-heading">
+          <span class="eyebrow">MÓDULOS REALES</span>
+          <h2>Lo que ya puede coordinar NavalGO.</h2>
         </div>
 
-        <div class="principles-grid">
-          <article class="principle-card">
-            <strong>Acciones grandes y cercanas</strong>
-            <p>CTAs amplias, zonas de toque cómodas y recorridos cortos en móvil.</p>
+        <div class="modules-grid">
+          <article class="module-card">
+            <strong>Partes y firmas</strong>
+            <p>Asignación, prioridad, materiales, firma y borrado controlado.</p>
           </article>
-          <article class="principle-card">
-            <strong>Pocas decisiones por pantalla</strong>
-            <p>Navegación corta, secciones compactas y una acción principal dominante.</p>
+          <article class="module-card">
+            <strong>Adjuntos técnicos</strong>
+            <p>Fotos, vídeos, ubicación y bloqueo de evidencias tras firma.</p>
           </article>
-          <article class="principle-card">
-            <strong>Patrones familiares</strong>
-            <p>Estructura SaaS reconocible para que el usuario entienda la interfaz al instante.</p>
+          <article class="module-card">
+            <strong>Flota</strong>
+            <p>Propietarios, embarcaciones, motores, jets, reductoras y analítica.</p>
+          </article>
+          <article class="module-card">
+            <strong>Equipo</strong>
+            <p>Roles, activación de cuentas, perfiles y solicitudes pendientes.</p>
+          </article>
+          <article class="module-card">
+            <strong>Fichajes y ausencias</strong>
+            <p>Control horario y gestión de permisos dentro del mismo flujo.</p>
+          </article>
+          <article class="module-card">
+            <strong>Presupuestos</strong>
+            <p>PDF, envío por email, altas de cliente y respuesta comercial.</p>
+          </article>
+          <article class="module-card">
+            <strong>Notificaciones</strong>
+            <p>Alertas web y push para mantener el trabajo en movimiento.</p>
+          </article>
+          <article class="module-card">
+            <strong>Acceso centralizado</strong>
+            <p>Todo bajo NavalGO, sin depender de dominios separados por cliente.</p>
           </article>
         </div>
       </section>
 
       <section class="section-block security-block" id="seguridad">
-        <div class="section-heading">
-          <p class="eyebrow">SEGURIDAD E INTEGRIDAD</p>
-          <h2>Evidencias pensadas para soportar revisión, no solo para adjuntarse.</h2>
-          <p>
-            NavalGO no trata una captura como un simple archivo. La vincula al parte,
-            la sella técnicamente y restringe cambios cuando el trabajo ya ha sido firmado.
-          </p>
+        <div class="section-heading compact-heading">
+          <span class="eyebrow">POR QUÉ CONFIAR</span>
+          <h2>La evidencia no solo se guarda. También se puede revisar y defender.</h2>
         </div>
 
-        <div class="security-layout">
-          <article class="security-card security-card-main">
-            <h3>Qué protege NavalGO</h3>
+        <div class="security-grid">
+          <article class="security-card security-card-featured">
+            <strong>Qué protege NavalGO</strong>
             <ul class="check-list">
-              <li>El binario final almacenado mediante SHA-256</li>
-              <li>Los metadatos técnicos ligados al adjunto</li>
-              <li>La coherencia del conjunto de evidencias tras el cierre</li>
-              <li>La descarga del acta solo para perfiles administradores</li>
+              <li>Archivo final con hash SHA-256</li>
+              <li>Metadatos técnicos unidos al adjunto</li>
+              <li>Sellado de servidor tras la firma</li>
             </ul>
           </article>
           <article class="security-card">
-            <h3>Para qué sirve el acta</h3>
-            <p>
-              Resume la cadena de custodia, explica los hash y deja claro qué quedó
-              sellado, cuándo y con qué firma de servidor.
-            </p>
+            <strong>Qué recibe el administrador</strong>
+            <p>Un acta de integridad clara para revisar la cadena de custodia.</p>
           </article>
           <article class="security-card">
-            <h3>Qué ve el equipo</h3>
-            <p>
-              Cada rol ve lo justo para actuar rápido. La complejidad técnica queda
-              donde debe estar: en backend y en el informe de integridad.
-            </p>
+            <strong>Qué gana el equipo</strong>
+            <p>Menos fricción en campo y menos dudas al cerrar trabajos.</p>
           </article>
         </div>
       </section>
 
       <section class="section-block pricing-block" id="precios">
-        <div class="section-heading">
-          <p class="eyebrow">PRECIOS</p>
-          <h2>Precio profesional para una operativa que no puede fallar.</h2>
-          <p>
-            Propongo una estructura comercial clara: suficiente valor para un software
-            vertical y lo bastante simple como para cerrar una demo sin discutir veinte planes.
-          </p>
+        <div class="section-heading compact-heading">
+          <span class="eyebrow">PRECIOS</span>
+          <h2>Tres planes. Una decisión rápida.</h2>
         </div>
 
         <div class="pricing-grid">
           <article class="price-card">
             <p class="plan-name">Starter</p>
-            <p class="plan-price">149 €<span>/mes</span></p>
-            <p class="plan-copy">Para equipos pequeños que quieren digitalizar partes y firmas.</p>
+            <p class="plan-price">99 €<span>/mes</span></p>
+            <p class="plan-copy">Para equipos pequeños que quieren digitalizar partes y evidencias.</p>
             <ul class="plan-list">
               <li>Hasta 5 usuarios</li>
               <li>Partes, flota y evidencias</li>
@@ -357,75 +353,40 @@
           <article class="price-card price-card-featured">
             <p class="plan-flag">Plan recomendado</p>
             <p class="plan-name">Pro</p>
-            <p class="plan-price">349 €<span>/mes</span></p>
-            <p class="plan-copy">
-              La mejor opción para astilleros, contratas navales y equipos con operativa diaria.
-            </p>
+            <p class="plan-price">229 €<span>/mes</span></p>
+            <p class="plan-copy">La opción más equilibrada para operativa diaria naval.</p>
             <ul class="plan-list">
               <li>Hasta 15 usuarios</li>
               <li>Fichajes, ausencias y presupuestos</li>
               <li>Acta de integridad de evidencias</li>
-              <li>Soporte prioritario</li>
             </ul>
             <a class="primary-button" href="mailto:hola@naval-go.com?subject=Quiero%20una%20demo%20de%20NavalGO">Solicitar demo</a>
           </article>
 
           <article class="price-card">
             <p class="plan-name">Enterprise</p>
-            <p class="plan-price">Desde 699 €<span>/mes</span></p>
-            <p class="plan-copy">Para despliegues multisede, más usuarios y acompañamiento de implantación.</p>
+            <p class="plan-price">Desde 449 €<span>/mes</span></p>
+            <p class="plan-copy">Para más usuarios, implantación guiada y operativa más compleja.</p>
             <ul class="plan-list">
               <li>Usuarios ampliables</li>
-              <li>Implantación guiada</li>
               <li>Adaptación operativa</li>
+              <li>Soporte prioritario</li>
             </ul>
             <a class="ghost-button" href="mailto:hola@naval-go.com?subject=Quiero%20hablar%20sobre%20NavalGO%20Enterprise">Hablar con ventas</a>
           </article>
         </div>
 
-        <p class="pricing-note">
-          Implantación recomendada aparte: desde <strong>490 €</strong> según migración, configuración y formación inicial.
-        </p>
-      </section>
-
-      <section class="section-block faq-block" id="faq">
-        <div class="section-heading">
-          <p class="eyebrow">FAQ</p>
-          <h2>Preguntas rápidas antes de pedir demo.</h2>
-        </div>
-
-        <div class="faq-list">
-          <details>
-            <summary>¿NavalGO funciona en móvil?</summary>
-            <p>Sí. La experiencia está pensada para que el operario trabaje desde el móvil y el administrador desde escritorio o tablet.</p>
-          </details>
-          <details>
-            <summary>¿Hace falta instalar otro servidor?</summary>
-            <p>No. Puedes servir la web comercial, la app Flutter y la API con el mismo Nginx en la VPS usando subdominios separados.</p>
-          </details>
-          <details>
-            <summary>¿Se puede entrar directamente a la app?</summary>
-            <p>Sí. El acceso operativo iría en <strong>app.naval-go.com</strong> y la web comercial en <strong>naval-go.com</strong>.</p>
-          </details>
-          <details>
-            <summary>¿Se puede demostrar la integridad de las evidencias?</summary>
-            <p>Sí. El sistema genera sellado técnico y un acta administrativa para administradores con hash y firma de servidor.</p>
-          </details>
-        </div>
+        <p class="pricing-note">Implantación inicial opcional: desde <strong>290 €</strong>.</p>
       </section>
 
       <section class="cta-band" id="contacto">
         <div>
-          <p class="eyebrow">SIGUIENTE PASO</p>
-          <h2>Lanza la web comercial y deja la app operativa en su propio subdominio.</h2>
-          <p>
-            La arquitectura recomendada es simple: <strong>naval-go.com</strong> para captar,
-            <strong>app.naval-go.com</strong> para operar y <strong>api.naval-go.com</strong> para servir backend.
-          </p>
+          <span class="eyebrow">SIGUIENTE PASO</span>
+          <h2>Solicita una demo o entra con tu acceso centralizado de NavalGO.</h2>
         </div>
         <div class="cta-actions">
-          <a class="primary-button" href="mailto:hola@naval-go.com?subject=Quiero%20activar%20NavalGO">Solicitar activación</a>
-          <a class="ghost-button" href="https://app.naval-go.com">Ir al login</a>
+          <a class="primary-button primary-button-large" href="mailto:hola@naval-go.com?subject=Quiero%20activar%20NavalGO">Solicitar demo</a>
+          <a class="ghost-button ghost-button-large" href="https://app.naval-go.com">Ir al login</a>
         </div>
       </section>
     </main>

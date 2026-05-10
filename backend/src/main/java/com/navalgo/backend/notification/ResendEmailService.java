@@ -100,6 +100,36 @@ public class ResendEmailService {
         return sendEmail(payload, "No se pudo enviar el email de presupuesto");
     }
 
+    public boolean sendBudgetDecisionNotification(String workerName,
+                                                  String workerEmail,
+                                                  String clientName,
+                                                  String vesselName,
+                                                  String budgetTitle,
+                                                  String statusLabel,
+                                                  String clientObservations) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("from", fromAddress);
+        payload.put("to", List.of(workerEmail));
+        payload.put("subject", sanitizeSubject("Presupuesto " + statusLabel.toLowerCase()));
+        payload.put("html", buildBudgetDecisionNotificationHtml(
+                workerName,
+                clientName,
+                vesselName,
+                budgetTitle,
+                statusLabel,
+                clientObservations
+        ));
+        payload.put("text", buildBudgetDecisionNotificationText(
+                workerName,
+                clientName,
+                vesselName,
+                budgetTitle,
+                statusLabel,
+                clientObservations
+        ));
+        return sendEmail(payload, "No se pudo enviar el email de respuesta del presupuesto");
+    }
+
     public boolean sendEmailVerification(String clientName,
                                          String clientEmail,
                                          String verificationLink,
@@ -375,6 +405,77 @@ public class ResendEmailService {
                 formatAmount(amount, currency),
                 pdfUrl,
                 accountHint
+        );
+    }
+
+    private String buildBudgetDecisionNotificationHtml(String workerName,
+                                                       String clientName,
+                                                       String vesselName,
+                                                       String budgetTitle,
+                                                       String statusLabel,
+                                                       String clientObservations) {
+        String appUrl = normalizeFrontendBaseUrl();
+        String observationsBlock = clientObservations == null || clientObservations.isBlank()
+                ? ""
+                : """
+                  <p><strong>Observaciones del cliente:</strong><br>%s</p>
+                  """.formatted(escapeHtml(clientObservations));
+        return """
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
+                  <h2 style="margin-bottom:12px;">Presupuesto %s</h2>
+                  <p>Hola, %s:</p>
+                  <p>El cliente <strong>%s</strong> ha marcado como <strong>%s</strong> el presupuesto de la embarcacion <strong>%s</strong>.</p>
+                  <p><strong>%s</strong></p>
+                  %s
+                  <p style="margin:24px 0;">
+                    <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
+                      Revisar presupuesto
+                    </a>
+                  </p>
+                  <p>Equipo Naval-GO</p>
+                </div>
+                """.formatted(
+                escapeHtml(statusLabel.toLowerCase()),
+                escapeHtml(workerName),
+                escapeHtml(clientName),
+                escapeHtml(statusLabel.toLowerCase()),
+                escapeHtml(vesselName),
+                escapeHtml(budgetTitle),
+                observationsBlock,
+                escapeHtmlAttribute(appUrl)
+        );
+    }
+
+    private String buildBudgetDecisionNotificationText(String workerName,
+                                                       String clientName,
+                                                       String vesselName,
+                                                       String budgetTitle,
+                                                       String statusLabel,
+                                                       String clientObservations) {
+        String observationsBlock = clientObservations == null || clientObservations.isBlank()
+                ? ""
+                : """
+
+                Observaciones del cliente:
+                %s
+                """.formatted(clientObservations);
+        return """
+                Hola, %s:
+
+                El cliente %s ha marcado como %s el presupuesto de la embarcacion %s.
+                %s
+                %s
+
+                Revisar presupuesto:
+                %s
+                """.formatted(
+                workerName,
+                clientName,
+                statusLabel.toLowerCase(),
+                vesselName,
+                budgetTitle,
+                observationsBlock,
+                normalizeFrontendBaseUrl()
         );
     }
 
