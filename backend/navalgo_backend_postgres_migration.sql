@@ -379,4 +379,17 @@ CREATE TABLE IF NOT EXISTS registration_invitations (
 CREATE INDEX IF NOT EXISTS idx_registration_invitations_worker_id
     ON registration_invitations(worker_id);
 
+CREATE TABLE IF NOT EXISTS budget_events (
+    id BIGSERIAL PRIMARY KEY,
+    budget_id BIGINT NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
+    event_type VARCHAR(40) NOT NULL,
+    actor_name VARCHAR(255) NOT NULL,
+    actor_role VARCHAR(40) NOT NULL,
+    event_note VARCHAR(2000),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_budget_events_budget_id_created_at
+    ON budget_events(budget_id, created_at, id);
+
 COMMIT;

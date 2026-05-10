@@ -36,6 +36,7 @@ public class BudgetService {
     private static final Logger log = LoggerFactory.getLogger(BudgetService.class);
 
     private final BudgetRepository budgetRepository;
+    private final BudgetEventRepository budgetEventRepository;
     private final OwnerRepository ownerRepository;
     private final VesselRepository vesselRepository;
     private final WorkerRepository workerRepository;
@@ -44,6 +45,7 @@ public class BudgetService {
     private final NotificationService notificationService;
 
     public BudgetService(BudgetRepository budgetRepository,
+                         BudgetEventRepository budgetEventRepository,
                          OwnerRepository ownerRepository,
                          VesselRepository vesselRepository,
                          WorkerRepository workerRepository,
@@ -51,6 +53,7 @@ public class BudgetService {
                          ResendEmailService resendEmailService,
                          NotificationService notificationService) {
         this.budgetRepository = budgetRepository;
+        this.budgetEventRepository = budgetEventRepository;
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.workerRepository = workerRepository;
@@ -139,8 +142,9 @@ public class BudgetService {
         budget.setStatus(BudgetStatus.DRAFT);
         budget.setCreatedAt(Instant.now());
         budget.setUpdatedAt(Instant.now());
-
-        return toDto(budgetRepository.save(budget));
+        Budget savedBudget = budgetRepository.save(budget);
+        recordEvent(savedBudget, BudgetEventType.CREATED, current, "Borrador creado.");
+        return toDto(savedBudget);
     }
 
     @Transactional
@@ -165,7 +169,14 @@ public class BudgetService {
 
         budget.setVessel(vessel);
         budget.setUpdatedAt(Instant.now());
-        return toDto(budgetRepository.save(budget));
+        Budget savedBudget = budgetRepository.save(budget);
+        recordEvent(
+                savedBudget,
+                BudgetEventType.VESSEL_LINKED,
+                current,
+                "Presupuesto vinculado a la embarcación " + vessel.getName() + "."
+        );
+        return toDto(savedBudget);
     }
 
     @Transactional
@@ -199,12 +210,31 @@ public class BudgetService {
 
         if (nextStatus == BudgetStatus.SENT && previousStatus != BudgetStatus.SENT) {
             budget.setSentAt(Instant.now());
+            budget.setClientDecidedAt(null);
             sendBudgetEmail(budget);
+            recordEvent(budget, BudgetEventType.SENT, current, "Presupuesto enviado al cliente.");
         }
 
-        if ((nextStatus == BudgetStatus.ACCEPTED || nextStatus == BudgetStatus.REJECTED)
-                && budget.getClientDecidedAt() == null) {
+        if (nextStatus == BudgetStatus.ACCEPTED || nextStatus == BudgetStatus.REJECTED) {
             budget.setClientDecidedAt(Instant.now());
+        }
+
+        if (nextStatus == BudgetStatus.ACCEPTED && previousStatus != BudgetStatus.ACCEPTED) {
+            recordEvent(
+                    budget,
+                    BudgetEventType.ACCEPTED,
+                    current,
+                    budget.getClientObservations()
+            );
+        } else if (nextStatus == BudgetStatus.REJECTED && previousStatus != BudgetStatus.REJECTED) {
+            recordEvent(
+                    budget,
+                    BudgetEventType.REJECTED,
+                    current,
+                    budget.getClientObservations()
+            );
+        } else if (nextStatus == BudgetStatus.CANCELLED && previousStatus != BudgetStatus.CANCELLED) {
+            recordEvent(budget, BudgetEventType.CANCELLED, current, "Presupuesto cancelado.");
         }
 
         if (current.getRole() == Role.CLIENT
@@ -407,7 +437,7 @@ public class BudgetService {
                 Role.CLIENT,
                 budget.getOwner().getId()
         );
-        return toDto(budget, clientHasAccount);
+        return toDto(budget, clientHasAccount, resolveTimeline(budget));
     }
 
     private List<BudgetDto> toDtos(List<Budget> budgets) {
@@ -418,8 +448,13 @@ public class BudgetService {
                 .map(budget -> budget.getOwner().getId())
                 .collect(java.util.stream.Collectors.toSet());
         Set<Long> clientOwnerIds = findClientOwnerIds(ownerIds);
+        Map<Long, List<BudgetEventDto>> timelineByBudgetId = resolveTimelineMap(budgets);
         return budgets.stream()
-                .map(budget -> toDto(budget, clientOwnerIds.contains(budget.getOwner().getId())))
+                .map(budget -> toDto(
+                        budget,
+                        clientOwnerIds.contains(budget.getOwner().getId()),
+                        timelineByBudgetId.getOrDefault(budget.getId(), List.of())
+                ))
                 .toList();
     }
 
@@ -430,7 +465,7 @@ public class BudgetService {
         return workerRepository.findOwnerIdsByRoleAndOwnerIdIn(Role.CLIENT, ownerIds);
     }
 
-    private BudgetDto toDto(Budget budget, boolean clientHasAccount) {
+    private BudgetDto toDto(Budget budget, boolean clientHasAccount, List<BudgetEventDto> timeline) {
         return new BudgetDto(
                 budget.getId(),
                 budget.getOwner().getId(),
@@ -451,7 +486,98 @@ public class BudgetService {
                 budget.getSentAt(),
                 budget.getClientDecidedAt(),
                 budget.getCreatedAt(),
-                budget.getUpdatedAt()
+                budget.getUpdatedAt(),
+                timeline
         );
+    }
+
+    private void recordEvent(Budget budget,
+                             BudgetEventType eventType,
+                             Worker actor,
+                             String note) {
+        BudgetEvent event = new BudgetEvent();
+        event.setBudget(budget);
+        event.setEventType(eventType);
+        event.setActorName(actor.getFullName());
+        event.setActorRole(actor.getRole().name());
+        event.setNote(inputSanitizer.optionalText(note, 2000));
+        event.setCreatedAt(Instant.now());
+        budgetEventRepository.save(event);
+    }
+
+    private Map<Long, List<BudgetEventDto>> resolveTimelineMap(List<Budget> budgets) {
+        if (budgets.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Long> budgetIds = budgets.stream()
+                .map(Budget::getId)
+                .toList();
+        List<BudgetEvent> events = budgetEventRepository.findByBudgetIdInOrderByBudgetIdAscCreatedAtAscIdAsc(budgetIds);
+        Map<Long, List<BudgetEventDto>> grouped = new LinkedHashMap<>();
+        for (BudgetEvent event : events) {
+            grouped.computeIfAbsent(event.getBudget().getId(), ignored -> new java.util.ArrayList<>())
+                    .add(toEventDto(event));
+        }
+
+        Map<Long, Budget> budgetById = budgets.stream()
+                .collect(java.util.stream.Collectors.toMap(Budget::getId, budget -> budget));
+        for (Budget budget : budgets) {
+            grouped.computeIfAbsent(budget.getId(), ignored -> buildFallbackTimeline(budget));
+        }
+        return grouped;
+    }
+
+    private List<BudgetEventDto> resolveTimeline(Budget budget) {
+        List<BudgetEvent> events = budgetEventRepository.findByBudgetIdOrderByCreatedAtAscIdAsc(budget.getId());
+        if (events.isEmpty()) {
+            return buildFallbackTimeline(budget);
+        }
+        return events.stream().map(this::toEventDto).toList();
+    }
+
+    private BudgetEventDto toEventDto(BudgetEvent event) {
+        return new BudgetEventDto(
+                event.getId(),
+                event.getEventType().name(),
+                event.getActorName(),
+                event.getActorRole(),
+                event.getNote(),
+                event.getCreatedAt()
+        );
+    }
+
+    private List<BudgetEventDto> buildFallbackTimeline(Budget budget) {
+        List<BudgetEventDto> timeline = new java.util.ArrayList<>();
+        timeline.add(new BudgetEventDto(
+                null,
+                BudgetEventType.CREATED.name(),
+                budget.getCreatedByWorker().getFullName(),
+                budget.getCreatedByWorker().getRole().name(),
+                "Borrador creado.",
+                budget.getCreatedAt()
+        ));
+        if (budget.getSentAt() != null) {
+            timeline.add(new BudgetEventDto(
+                    null,
+                    BudgetEventType.SENT.name(),
+                    budget.getCreatedByWorker().getFullName(),
+                    budget.getCreatedByWorker().getRole().name(),
+                    "Presupuesto enviado al cliente.",
+                    budget.getSentAt()
+            ));
+        }
+        if (budget.getClientDecidedAt() != null &&
+                (budget.getStatus() == BudgetStatus.ACCEPTED || budget.getStatus() == BudgetStatus.REJECTED)) {
+            timeline.add(new BudgetEventDto(
+                    null,
+                    budget.getStatus().name(),
+                    budget.getOwner().getDisplayName(),
+                    Role.CLIENT.name(),
+                    budget.getClientObservations(),
+                    budget.getClientDecidedAt()
+            ));
+        }
+        return timeline;
     }
 }

@@ -221,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _describePasswordChangeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? 'No se pudo cambiar la contrase\u00F1a.';
+      return error.userMessage;
     }
     final message = error.toString();
     if (message.startsWith('Exception: ')) {

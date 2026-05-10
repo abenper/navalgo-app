@@ -10,6 +10,7 @@ import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
 import '../../utils/browser_file_download.dart' as browser_file;
 import '../../viewmodels/session_view_model.dart';
+import '../../widgets/budget_timeline.dart';
 import '../../widgets/navalgo_ui.dart';
 import '../../widgets/pdf_preview.dart';
 import 'client_vessels_screen.dart';
@@ -437,6 +438,9 @@ class _ClientBudgetsScreenState extends State<ClientBudgetsScreen> {
                   child: _ClientBudgetCard(
                     budget: budget,
                     saving: _isSaving,
+                    onLinkVessel: _hasPendingBudgetVessel(budget)
+                        ? () => _ensureBudgetVessel(budget)
+                        : null,
                     onOpenPdf: () => _openBudget(budget),
                     onAccept: budget.status == 'SENT'
                         ? () => _respondToBudget(budget, 'ACCEPTED')
@@ -459,6 +463,7 @@ class _ClientBudgetCard extends StatelessWidget {
   const _ClientBudgetCard({
     required this.budget,
     required this.saving,
+    required this.onLinkVessel,
     required this.onOpenPdf,
     required this.onAccept,
     required this.onReject,
@@ -466,6 +471,7 @@ class _ClientBudgetCard extends StatelessWidget {
 
   final Budget budget;
   final bool saving;
+  final Future<void> Function()? onLinkVessel;
   final VoidCallback onOpenPdf;
   final VoidCallback? onAccept;
   final VoidCallback? onReject;
@@ -541,6 +547,49 @@ class _ClientBudgetCard extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 14),
+          if (onLinkVessel != null) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: NavalgoColors.sand.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: NavalgoColors.sand.withValues(alpha: 0.24),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Este presupuesto aún no está vinculado a una embarcación.',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: NavalgoColors.deepSea,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Vincúlalo antes de abrirlo para mantener el seguimiento correcto.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: saving || onLinkVessel == null
+                        ? null
+                        : () async {
+                            await onLinkVessel!();
+                          },
+                    icon: const Icon(Icons.link_outlined),
+                    label: const Text(
+                      'Vincula tu presupuesto a una embarcación',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -564,6 +613,16 @@ class _ClientBudgetCard extends StatelessWidget {
                 ),
             ],
           ),
+          const SizedBox(height: 18),
+          Text(
+            'Historial',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              color: NavalgoColors.deepSea,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          BudgetTimeline(events: budget.timeline),
         ],
       ),
     );

@@ -13,6 +13,7 @@ import '../../services/fleet_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/browser_file_download.dart' as browser_file;
 import '../../viewmodels/session_view_model.dart';
+import '../../widgets/budget_timeline.dart';
 import '../../widgets/navalgo_ui.dart';
 import '../../widgets/pdf_preview.dart';
 
@@ -539,6 +540,17 @@ class _BudgetCard extends StatelessWidget {
               ),
             ),
           ],
+          if (budget.vesselName.trim().toLowerCase() ==
+              'embarcacion pendiente de registrar') ...[
+            const SizedBox(height: 8),
+            Text(
+              'La embarcación real quedará vinculada cuando el cliente entre y la seleccione o la registre.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: NavalgoColors.sand,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Wrap(
             spacing: 10,
@@ -566,6 +578,16 @@ class _BudgetCard extends StatelessWidget {
                 ),
             ],
           ),
+          const SizedBox(height: 18),
+          Text(
+            'Historial',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              color: NavalgoColors.deepSea,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          BudgetTimeline(events: budget.timeline),
         ],
       ),
     );

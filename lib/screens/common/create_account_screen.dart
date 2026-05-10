@@ -147,7 +147,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
 
   String _describeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? error.message;
+      return error.userMessage;
     }
     final text = error.toString();
     return text.startsWith('Exception: ')

@@ -127,7 +127,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   String _describeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? error.message;
+      return error.userMessage;
     }
     final text = error.toString();
     return text.startsWith('Exception: ')
@@ -175,10 +175,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           textAlign: TextAlign.center,
                         )
                       else ...[
-                        Text(
-                          _info?.email ?? '',
-                          textAlign: TextAlign.center,
-                        ),
+                        Text(_info?.email ?? '', textAlign: TextAlign.center),
                         const SizedBox(height: 16),
                         TextField(
                           controller: _passwordCtrl,

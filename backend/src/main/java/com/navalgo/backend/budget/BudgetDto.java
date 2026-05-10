@@ -23,6 +23,7 @@ public record BudgetDto(
         Instant sentAt,
         Instant clientDecidedAt,
         Instant createdAt,
-        Instant updatedAt
+        Instant updatedAt,
+        java.util.List<BudgetEventDto> timeline
 ) {
 }

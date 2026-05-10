@@ -63,7 +63,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
   String _describeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? error.message;
+      return error.userMessage;
     }
     return error.toString();
   }
@@ -101,10 +101,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         status: 'PENDING',
       );
       final loadWorkersFuture = workersViewModel.loadWorkers();
-      await Future.wait<dynamic>([
-        pendingRequestsFuture,
-        loadWorkersFuture,
-      ]);
+      await Future.wait<dynamic>([pendingRequestsFuture, loadWorkersFuture]);
       final pendingRequests = await pendingRequestsFuture;
       if (!mounted) {
         return;
@@ -112,7 +109,11 @@ class _EquipoScreenState extends State<EquipoScreen> {
 
       final counts = <int, int>{};
       for (final request in pendingRequests) {
-        counts.update(request.workerId, (value) => value + 1, ifAbsent: () => 1);
+        counts.update(
+          request.workerId,
+          (value) => value + 1,
+          ifAbsent: () => 1,
+        );
       }
       setState(() {
         _pendingAdjustmentCountByWorker = counts;
@@ -205,7 +206,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
     if (!_canManageAdminAccount(worker, currentEmail)) {
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Solo el superadmin puede editar cuentas de administrador'),
+          content: Text(
+            'Solo el superadmin puede editar cuentas de administrador',
+          ),
         ),
       );
       return;
@@ -260,7 +263,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
     if (!_canManageAdminAccount(worker, currentEmail)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Solo el superadmin puede eliminar cuentas de administrador'),
+          content: Text(
+            'Solo el superadmin puede eliminar cuentas de administrador',
+          ),
         ),
       );
       return;
@@ -315,7 +320,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
     if (!_canManageAdminAccount(worker, currentEmail)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Solo el superadmin puede cambiar el estado de otro administrador'),
+          content: Text(
+            'Solo el superadmin puede cambiar el estado de otro administrador',
+          ),
         ),
       );
       return;
@@ -351,7 +358,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
     if (!_canManageAdminAccount(worker, currentEmail)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Solo el superadmin puede restablecer contraseñas de administradores'),
+          content: Text(
+            'Solo el superadmin puede restablecer contraseñas de administradores',
+          ),
         ),
       );
       return;
@@ -493,7 +502,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
                               worker: worker,
                               formattedDate: _fmtDate(worker.contractStartDate),
                               pendingAdjustmentCount:
-                                  _pendingAdjustmentCountByWorker[worker.id] ?? 0,
+                                  _pendingAdjustmentCountByWorker[worker.id] ??
+                                  0,
                               canManageAdminAccount:
                                   worker.role != 'ADMIN' || canManageAdmins,
                               onEdit: () => _openEditWorkerDialog(worker),
@@ -1010,10 +1020,10 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
                 onChanged: _role == 'COMERCIAL'
                     ? null
                     : (value) {
-                  setState(() {
-                    _canEditWorkOrders = value ?? false;
-                  });
-                },
+                        setState(() {
+                          _canEditWorkOrders = value ?? false;
+                        });
+                      },
               ),
             ),
             const SizedBox(height: 14),
@@ -1248,10 +1258,10 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
                 onChanged: _role == 'COMERCIAL'
                     ? null
                     : (value) {
-                  setState(() {
-                    _canEditWorkOrders = value ?? false;
-                  });
-                },
+                        setState(() {
+                          _canEditWorkOrders = value ?? false;
+                        });
+                      },
               ),
             ),
             const SizedBox(height: 14),

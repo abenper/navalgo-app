@@ -89,7 +89,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   String _describeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? error.message;
+      return error.userMessage;
     }
     final text = error.toString();
     return text.startsWith('Exception: ')
@@ -142,10 +142,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          _info?.email ?? '',
-                          textAlign: TextAlign.center,
-                        ),
+                        Text(_info?.email ?? '', textAlign: TextAlign.center),
                         const SizedBox(height: 18),
                         FilledButton(
                           onPressed: _verifying ? null : _confirm,

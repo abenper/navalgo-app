@@ -62,7 +62,7 @@ class _RequestPasswordResetScreenState
 
   String _describeError(Object error) {
     if (error is ApiException) {
-      return error.serverMessage ?? error.message;
+      return error.userMessage;
     }
     final text = error.toString();
     return text.startsWith('Exception: ')

@@ -20,6 +20,7 @@ class Budget {
     this.clientDecidedAt,
     required this.createdAt,
     required this.updatedAt,
+    required this.timeline,
   });
 
   final int id;
@@ -42,6 +43,7 @@ class Budget {
   final DateTime? clientDecidedAt;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final List<BudgetTimelineEntry> timeline;
 
   factory Budget.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic value) {
@@ -51,6 +53,7 @@ class Budget {
       return null;
     }
 
+    final rawTimeline = json['timeline'];
     return Budget(
       id: (json['id'] as num).toInt(),
       ownerId: (json['ownerId'] as num).toInt(),
@@ -72,15 +75,44 @@ class Budget {
       clientDecidedAt: parseDate(json['clientDecidedAt']),
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
+      timeline: rawTimeline is List
+          ? rawTimeline
+                .whereType<Map<String, dynamic>>()
+                .map(BudgetTimelineEntry.fromJson)
+                .toList()
+          : const <BudgetTimelineEntry>[],
+    );
+  }
+}
+
+class BudgetTimelineEntry {
+  const BudgetTimelineEntry({
+    required this.eventType,
+    required this.actorName,
+    required this.actorRole,
+    this.note,
+    required this.createdAt,
+  });
+
+  final String eventType;
+  final String actorName;
+  final String actorRole;
+  final String? note;
+  final DateTime createdAt;
+
+  factory BudgetTimelineEntry.fromJson(Map<String, dynamic> json) {
+    return BudgetTimelineEntry(
+      eventType: json['eventType'] as String? ?? 'CREATED',
+      actorName: json['actorName'] as String? ?? 'Sistema',
+      actorRole: json['actorRole'] as String? ?? 'SYSTEM',
+      note: json['note'] as String?,
+      createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
 }
 
 class UploadedBudgetDocument {
-  const UploadedBudgetDocument({
-    required this.fileUrl,
-    this.originalFileName,
-  });
+  const UploadedBudgetDocument({required this.fileUrl, this.originalFileName});
 
   final String fileUrl;
   final String? originalFileName;
