@@ -9,6 +9,7 @@ import '../admin/admin_shell_screen.dart';
 import '../commercial/commercial_shell_screen.dart';
 import '../common/login_screen.dart';
 import '../worker/worker_shell_screen.dart';
+import 'client_account_screen.dart';
 import 'client_budgets_screen.dart';
 import 'client_dashboard_screen.dart';
 import 'client_vessels_screen.dart';
@@ -26,11 +27,12 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
   late int _selectedIndex;
   final Set<int> _loadedIndices = <int>{0};
 
-  static const _titles = ['Inicio', 'Flota', 'Presupuestos'];
+  static const _titles = ['Inicio', 'Flota', 'Presupuestos', 'Cuenta'];
   static const _icons = [
     Icons.dashboard_outlined,
     Icons.directions_boat_outlined,
     Icons.request_quote_outlined,
+    Icons.manage_accounts_outlined,
   ];
 
   @override
@@ -208,11 +210,13 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
           }
           setState(() {
             _selectedIndex = 2;
+            _loadedIndices.add(2);
           });
         },
       ),
       const ClientVesselsScreen(),
       const ClientBudgetsScreen(),
+      const ClientAccountScreen(),
     ];
 
     return LayoutBuilder(
@@ -299,6 +303,11 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
                                   icon: Icon(Icons.request_quote_outlined),
                                   selectedIcon: Icon(Icons.request_quote),
                                   label: Text('Presupuestos'),
+                                ),
+                                NavigationRailDestination(
+                                  icon: Icon(Icons.manage_accounts_outlined),
+                                  selectedIcon: Icon(Icons.manage_accounts),
+                                  label: Text('Cuenta'),
                                 ),
                               ],
                             ),

@@ -207,7 +207,7 @@ public class ResendEmailService {
                   </p>
                   <p>Si el bot\u00f3n no funciona, copia y pega esta URL en tu navegador:</p>
                   <p><a href="%s">%s</a></p>
-                  <p>Tratamos tus datos para gestionar tu acceso y el uso de Naval-GO. Puedes consultar la Pol\u00edtica de Privacidad aqu\u00ed:</p>
+                  <p>Tratamos tus datos para gestionar tu acceso y el uso de Naval-GO. Puedes consultar la documentacion legal, privacidad y condiciones aqui:</p>
                   <p><a href="%s">%s</a></p>
                   <p>Este correo se env\u00eda desde una direcci\u00f3n no monitorizada. Si respondes a este mensaje, tu respuesta no ser\u00e1 atendida.</p>
                   <p>Si no esperabas este correo, puedes ignorarlo.</p>
@@ -231,7 +231,7 @@ public class ResendEmailService {
                 Completa tu registro creando tu contrase\u00f1a aqu\u00ed:
                 %s
 
-                Pol\u00edtica de Privacidad:
+                Privacidad y condiciones:
                 %s
 
                 Este correo se env\u00eda desde una direcci\u00f3n no monitorizada.
@@ -254,7 +254,7 @@ public class ResendEmailService {
                   </p>
                   <p>Si el boton no funciona, copia y pega esta URL en tu navegador:</p>
                   <p><a href="%s">%s</a></p>
-                  <p>Puedes consultar la Politica de Privacidad aqui:</p>
+                  <p>Puedes consultar la documentacion legal, privacidad y condiciones aqui:</p>
                   <p><a href="%s">%s</a></p>
                   <p>Si no has creado esta cuenta, puedes ignorar este mensaje.</p>
                   <p>Equipo Naval-GO</p>
@@ -277,7 +277,7 @@ public class ResendEmailService {
                 Confirma tu correo aqui:
                 %s
 
-                Politica de Privacidad:
+                Privacidad y condiciones:
                 %s
                 """.formatted(clientName, verificationLink, privacyPolicyLink);
     }

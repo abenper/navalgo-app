@@ -171,6 +171,13 @@ class AuthService {
     );
   }
 
+  Future<void> deleteClientAccount({required String token}) async {
+    await _apiClient.delete(
+      '/auth/clients/me',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   Map<String, dynamic> _mapLoginResponse(dynamic responseData) {
     if (responseData is! Map<String, dynamic>) {
       throw const FormatException('Respuesta invalida.');

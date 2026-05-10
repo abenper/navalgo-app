@@ -41,7 +41,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
       backgroundColor: NavalgoColors.foam,
       appBar: AppBar(
         automaticallyImplyLeading: !isPublicEntry,
-        title: const Text('Política de privacidad'),
+        title: const Text('Privacidad y condiciones'),
       ),
       body: SelectionArea(
         child: ListView(
@@ -60,7 +60,9 @@ class PrivacyPolicyScreen extends StatelessWidget {
     final uri = Uri(
       scheme: 'mailto',
       path: _privacyEmail,
-      queryParameters: const {'subject': 'Consulta de privacidad Naval-GO'},
+      queryParameters: const {
+        'subject': 'Consulta legal y privacidad Naval-GO',
+      },
     );
     await launchUrl(uri);
   }
@@ -80,39 +82,77 @@ class _AudienceAccordion extends StatefulWidget {
 }
 
 class _AudienceAccordionState extends State<_AudienceAccordion> {
-  late bool _workerExpanded = widget.initialAudience == PrivacyAudience.worker;
-  late bool _clientExpanded = widget.initialAudience == PrivacyAudience.client;
+  late bool _workerPrivacyExpanded =
+      widget.initialAudience == PrivacyAudience.worker;
+  late bool _workerTermsExpanded =
+      widget.initialAudience == PrivacyAudience.worker;
+  late bool _clientPrivacyExpanded =
+      widget.initialAudience == PrivacyAudience.client;
+  late bool _clientTermsExpanded =
+      widget.initialAudience == PrivacyAudience.client;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         _AudienceCard(
-          title: 'Política para trabajadores',
+          title: 'Privacidad para trabajadores',
           subtitle:
-              'Acceso, fichajes, partes, ausencias, geolocalización puntual, adjuntos y seguridad de la cuenta.',
+              'Acceso, fichajes, partes, adjuntos, seguridad y trazabilidad del trabajo.',
           icon: Icons.badge_outlined,
-          initiallyExpanded: _workerExpanded,
+          accent: NavalgoColors.tide,
+          initiallyExpanded: _workerPrivacyExpanded,
           onExpansionChanged: (expanded) {
             setState(() {
-              _workerExpanded = expanded;
+              _workerPrivacyExpanded = expanded;
             });
           },
           child: const _WorkerPrivacyContent(),
         ),
         const SizedBox(height: 12),
         _AudienceCard(
-          title: 'Política para clientes',
+          title: 'Condiciones para trabajadores',
           subtitle:
-              'Alta de cuenta, verificación por email, flota, presupuestos, documentación y futuras caducidades.',
-          icon: Icons.directions_boat_outlined,
-          initiallyExpanded: _clientExpanded,
+              'Uso correcto de la cuenta, responsabilidad operativa y normas basicas del servicio.',
+          icon: Icons.rule_folder_outlined,
+          accent: NavalgoColors.harbor,
+          initiallyExpanded: _workerTermsExpanded,
           onExpansionChanged: (expanded) {
             setState(() {
-              _clientExpanded = expanded;
+              _workerTermsExpanded = expanded;
+            });
+          },
+          child: const _WorkerTermsContent(),
+        ),
+        const SizedBox(height: 12),
+        _AudienceCard(
+          title: 'Privacidad para clientes',
+          subtitle:
+              'Cuenta cliente, flota, presupuestos, documentacion y comunicaciones.',
+          icon: Icons.directions_boat_outlined,
+          accent: NavalgoColors.kelp,
+          initiallyExpanded: _clientPrivacyExpanded,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _clientPrivacyExpanded = expanded;
             });
           },
           child: const _ClientPrivacyContent(),
+        ),
+        const SizedBox(height: 12),
+        _AudienceCard(
+          title: 'Condiciones para clientes',
+          subtitle:
+              'Uso del area cliente, presupuestos, vinculacion de embarcaciones y baja de cuenta.',
+          icon: Icons.gavel_outlined,
+          accent: NavalgoColors.sand,
+          initiallyExpanded: _clientTermsExpanded,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _clientTermsExpanded = expanded;
+            });
+          },
+          child: const _ClientTermsContent(),
         ),
       ],
     );
@@ -124,6 +164,7 @@ class _AudienceCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    required this.accent,
     required this.initiallyExpanded,
     required this.onExpansionChanged,
     required this.child,
@@ -132,6 +173,7 @@ class _AudienceCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+  final Color accent;
   final bool initiallyExpanded;
   final ValueChanged<bool> onExpansionChanged;
   final Widget child;
@@ -157,10 +199,10 @@ class _AudienceCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: NavalgoColors.mist,
+              color: accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: NavalgoColors.tide),
+            child: Icon(icon, color: accent),
           ),
           title: Text(
             title,
@@ -185,124 +227,320 @@ class _AudienceCard extends StatelessWidget {
   }
 }
 
+class _HeroCard extends StatelessWidget {
+  const _HeroCard({required this.isPublicEntry, required this.onContactTap});
+
+  final bool isPublicEntry;
+  final Future<void> Function() onContactTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: NavalgoColors.heroGradient,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              isPublicEntry ? 'ACCESO PUBLICO' : 'DOCUMENTACION LEGAL',
+              style: textTheme.labelLarge?.copyWith(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Transparencia legal clara para trabajadores y clientes.',
+            style: textTheme.headlineSmall?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Aqui reunimos la politica de privacidad y las condiciones de uso de Naval-GO. El objetivo es que cada perfil sepa que datos se tratan, para que se usan y que reglas aplican al utilizar la plataforma.',
+            style: textTheme.bodyLarge?.copyWith(
+              color: Colors.white.withValues(alpha: 0.92),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _HeroPill(
+                icon: Icons.verified_user_outlined,
+                label: 'Privacidad por perfil',
+              ),
+              _HeroPill(
+                icon: Icons.rule_outlined,
+                label: 'Condiciones operativas',
+              ),
+              _HeroPill(
+                icon: Icons.support_agent_outlined,
+                label: 'Soporte legal y privacidad',
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              FilledButton.tonalIcon(
+                onPressed: onContactTap,
+                icon: const Icon(Icons.mail_outline),
+                label: const Text('Contactar con soporte'),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: PrivacyPolicyScreen._openAepd,
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('AEPD'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeroPill extends StatelessWidget {
+  const _HeroPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _WorkerPrivacyContent extends StatelessWidget {
   const _WorkerPrivacyContent();
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: [
-        const _SummaryGrid(
+      children: const [
+        _SummaryGrid(
           items: [
             _SummaryData(
-              title: 'Qué tratamos',
+              title: 'Que tratamos',
               body:
-                  'Datos de identidad, acceso, jornada, partes, adjuntos, firmas y trazabilidad técnica.',
+                  'Identidad, acceso, jornada, partes, adjuntos, firmas y trazabilidad tecnica.',
               icon: Icons.inventory_2_outlined,
             ),
             _SummaryData(
-              title: 'Para qué',
+              title: 'Para que',
               body:
-                  'Gestionar tu relación profesional, coordinar trabajo, documentar servicios y proteger la plataforma.',
+                  'Organizar trabajo, documentar servicios, registrar actividad y proteger la plataforma.',
               icon: Icons.fact_check_outlined,
             ),
             _SummaryData(
-              title: 'Ubicación',
+              title: 'Ubicacion',
               body:
-                  'Solo se solicita de forma puntual para fichajes o evidencias concretas, nunca de forma continua.',
+                  'Solo se usa de forma puntual para fichajes o evidencias concretas, nunca de forma continua.',
               icon: Icons.place_outlined,
             ),
             _SummaryData(
               title: 'Tus derechos',
               body:
-                  'Puedes pedir acceso, rectificación, supresión, oposición, limitación o portabilidad cuando aplique.',
+                  'Acceso, rectificacion, supresion, oposicion, limitacion y portabilidad cuando aplique.',
               icon: Icons.gavel_outlined,
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        const _SectionCard(
-          title: '1. Responsable y finalidad',
+        SizedBox(height: 20),
+        _SectionCard(
+          title: '1. Responsable y finalidades',
           children: [
             _PolicyParagraph(
-              'El responsable del tratamiento es Náutica Benítez. Naval-GO trata los datos de trabajadores y colaboradores para gestionar el acceso a la plataforma, la organización del trabajo, el registro de jornada, los partes, las ausencias, las notificaciones internas y la seguridad del servicio.',
+              'Naval-GO trata los datos de trabajadores y colaboradores para gestionar el acceso a la plataforma, la organizacion del trabajo, el registro de jornada, los partes, las ausencias, las notificaciones internas y la seguridad del servicio.',
             ),
             _PolicyBullet(
-              'Contacto de privacidad y soporte: soporte@naval-go.com',
+              'Responsable funcional del tratamiento: Nautica Benitez.',
+            ),
+            _PolicyBullet(
+              'Contacto de privacidad y soporte: soporte@naval-go.com.',
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        const _SectionCard(
-          title: '2. Datos tratados',
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '2. Datos que se utilizan',
           children: [
             _PolicyBullet('Datos identificativos y de contacto.'),
             _PolicyBullet(
-              'Rol, especialidad, permisos, estado del usuario y fecha de alta.',
+              'Rol, especialidad, permisos, estado de la cuenta y fecha de alta.',
             ),
             _PolicyBullet(
-              'Credenciales, tokens de sesión, confirmaciones de email y registros técnicos de acceso.',
+              'Credenciales, tokens de sesion, confirmaciones de email y registros tecnicos de acceso.',
             ),
             _PolicyBullet(
               'Fichajes, horas, ajustes de jornada, ausencias y vacaciones.',
             ),
             _PolicyBullet(
-              'Geolocalización puntual asociada al fichaje o a evidencias concretas.',
+              'Geolocalizacion puntual asociada a fichaje o evidencia concreta.',
             ),
             _PolicyBullet(
               'Partes de trabajo, materiales, checklists, revisiones, firmas y archivos adjuntos.',
             ),
-            _PolicyBullet(
-              'Notificaciones internas, trazabilidad operativa y eventos de seguridad.',
-            ),
           ],
         ),
-        const SizedBox(height: 12),
-        const _SectionCard(
-          title: '3. Base jurídica',
-          children: [
-            _PolicyParagraph(
-              'La base jurídica principal es la ejecución de la relación laboral o profesional, el cumplimiento de obligaciones legales y el interés legítimo del responsable para organizar el trabajo, documentar la actividad y proteger el sistema.',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const _SectionCard(
-          title: '4. Seguridad',
-          children: [
-            _PolicyParagraph(
-              'La plataforma aplica controles de acceso por rol, cifrado de contraseñas, revocación de sesiones, trazabilidad de acciones y medidas de protección para comunicaciones, almacenamiento y evidencias.',
-            ),
-            _PolicyParagraph(
-              'Las contraseñas no se almacenan en texto plano. Los enlaces de activación y recuperación usan tokens seguros, con caducidad limitada y un solo uso.',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const _SectionCard(
-          title: '5. Conservación',
-          children: [
-            _PolicyParagraph(
-              'Los datos se conservan mientras exista relación activa con la empresa y durante los plazos legales aplicables. Los registros de jornada se conservan, con carácter general, durante 4 años.',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _SectionCard(
-          title: '6. Derechos',
-          footer: _InlineActionRow(
-            primaryLabel: 'Contactar con privacidad',
-            secondaryLabel: 'Web de la AEPD',
-            onPrimaryTap: PrivacyPolicyScreen._openMail,
-            onSecondaryTap: PrivacyPolicyScreen._openAepd,
-          ),
-          children: const [
-            _PolicyBullet(
-              'Acceso, rectificación, supresión, oposición y limitación.',
+          title: '3. Base juridica y conservacion',
+          children: [
+            _PolicyParagraph(
+              'La base juridica principal es la ejecucion de la relacion laboral o profesional, el cumplimiento de obligaciones legales y el interes legitimo del responsable para organizar el trabajo, documentar la actividad y proteger el sistema.',
             ),
-            _PolicyBullet('Portabilidad, cuando resulte aplicable.'),
+            _PolicyParagraph(
+              'Los datos se conservan mientras exista relacion activa y durante los plazos legales aplicables. Los registros de jornada se conservan, con caracter general, durante 4 anos.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '4. Destinatarios y derechos',
+          children: [
+            _PolicyParagraph(
+              'Los datos pueden tratarse por proveedores necesarios para hosting, correo, almacenamiento o soporte tecnico, siempre bajo instrucciones del responsable y con medidas de seguridad razonables.',
+            ),
             _PolicyBullet(
-              'Retirada del consentimiento, si algún tratamiento se basó en él.',
+              'Puedes solicitar acceso, rectificacion o supresion de tus datos.',
+            ),
+            _PolicyBullet('Puedes pedir limitacion u oposicion cuando proceda.'),
+            _PolicyBullet(
+              'Puedes presentar reclamacion ante la AEPD si consideras que el tratamiento no es correcto.',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkerTermsContent extends StatelessWidget {
+  const _WorkerTermsContent();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: const [
+        _SummaryGrid(
+          items: [
+            _SummaryData(
+              title: 'Uso autorizado',
+              body:
+                  'La cuenta es profesional y solo debe usarse dentro del marco de trabajo autorizado.',
+              icon: Icons.lock_outline,
+            ),
+            _SummaryData(
+              title: 'Responsabilidad',
+              body:
+                  'Cada usuario responde del uso de su cuenta, sus adjuntos y la informacion que registra.',
+              icon: Icons.assignment_turned_in_outlined,
+            ),
+            _SummaryData(
+              title: 'Seguridad',
+              body:
+                  'No compartas credenciales ni intentes eludir permisos o controles internos.',
+              icon: Icons.security_outlined,
+            ),
+            _SummaryData(
+              title: 'Control',
+              body:
+                  'La empresa puede auditar actividad operativa para seguridad, soporte y cumplimiento.',
+              icon: Icons.visibility_outlined,
+            ),
+          ],
+        ),
+        SizedBox(height: 20),
+        _SectionCard(
+          title: '1. Objeto del acceso',
+          children: [
+            _PolicyParagraph(
+              'La cuenta de trabajador se facilita para ejecutar tareas operativas, documentar actividad, registrar jornada y colaborar dentro de Naval-GO de acuerdo con el rol asignado.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '2. Uso de cuenta y credenciales',
+          children: [
+            _PolicyBullet('La cuenta es personal e intransferible.'),
+            _PolicyBullet('No esta permitido compartir credenciales con terceros.'),
+            _PolicyBullet(
+              'Debes custodiar la contrasena y comunicar cualquier acceso no autorizado.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '3. Uso correcto de la plataforma',
+          children: [
+            _PolicyBullet(
+              'Solo se debe registrar informacion real, exacta y relacionada con el trabajo efectuado.',
+            ),
+            _PolicyBullet(
+              'No esta permitido borrar, alterar o manipular evidencias con fines fraudulentos.',
+            ),
+            _PolicyBullet(
+              'No esta permitido extraer informacion de clientes, empresa o companeros fuera del uso autorizado.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '4. Adjuntos, firmas y trazabilidad',
+          children: [
+            _PolicyParagraph(
+              'Las fotos, videos, firmas, checklists y registros introducidos en Naval-GO forman parte de la documentacion operativa del servicio. Su uso debe responder al trabajo realizado y a las instrucciones de la empresa.',
+            ),
+            _PolicyParagraph(
+              'La plataforma puede conservar trazabilidad tecnica de acciones relevantes para seguridad, soporte, auditoria interna y defensa ante incidencias.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '5. Suspension o baja del acceso',
+          children: [
+            _PolicyParagraph(
+              'La empresa puede limitar, suspender o desactivar la cuenta cuando exista baja laboral o contractual, cambio de rol, uso indebido, riesgo de seguridad o necesidad organizativa.',
             ),
           ],
         ),
@@ -317,115 +555,88 @@ class _ClientPrivacyContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: [
-        const _SummaryGrid(
+      children: const [
+        _SummaryGrid(
           items: [
             _SummaryData(
-              title: 'Qué tratamos',
+              title: 'Que tratamos',
               body:
-                  'Nombre, email, teléfono, flota, presupuestos, documentos y futuras caducidades asociadas a tu barco.',
-              icon: Icons.badge_outlined,
+                  'Identidad, contacto, flota, presupuestos, respuestas, evidencias y trazabilidad basica.',
+              icon: Icons.receipt_long_outlined,
             ),
             _SummaryData(
-              title: 'Para qué',
+              title: 'Para que',
               body:
-                  'Crear tu cuenta, verificarla, vincularla a tu ficha, gestionar presupuestos y documentación.',
-              icon: Icons.assignment_turned_in_outlined,
+                  'Gestionar tu cuenta, preparar presupuestos, coordinar trabajos y mantener documentacion asociada.',
+              icon: Icons.handshake_outlined,
             ),
             _SummaryData(
-              title: 'Correo electrónico',
+              title: 'Comunicaciones',
               body:
-                  'Se usa para verificar tu cuenta, avisarte de nuevos presupuestos y ayudarte a recuperar tu contraseña.',
-              icon: Icons.mark_email_read_outlined,
+                  'Se usan correos operativos para verificacion, presupuestos, cambios relevantes o soporte.',
+              icon: Icons.email_outlined,
             ),
             _SummaryData(
               title: 'Tus derechos',
               body:
-                  'Puedes pedir acceso, rectificación, supresión, oposición, limitación o portabilidad cuando aplique.',
-              icon: Icons.gavel_outlined,
+                  'Puedes solicitar acceso, rectificacion, supresion, limitacion u oposicion cuando proceda.',
+              icon: Icons.balance_outlined,
             ),
           ],
         ),
-        const SizedBox(height: 20),
-        const _SectionCard(
-          title: '1. Responsable y finalidad',
+        SizedBox(height: 20),
+        _SectionCard(
+          title: '1. Responsable y alcance',
           children: [
             _PolicyParagraph(
-              'El responsable del tratamiento es Náutica Benítez. Naval-GO trata los datos del cliente para crear y verificar su cuenta, vincularla a su ficha de propietario, gestionar embarcaciones, presupuestos, documentación y futuras comunicaciones operativas relacionadas con el servicio.',
+              'Naval-GO trata datos de clientes y representantes para permitir el acceso al area cliente, la gestion de presupuestos, la asociacion de embarcaciones, la documentacion operativa y la comunicacion vinculada al servicio.',
             ),
             _PolicyBullet(
-              'Contacto de privacidad y soporte: soporte@naval-go.com',
+              'Contacto de privacidad y soporte: soporte@naval-go.com.',
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        const _SectionCard(
+        SizedBox(height: 12),
+        _SectionCard(
           title: '2. Datos tratados',
           children: [
-            _PolicyBullet('Nombre y apellidos o razón social.'),
+            _PolicyBullet('Nombre y apellidos o razon social.'),
+            _PolicyBullet('Correo electronico, telefono y datos de cuenta.'),
             _PolicyBullet(
-              'Correo electrónico y, en su caso, teléfono de contacto.',
+              'Embarcaciones, matriculas, modelos y datos operativos asociados.',
             ),
             _PolicyBullet(
-              'Credenciales, verificación de email y registros técnicos de acceso.',
+              'Presupuestos, respuestas, observaciones y documentos vinculados.',
             ),
             _PolicyBullet(
-              'Datos vinculados a tu ficha de cliente y a tus embarcaciones.',
-            ),
-            _PolicyBullet(
-              'Presupuestos, observaciones, respuestas, documentos y adjuntos enviados a través de la plataforma.',
-            ),
-            _PolicyBullet(
-              'Caducidades y documentación asociada a artículos de tu embarcación, cuando actives esa funcionalidad.',
+              'Registros tecnicos de acceso, verificacion y seguridad de la cuenta.',
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        const _SectionCard(
-          title: '3. Base jurídica',
-          children: [
-            _PolicyParagraph(
-              'La base jurídica es la ejecución de la relación precontractual o contractual, el interés legítimo para la gestión del servicio y el cumplimiento de obligaciones legales. El consentimiento se usa cuando sea necesario para funcionalidades específicas o comunicaciones no esenciales.',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const _SectionCard(
-          title: '4. Seguridad y acceso',
-          children: [
-            _PolicyParagraph(
-              'Tu cuenta se activa solo después de confirmar el correo electrónico. Las contraseñas se almacenan cifradas y los enlaces de verificación y recuperación usan tokens seguros, de un solo uso y con caducidad limitada.',
-            ),
-            _PolicyParagraph(
-              'La plataforma puede revocar sesiones y registrar eventos técnicos para proteger el acceso y prevenir usos indebidos.',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        const _SectionCard(
-          title: '5. Conservación',
-          children: [
-            _PolicyParagraph(
-              'Los datos se conservarán mientras exista relación comercial o contractual y durante los plazos necesarios para gestionar presupuestos, documentación, incidencias, obligaciones legales y posibles reclamaciones.',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _SectionCard(
-          title: '6. Derechos',
-          footer: _InlineActionRow(
-            primaryLabel: 'Contactar con privacidad',
-            secondaryLabel: 'Web de la AEPD',
-            onPrimaryTap: PrivacyPolicyScreen._openMail,
-            onSecondaryTap: PrivacyPolicyScreen._openAepd,
-          ),
-          children: const [
-            _PolicyBullet(
-              'Acceso, rectificación, supresión, oposición y limitación.',
+          title: '3. Finalidades, base juridica y conservacion',
+          children: [
+            _PolicyParagraph(
+              'La base juridica es la ejecucion de la relacion precontractual o contractual, el interes legitimo para la gestion del servicio y el cumplimiento de obligaciones legales. El consentimiento se usa cuando sea necesario para funcionalidades especificas o comunicaciones no esenciales.',
             ),
-            _PolicyBullet('Portabilidad, cuando resulte aplicable.'),
+            _PolicyParagraph(
+              'Los datos se conservaran mientras exista relacion comercial o contractual y durante los plazos necesarios para gestionar presupuestos, documentacion, incidencias, obligaciones legales y posibles reclamaciones.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '4. Derechos y reclamaciones',
+          children: [
             _PolicyBullet(
-              'Retirada del consentimiento, si algún tratamiento se basó en él.',
+              'Puedes solicitar acceso, rectificacion o supresion de tus datos.',
+            ),
+            _PolicyBullet(
+              'Puedes oponerte o pedir limitacion cuando concurran los requisitos legales.',
+            ),
+            _PolicyBullet(
+              'Puedes presentar una reclamacion ante la AEPD si consideras que el tratamiento no es adecuado.',
             ),
           ],
         ),
@@ -434,114 +645,97 @@ class _ClientPrivacyContent extends StatelessWidget {
   }
 }
 
-class _HeroCard extends StatelessWidget {
-  const _HeroCard({required this.isPublicEntry, required this.onContactTap});
-
-  final bool isPublicEntry;
-  final Future<void> Function() onContactTap;
+class _ClientTermsContent extends StatelessWidget {
+  const _ClientTermsContent();
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: NavalgoColors.heroGradient,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(999),
+    return Column(
+      children: const [
+        _SummaryGrid(
+          items: [
+            _SummaryData(
+              title: 'Area cliente',
+              body:
+                  'La cuenta cliente sirve para revisar presupuestos, responderlos y gestionar embarcaciones asociadas.',
+              icon: Icons.space_dashboard_outlined,
             ),
-            child: Text(
-              isPublicEntry ? 'ACCESO PÚBLICO' : 'PRIVACIDAD',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-              ),
+            _SummaryData(
+              title: 'Datos reales',
+              body:
+                  'El cliente debe aportar datos veraces y mantener actualizada la informacion relevante.',
+              icon: Icons.verified_outlined,
             ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Cómo protege Naval-GO tus datos',
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w900,
+            _SummaryData(
+              title: 'Presupuestos',
+              body:
+                  'Los presupuestos pueden requerir vinculacion a una embarcacion para asegurar trazabilidad.',
+              icon: Icons.request_quote_outlined,
             ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Aquí puedes consultar qué datos tratamos para trabajadores y clientes, con qué finalidad, qué medidas de seguridad aplicamos y cómo ejercer tus derechos.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyLarge?.copyWith(color: Colors.white),
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: const [
-              _HeroChip(
-                icon: Icons.mark_email_read_outlined,
-                label: 'Verificación por email',
-              ),
-              _HeroChip(
-                icon: Icons.lock_reset_outlined,
-                label: 'Recuperación segura',
-              ),
-              _HeroChip(
-                icon: Icons.shield_outlined,
-                label: 'Tokens seguros',
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          OutlinedButton.icon(
-            onPressed: onContactTap,
-            icon: const Icon(Icons.mail_outline_rounded),
-            label: const Text('Contactar con privacidad'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+            _SummaryData(
+              title: 'Baja de cuenta',
+              body:
+                  'La cuenta puede eliminarse, pero cierta informacion puede mantenerse archivada por historial y obligaciones legales.',
+              icon: Icons.delete_outline,
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeroChip extends StatelessWidget {
-  const _HeroChip({required this.icon, required this.label});
-
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 18),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: Colors.white,
+          ],
+        ),
+        SizedBox(height: 20),
+        _SectionCard(
+          title: '1. Objeto del servicio',
+          children: [
+            _PolicyParagraph(
+              'El area cliente de Naval-GO permite revisar presupuestos, responder ofertas, consultar documentacion asociada y mantener vinculadas embarcaciones para la correcta trazabilidad del servicio.',
             ),
-          ),
-        ],
-      ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '2. Registro y uso de la cuenta',
+          children: [
+            _PolicyBullet('La cuenta debe registrarse con datos reales y vigentes.'),
+            _PolicyBullet(
+              'El cliente es responsable de custodiar sus credenciales y de cualquier actividad realizada con su acceso.',
+            ),
+            _PolicyBullet(
+              'No esta permitido ceder la cuenta a terceros sin autorizacion de la empresa.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '3. Presupuestos y embarcaciones',
+          children: [
+            _PolicyParagraph(
+              'Para aceptar, rechazar o revisar determinados presupuestos puede ser necesario vincular la oferta a una embarcacion. Esta vinculacion forma parte del seguimiento operativo y documental del servicio.',
+            ),
+            _PolicyParagraph(
+              'El cliente debe revisar la informacion enviada y comunicar cualquier error material antes de aceptar una propuesta.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '4. Uso correcto y disponibilidad',
+          children: [
+            _PolicyBullet(
+              'No esta permitido manipular documentos, enlaces, estados o flujos de aprobacion de forma fraudulenta.',
+            ),
+            _PolicyBullet(
+              'Naval-GO puede introducir mejoras, cambios de interfaz o tareas de mantenimiento para proteger el servicio.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '5. Baja de cuenta y conservacion minima',
+          children: [
+            _PolicyParagraph(
+              'El cliente puede solicitar o ejecutar la baja de su cuenta. Esa baja desactiva el acceso, pero ciertos datos operativos, presupuestos o trazas pueden mantenerse archivados cuando sea necesario para la gestion del servicio, cumplimiento legal o defensa ante reclamaciones.',
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -553,10 +747,25 @@ class _SummaryGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: items.map((item) => _SummaryCard(data: item)).toList(),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 900
+            ? 4
+            : constraints.maxWidth >= 600
+            ? 2
+            : 1;
+        final itemWidth = (constraints.maxWidth - (columns - 1) * 12) / columns;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: items.map((item) {
+            return SizedBox(
+              width: itemWidth.clamp(0, 320).toDouble(),
+              child: _SummaryItem(data: item),
+            );
+          }).toList(),
+        );
+      },
     );
   }
 }
@@ -573,89 +782,81 @@ class _SummaryData {
   final IconData icon;
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.data});
+class _SummaryItem extends StatelessWidget {
+  const _SummaryItem({required this.data});
 
   final _SummaryData data;
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 240, maxWidth: 420),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: NavalgoColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: NavalgoColors.mist,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(data.icon, color: NavalgoColors.tide),
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: NavalgoColors.shell,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: NavalgoColors.mist,
+              borderRadius: BorderRadius.circular(14),
             ),
-            const SizedBox(height: 14),
-            Text(
-              data.title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+            child: Icon(data.icon, color: NavalgoColors.tide),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            data.title,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
             ),
-            const SizedBox(height: 8),
-            Text(data.body, style: Theme.of(context).textTheme.bodyMedium),
-          ],
-        ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            data.body,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: NavalgoColors.storm,
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class _SectionCard extends StatelessWidget {
-  const _SectionCard({
-    required this.title,
-    required this.children,
-    this.footer,
-  });
+  const _SectionCard({required this.title, required this.children});
 
   final String title;
   final List<Widget> children;
-  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: NavalgoColors.border),
-        ),
-        child: ExpansionTile(
-          initiallyExpanded: true,
-          tilePadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 6),
-          childrenPadding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
-          iconColor: NavalgoColors.tide,
-          collapsedIconColor: NavalgoColors.storm,
-          title: Text(
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: NavalgoColors.shell,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
             title,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
               color: NavalgoColors.deepSea,
             ),
           ),
-          children: [
-            ...children,
-            if (footer != null) ...[const SizedBox(height: 12), footer!],
-          ],
-        ),
+          const SizedBox(height: 12),
+          ...children,
+        ],
       ),
     );
   }
@@ -674,7 +875,7 @@ class _PolicyParagraph extends StatelessWidget {
         text,
         style: Theme.of(
           context,
-        ).textTheme.bodyLarge?.copyWith(color: NavalgoColors.ink),
+        ).textTheme.bodyLarge?.copyWith(color: NavalgoColors.deepSea),
       ),
     );
   }
@@ -692,61 +893,26 @@ class _PolicyBullet extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 8, right: 10),
-            child: Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
-                color: NavalgoColors.harbor,
-                shape: BoxShape.circle,
-              ),
+          Container(
+            width: 8,
+            height: 8,
+            margin: const EdgeInsets.only(top: 7),
+            decoration: const BoxDecoration(
+              color: NavalgoColors.tide,
+              shape: BoxShape.circle,
             ),
           ),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: Theme.of(
                 context,
-              ).textTheme.bodyLarge?.copyWith(color: NavalgoColors.ink),
+              ).textTheme.bodyLarge?.copyWith(color: NavalgoColors.deepSea),
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _InlineActionRow extends StatelessWidget {
-  const _InlineActionRow({
-    required this.primaryLabel,
-    required this.secondaryLabel,
-    required this.onPrimaryTap,
-    required this.onSecondaryTap,
-  });
-
-  final String primaryLabel;
-  final String secondaryLabel;
-  final Future<void> Function() onPrimaryTap;
-  final Future<void> Function() onSecondaryTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: [
-        FilledButton.icon(
-          onPressed: onPrimaryTap,
-          icon: const Icon(Icons.mail_outline_rounded),
-          label: Text(primaryLabel),
-        ),
-        OutlinedButton.icon(
-          onPressed: onSecondaryTap,
-          icon: const Icon(Icons.open_in_new_rounded),
-          label: Text(secondaryLabel),
-        ),
-      ],
     );
   }
 }

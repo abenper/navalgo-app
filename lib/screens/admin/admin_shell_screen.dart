@@ -563,7 +563,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     context: sheetContext,
                     value: 'privacy',
                     icon: Icons.privacy_tip_outlined,
-                    title: 'Política de Privacidad',
+                    title: 'Privacidad y condiciones',
                   ),
                   const SizedBox(height: 8),
                   _buildAccountAction(

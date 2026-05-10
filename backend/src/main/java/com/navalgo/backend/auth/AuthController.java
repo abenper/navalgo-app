@@ -88,6 +88,15 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @DeleteMapping("/clients/me")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<Void> deleteOwnClientAccount(Authentication authentication,
+                                                       HttpServletResponse response) {
+        clientAccountService.deleteOwnAccount(authentication.getName());
+        response.addHeader(HttpHeaders.SET_COOKIE, authService.clearRefreshCookie().toString());
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/email-verification/status")
     public ResponseEntity<EmailVerificationStatusResponse> emailVerificationStatus(@RequestParam("token") String token) {
         return ResponseEntity.ok(clientAccountService.getVerificationStatus(token));

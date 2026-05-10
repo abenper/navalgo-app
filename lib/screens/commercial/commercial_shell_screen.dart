@@ -352,7 +352,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
                     context: sheetContext,
                     value: 'privacy',
                     icon: Icons.privacy_tip_outlined,
-                    title: 'Pol\u00EDtica de Privacidad',
+                    title: 'Privacidad y condiciones',
                   ),
                   const SizedBox(height: 8),
                   _buildAccountAction(

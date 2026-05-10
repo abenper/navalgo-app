@@ -36,7 +36,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _phoneCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
-  bool _acceptedPrivacy = false;
+  bool _acceptedLegal = false;
   bool _loading = false;
   bool _done = false;
   String? _error;
@@ -139,8 +139,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     if (password != confirm) {
       return 'Las contraseñas no coinciden.';
     }
-    if (!_acceptedPrivacy) {
-      return 'Debes aceptar la política de privacidad para crear la cuenta.';
+    if (!_acceptedLegal) {
+      return 'Debes aceptar la politica de privacidad y las condiciones de uso para crear la cuenta.';
     }
     return null;
   }
@@ -231,18 +231,18 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         ),
                         const SizedBox(height: 14),
                         CheckboxListTile(
-                          value: _acceptedPrivacy,
+                          value: _acceptedLegal,
                           onChanged: _loading
                               ? null
                               : (value) {
                                   setState(() {
-                                    _acceptedPrivacy = value ?? false;
+                                    _acceptedLegal = value ?? false;
                                   });
                                 },
                           contentPadding: EdgeInsets.zero,
                           controlAffinity: ListTileControlAffinity.leading,
                           title: const Text(
-                            'He leído y acepto la política de privacidad',
+                            'He leido y acepto la politica de privacidad y las condiciones de uso',
                           ),
                           subtitle: TextButton(
                             onPressed: _loading
@@ -265,7 +265,7 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             child: const Text(
-                              'Consultar política de privacidad',
+                              'Consultar privacidad y condiciones',
                             ),
                           ),
                         ),

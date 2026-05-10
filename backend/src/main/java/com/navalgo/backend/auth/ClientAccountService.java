@@ -11,12 +11,14 @@ import com.navalgo.backend.notification.ResendEmailService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -32,9 +34,11 @@ public class ClientAccountService {
     private final PasswordEncoder passwordEncoder;
     private final InputSanitizer inputSanitizer;
     private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final SecureTokenSupport secureTokenSupport;
     private final ResendEmailService resendEmailService;
     private final LoginAttemptService loginAttemptService;
+    private final RefreshTokenService refreshTokenService;
     private final String frontendBaseUrl;
     private final long emailVerificationTtlHours;
 
@@ -44,9 +48,11 @@ public class ClientAccountService {
                                 PasswordEncoder passwordEncoder,
                                 InputSanitizer inputSanitizer,
                                 EmailVerificationTokenRepository emailVerificationTokenRepository,
+                                PasswordResetTokenRepository passwordResetTokenRepository,
                                 SecureTokenSupport secureTokenSupport,
                                 ResendEmailService resendEmailService,
                                 LoginAttemptService loginAttemptService,
+                                RefreshTokenService refreshTokenService,
                                 @Value("${app.frontend.base-url:https://app.naval-go.com}") String frontendBaseUrl,
                                 @Value("${app.auth.email-verification-ttl-hours:48}") long emailVerificationTtlHours) {
         this.workerRepository = workerRepository;
@@ -55,9 +61,11 @@ public class ClientAccountService {
         this.passwordEncoder = passwordEncoder;
         this.inputSanitizer = inputSanitizer;
         this.emailVerificationTokenRepository = emailVerificationTokenRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.secureTokenSupport = secureTokenSupport;
         this.resendEmailService = resendEmailService;
         this.loginAttemptService = loginAttemptService;
+        this.refreshTokenService = refreshTokenService;
         this.frontendBaseUrl = frontendBaseUrl;
         this.emailVerificationTtlHours = emailVerificationTtlHours;
     }
@@ -157,6 +165,39 @@ public class ClientAccountService {
 
         token.setConsumedAt(Instant.now());
         emailVerificationTokenRepository.save(token);
+    }
+
+    @Transactional
+    public void deleteOwnAccount(String authenticatedEmail) {
+        Worker worker = workerRepository.findByEmailIgnoreCase(authenticatedEmail)
+                .orElseThrow(() -> new IllegalArgumentException("Cuenta cliente no encontrada"));
+
+        if (worker.getRole() != Role.CLIENT) {
+            throw new AccessDeniedException("Solo el cliente puede eliminar su propia cuenta");
+        }
+
+        Owner owner = worker.getOwner();
+        if (owner != null && !owner.isArchived()) {
+            owner.setArchived(true);
+            owner.setArchivedAt(Instant.now());
+            ownerRepository.save(owner);
+
+            List<Vessel> vessels = vesselRepository.findByOwnerIdAndArchivedFalse(owner.getId());
+            Instant archivedAt = Instant.now();
+            for (Vessel vessel : vessels) {
+                vessel.setArchived(true);
+                vessel.setArchivedAt(archivedAt);
+                vesselRepository.save(vessel);
+            }
+        }
+
+        worker.setActive(false);
+        worker.setEmailVerified(false);
+        workerRepository.save(worker);
+
+        emailVerificationTokenRepository.deleteByWorker_Id(worker.getId());
+        passwordResetTokenRepository.deleteByWorker_Id(worker.getId());
+        refreshTokenService.revokeAllForWorker(worker.getId());
     }
 
     @Transactional

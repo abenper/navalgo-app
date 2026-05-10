@@ -223,7 +223,7 @@ class _CompleteRegistrationScreenState
                         ),
                       );
                     },
-                    child: const Text('Consultar Política de Privacidad'),
+                    child: const Text('Consultar privacidad y condiciones'),
                   ),
                   if (_completed)
                     FilledButton(
