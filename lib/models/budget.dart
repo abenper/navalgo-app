@@ -9,6 +9,8 @@ class Budget {
     required this.vesselName,
     required this.createdByWorkerId,
     required this.createdByWorkerName,
+    this.originBudgetId,
+    this.originBudgetTitle,
     required this.title,
     this.description,
     this.amount,
@@ -32,6 +34,8 @@ class Budget {
   final String vesselName;
   final int createdByWorkerId;
   final String createdByWorkerName;
+  final int? originBudgetId;
+  final String? originBudgetTitle;
   final String title;
   final String? description;
   final double? amount;
@@ -64,6 +68,8 @@ class Budget {
       vesselName: json['vesselName'] as String,
       createdByWorkerId: (json['createdByWorkerId'] as num).toInt(),
       createdByWorkerName: json['createdByWorkerName'] as String,
+      originBudgetId: (json['originBudgetId'] as num?)?.toInt(),
+      originBudgetTitle: json['originBudgetTitle'] as String?,
       title: json['title'] as String,
       description: json['description'] as String?,
       amount: (json['amount'] as num?)?.toDouble(),

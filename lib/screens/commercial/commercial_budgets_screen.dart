@@ -154,6 +154,44 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     });
   }
 
+  Future<void> _reissueBudget(Budget budget) async {
+    final token = context.read<SessionViewModel>().token;
+    if (token == null) {
+      return;
+    }
+
+    try {
+      final created = await context.read<BudgetService>().reissueBudget(
+        token,
+        budgetId: budget.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      await _editBudget(created);
+      await _loadData();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Se ha creado una nueva oferta en borrador a partir del rechazo.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo rehacer la oferta en este momento.'),
+        ),
+      );
+    }
+  }
+
   Future<void> _editBudget(Budget budget) async {
     final draft = await showDialog<_BudgetDraft>(
       context: context,
@@ -605,6 +643,9 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                         child: _BudgetCard(
                           budget: budget,
                           onOpenPdf: () => _openPdf(budget),
+                          onReissue: budget.status == 'REJECTED'
+                              ? () => _reissueBudget(budget)
+                              : null,
                           onDelete: () => _deleteBudget(budget),
                         ),
                       ),
@@ -625,6 +666,7 @@ class _BudgetCard extends StatelessWidget {
     required this.budget,
     required this.onOpenPdf,
     this.onEdit,
+    this.onReissue,
     this.onSend,
     this.onDelete,
   });
@@ -632,6 +674,7 @@ class _BudgetCard extends StatelessWidget {
   final Budget budget;
   final VoidCallback onOpenPdf;
   final VoidCallback? onEdit;
+  final VoidCallback? onReissue;
   final VoidCallback? onSend;
   final VoidCallback? onDelete;
 
@@ -716,6 +759,16 @@ class _BudgetCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(budget.description!),
           ],
+          if (budget.originBudgetId != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Esta oferta rehace un presupuesto rechazado anteriormente.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: NavalgoColors.harbor,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
           if (!budget.clientHasAccount) ...[
             const SizedBox(height: 8),
             Text(
@@ -758,6 +811,12 @@ class _BudgetCard extends StatelessWidget {
                   onPressed: onSend,
                   icon: const Icon(Icons.send_outlined),
                   label: const Text('Enviar al cliente'),
+                ),
+              if (onReissue != null)
+                OutlinedButton.icon(
+                  onPressed: onReissue,
+                  icon: const Icon(Icons.restart_alt_outlined),
+                  label: const Text('Rehacer oferta'),
                 ),
               if (onDelete != null)
                 OutlinedButton.icon(

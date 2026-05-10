@@ -28,6 +28,7 @@ class BudgetService {
 
   Future<Budget> createBudget(
     String token, {
+    int? originBudgetId,
     int? ownerId,
     int? vesselId,
     String? contactEmail,
@@ -43,6 +44,7 @@ class BudgetService {
       '/budgets',
       headers: {'Authorization': 'Bearer $token'},
       body: {
+        'originBudgetId': originBudgetId,
         'ownerId': ownerId,
         'vesselId': vesselId,
         'contactEmail': contactEmail,
@@ -54,6 +56,14 @@ class BudgetService {
         'currency': currency,
         'pdfUrl': pdfUrl,
       },
+    );
+    return Budget.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Budget> reissueBudget(String token, {required int budgetId}) async {
+    final data = await _apiClient.post(
+      '/budgets/$budgetId/reissue',
+      headers: {'Authorization': 'Bearer $token'},
     );
     return Budget.fromJson(data as Map<String, dynamic>);
   }

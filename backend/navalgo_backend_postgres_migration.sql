@@ -392,4 +392,23 @@ CREATE TABLE IF NOT EXISTS budget_events (
 CREATE INDEX IF NOT EXISTS idx_budget_events_budget_id_created_at
     ON budget_events(budget_id, created_at, id);
 
+ALTER TABLE budgets
+    ADD COLUMN IF NOT EXISTS origin_budget_id BIGINT;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'fk_budgets_origin_budget'
+    ) THEN
+        ALTER TABLE budgets
+            ADD CONSTRAINT fk_budgets_origin_budget
+            FOREIGN KEY (origin_budget_id) REFERENCES budgets(id);
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_budgets_origin_budget_id
+    ON budgets(origin_budget_id);
+
 COMMIT;

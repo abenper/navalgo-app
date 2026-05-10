@@ -83,6 +83,7 @@ public class BudgetService {
     @Transactional
     public BudgetDto create(CreateBudgetRequest request, String currentUserEmail) {
         Worker current = requireCommercialOrAdmin(currentUserEmail);
+        Budget originBudget = resolveRejectedOriginBudget(request.originBudgetId());
         BudgetTarget target = resolveBudgetTarget(
                 request.ownerId(),
                 request.contactEmail(),
@@ -93,6 +94,7 @@ public class BudgetService {
         budget.setOwner(target.owner());
         budget.setVessel(target.vessel());
         budget.setCreatedByWorker(current);
+        budget.setOriginBudget(originBudget);
         budget.setTitle(inputSanitizer.requiredText(request.title(), "El titulo del presupuesto", 255));
         budget.setDescription(inputSanitizer.optionalText(request.description(), 3000));
         budget.setAmount(request.amount());
@@ -103,6 +105,69 @@ public class BudgetService {
         budget.setUpdatedAt(Instant.now());
         Budget savedBudget = budgetRepository.save(budget);
         recordEvent(savedBudget, BudgetEventType.CREATED, current, "Borrador creado.");
+        if (originBudget != null) {
+            recordEvent(
+                    savedBudget,
+                    BudgetEventType.REISSUED,
+                    current,
+                    "Nueva oferta creada a partir del presupuesto rechazado anterior."
+            );
+            recordEvent(
+                    originBudget,
+                    BudgetEventType.REISSUED,
+                    current,
+                    "Se ha creado una nueva oferta en borrador para este rechazo."
+            );
+        }
+        return toDto(savedBudget);
+    }
+
+    @Transactional
+    public BudgetDto reissue(Long budgetId, String currentUserEmail) {
+        Worker current = requireCommercialOrAdmin(currentUserEmail);
+        Budget rejectedBudget = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new EntityNotFoundException("Presupuesto no encontrado"));
+
+        if (rejectedBudget.getStatus() != BudgetStatus.REJECTED) {
+            throw new IllegalArgumentException("Solo se puede rehacer una oferta rechazada");
+        }
+
+        Budget newBudget = new Budget();
+        newBudget.setOwner(rejectedBudget.getOwner());
+        newBudget.setVessel(rejectedBudget.getVessel());
+        newBudget.setCreatedByWorker(current);
+        newBudget.setOriginBudget(rejectedBudget);
+        newBudget.setTitle(rejectedBudget.getTitle());
+        newBudget.setDescription(rejectedBudget.getDescription());
+        newBudget.setAmount(rejectedBudget.getAmount());
+        newBudget.setCurrency(rejectedBudget.getCurrency());
+        newBudget.setPdfUrl(rejectedBudget.getPdfUrl());
+        newBudget.setStatus(BudgetStatus.DRAFT);
+        newBudget.setClientObservations(null);
+        newBudget.setSentAt(null);
+        newBudget.setClientDecidedAt(null);
+        newBudget.setCreatedAt(Instant.now());
+        newBudget.setUpdatedAt(Instant.now());
+
+        Budget savedBudget = budgetRepository.save(newBudget);
+        recordEvent(
+                savedBudget,
+                BudgetEventType.CREATED,
+                current,
+                "Borrador creado."
+        );
+        recordEvent(
+                savedBudget,
+                BudgetEventType.REISSUED,
+                current,
+                "Nueva oferta creada a partir del presupuesto rechazado anterior."
+        );
+        recordEvent(
+                rejectedBudget,
+                BudgetEventType.REISSUED,
+                current,
+                "Se ha generado una nueva oferta en borrador para este presupuesto rechazado."
+        );
         return toDto(savedBudget);
     }
 
@@ -460,6 +525,18 @@ public class BudgetService {
         return normalized.toUpperCase(Locale.ROOT);
     }
 
+    private Budget resolveRejectedOriginBudget(Long originBudgetId) {
+        if (originBudgetId == null) {
+            return null;
+        }
+        Budget originBudget = budgetRepository.findById(originBudgetId)
+                .orElseThrow(() -> new EntityNotFoundException("Presupuesto origen no encontrado"));
+        if (originBudget.getStatus() != BudgetStatus.REJECTED) {
+            throw new IllegalArgumentException("Solo se puede crear una nueva oferta desde un presupuesto rechazado");
+        }
+        return originBudget;
+    }
+
     private String buildPlaceholderRegistrationNumber(Long ownerId, String vesselName) {
         String baseName = vesselName == null ? "VESSEL" : vesselName.trim().toUpperCase(Locale.ROOT);
         baseName = baseName.replaceAll("[^A-Z0-9]+", "-");
@@ -562,6 +639,8 @@ public class BudgetService {
                 budget.getVessel().getName(),
                 budget.getCreatedByWorker().getId(),
                 budget.getCreatedByWorker().getFullName(),
+                budget.getOriginBudget() == null ? null : budget.getOriginBudget().getId(),
+                budget.getOriginBudget() == null ? null : budget.getOriginBudget().getTitle(),
                 budget.getTitle(),
                 budget.getDescription(),
                 budget.getAmount(),

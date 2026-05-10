@@ -13,6 +13,8 @@ public record BudgetDto(
         String vesselName,
         Long createdByWorkerId,
         String createdByWorkerName,
+        Long originBudgetId,
+        String originBudgetTitle,
         String title,
         String description,
         BigDecimal amount,

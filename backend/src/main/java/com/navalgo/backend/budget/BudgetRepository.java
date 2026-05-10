@@ -7,5 +7,6 @@ import java.util.List;
 public interface BudgetRepository extends JpaRepository<Budget, Long> {
     List<Budget> findAllByOrderByCreatedAtDesc();
     List<Budget> findByOwnerIdOrderByCreatedAtDesc(Long ownerId);
+    List<Budget> findByOriginBudgetIdOrderByCreatedAtAsc(Long originBudgetId);
     boolean existsByOwnerId(Long ownerId);
 }

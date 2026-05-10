@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 
 public record CreateBudgetRequest(
+        Long originBudgetId,
         Long ownerId,
         Long vesselId,
         @Size(max = 255) String contactEmail,
@@ -19,4 +20,3 @@ public record CreateBudgetRequest(
         @NotBlank @Size(max = 2000) String pdfUrl
 ) {
 }
-

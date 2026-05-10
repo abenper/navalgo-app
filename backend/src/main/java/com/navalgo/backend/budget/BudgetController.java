@@ -46,6 +46,13 @@ public class BudgetController {
         return ResponseEntity.ok(budgetService.create(request, authentication.getName()));
     }
 
+    @PostMapping("/{id}/reissue")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
+    public ResponseEntity<BudgetDto> reissue(@PathVariable Long id,
+                                             Authentication authentication) {
+        return ResponseEntity.ok(budgetService.reissue(id, authentication.getName()));
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
     public ResponseEntity<BudgetDto> updateDraft(@PathVariable Long id,

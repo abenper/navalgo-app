@@ -26,6 +26,10 @@ public class Budget {
     @JoinColumn(name = "created_by_worker_id")
     private Worker createdByWorker;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "origin_budget_id")
+    private Budget originBudget;
+
     @Column(nullable = false)
     private String title;
 
@@ -90,6 +94,14 @@ public class Budget {
 
     public void setCreatedByWorker(Worker createdByWorker) {
         this.createdByWorker = createdByWorker;
+    }
+
+    public Budget getOriginBudget() {
+        return originBudget;
+    }
+
+    public void setOriginBudget(Budget originBudget) {
+        this.originBudget = originBudget;
     }
 
     public String getTitle() {

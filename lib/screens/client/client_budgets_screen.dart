@@ -529,6 +529,27 @@ class _ClientBudgetCard extends StatelessWidget {
             const SizedBox(height: 12),
             Text(budget.description!),
           ],
+          if (budget.originBudgetId != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: NavalgoColors.tide.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: NavalgoColors.tide.withValues(alpha: 0.18),
+                ),
+              ),
+              child: Text(
+                'Esta es una oferta revisada que se ha preparado tras un rechazo anterior.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: NavalgoColors.deepSea,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
           if (budget.clientObservations != null &&
               budget.clientObservations!.isNotEmpty) ...[
             const SizedBox(height: 12),
