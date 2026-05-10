@@ -83,56 +83,15 @@ public class BudgetService {
     @Transactional
     public BudgetDto create(CreateBudgetRequest request, String currentUserEmail) {
         Worker current = requireCommercialOrAdmin(currentUserEmail);
-        
-        Owner owner;
-        Vessel vessel;
-
-        if (request.ownerId() != null) {
-            owner = ownerRepository.findById(request.ownerId())
-                    .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
-
-            String normalizedContactEmail = inputSanitizer.email(request.contactEmail());
-            if (normalizedContactEmail != null && !normalizedContactEmail.isBlank()) {
-                ensureOwnerEmailAvailable(normalizedContactEmail, owner.getId());
-                owner.setEmail(normalizedContactEmail);
-                owner = ownerRepository.save(owner);
-            }
-
-            if (request.vesselId() != null) {
-                vessel = vesselRepository.findById(request.vesselId())
-                        .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
-
-                if (!vessel.getOwner().getId().equals(owner.getId())) {
-                    throw new IllegalArgumentException("La embarcacion seleccionada no pertenece a ese cliente");
-                }
-            } else {
-                vessel = findOrCreatePlaceholderVessel(owner);
-            }
-        } else {
-            String email = inputSanitizer.email(request.contactEmail());
-            if (email == null || email.isBlank()) {
-                throw new IllegalArgumentException("Debe proporcionar un correo electronico valido");
-            }
-
-            owner = resolveOwnerByEmail(email).orElseGet(() -> {
-                String name = request.newClientName();
-                if (name == null || name.isBlank()) {
-                    name = email.split("@")[0];
-                }
-                Owner newOwner = new Owner();
-                newOwner.setType(OwnerType.PERSON);
-                newOwner.setDisplayName(name);
-                newOwner.setDocumentId("PENDIENTE");
-                newOwner.setEmail(email);
-                return ownerRepository.save(newOwner);
-            });
-
-            vessel = findOrCreatePlaceholderVessel(owner);
-        }
+        BudgetTarget target = resolveBudgetTarget(
+                request.ownerId(),
+                request.contactEmail(),
+                request.newClientName()
+        );
 
         Budget budget = new Budget();
-        budget.setOwner(owner);
-        budget.setVessel(vessel);
+        budget.setOwner(target.owner());
+        budget.setVessel(target.vessel());
         budget.setCreatedByWorker(current);
         budget.setTitle(inputSanitizer.requiredText(request.title(), "El titulo del presupuesto", 255));
         budget.setDescription(inputSanitizer.optionalText(request.description(), 3000));
@@ -144,6 +103,60 @@ public class BudgetService {
         budget.setUpdatedAt(Instant.now());
         Budget savedBudget = budgetRepository.save(budget);
         recordEvent(savedBudget, BudgetEventType.CREATED, current, "Borrador creado.");
+        return toDto(savedBudget);
+    }
+
+    @Transactional
+    public BudgetDto updateDraft(Long budgetId,
+                                 UpdateBudgetDraftRequest request,
+                                 String currentUserEmail) {
+        Worker current = requireCommercialOrAdmin(currentUserEmail);
+        Budget budget = budgetRepository.findById(budgetId)
+                .orElseThrow(() -> new EntityNotFoundException("Presupuesto no encontrado"));
+
+        if (budget.getStatus() != BudgetStatus.DRAFT) {
+            throw new IllegalArgumentException("Solo se pueden editar presupuestos en borrador");
+        }
+
+        Owner previousOwner = budget.getOwner();
+        String previousEmail = previousOwner.getEmail();
+        String previousTitle = budget.getTitle();
+        String previousDescription = budget.getDescription();
+        java.math.BigDecimal previousAmount = budget.getAmount();
+        String previousCurrency = budget.getCurrency();
+        String previousPdfUrl = budget.getPdfUrl();
+
+        BudgetTarget target = resolveBudgetTarget(
+                request.ownerId(),
+                request.contactEmail(),
+                request.newClientName()
+        );
+
+        budget.setOwner(target.owner());
+        budget.setVessel(target.vessel());
+        budget.setTitle(inputSanitizer.requiredText(request.title(), "El titulo del presupuesto", 255));
+        budget.setDescription(inputSanitizer.optionalText(request.description(), 3000));
+        budget.setAmount(request.amount());
+        budget.setCurrency(normalizeCurrency(request.currency()));
+        budget.setPdfUrl(inputSanitizer.optionalUrl(request.pdfUrl(), 2000));
+        budget.setUpdatedAt(Instant.now());
+
+        Budget savedBudget = budgetRepository.save(budget);
+        recordEvent(
+                savedBudget,
+                BudgetEventType.UPDATED,
+                current,
+                buildDraftUpdatedNote(
+                        previousOwner,
+                        previousEmail,
+                        previousTitle,
+                        previousDescription,
+                        previousAmount,
+                        previousCurrency,
+                        previousPdfUrl,
+                        savedBudget
+                )
+        );
         return toDto(savedBudget);
     }
 
@@ -364,6 +377,79 @@ public class BudgetService {
         if (!client.getOwner().getId().equals(budget.getOwner().getId())) {
             throw new AccessDeniedException("No puedes responder a presupuestos de otro cliente");
         }
+    }
+
+    private BudgetTarget resolveBudgetTarget(Long ownerId,
+                                             String contactEmail,
+                                             String newClientName) {
+        Owner owner;
+        if (ownerId != null) {
+            owner = ownerRepository.findById(ownerId)
+                    .orElseThrow(() -> new EntityNotFoundException("Cliente no encontrado"));
+
+            String normalizedContactEmail = inputSanitizer.email(contactEmail);
+            if (normalizedContactEmail != null && !normalizedContactEmail.isBlank()) {
+                ensureOwnerEmailAvailable(normalizedContactEmail, owner.getId());
+                owner.setEmail(normalizedContactEmail);
+                owner = ownerRepository.save(owner);
+            }
+        } else {
+            String email = inputSanitizer.email(contactEmail);
+            if (email == null || email.isBlank()) {
+                throw new IllegalArgumentException("Debe proporcionar un correo electronico valido");
+            }
+
+            owner = resolveOwnerByEmail(email).orElseGet(() -> {
+                String name = newClientName;
+                if (name == null || name.isBlank()) {
+                    name = email.split("@")[0];
+                }
+                Owner newOwner = new Owner();
+                newOwner.setType(OwnerType.PERSON);
+                newOwner.setDisplayName(name);
+                newOwner.setDocumentId("PENDIENTE");
+                newOwner.setEmail(email);
+                return ownerRepository.save(newOwner);
+            });
+        }
+
+        Vessel vessel = findOrCreatePlaceholderVessel(owner);
+        return new BudgetTarget(owner, vessel);
+    }
+
+    private String buildDraftUpdatedNote(Owner previousOwner,
+                                         String previousEmail,
+                                         String previousTitle,
+                                         String previousDescription,
+                                         java.math.BigDecimal previousAmount,
+                                         String previousCurrency,
+                                         String previousPdfUrl,
+                                         Budget updatedBudget) {
+        List<String> changes = new java.util.ArrayList<>();
+        if (!previousOwner.getId().equals(updatedBudget.getOwner().getId())) {
+            changes.add("cliente");
+        }
+        if (!java.util.Objects.equals(previousEmail, updatedBudget.getOwner().getEmail())) {
+            changes.add("correo");
+        }
+        if (!java.util.Objects.equals(previousTitle, updatedBudget.getTitle())) {
+            changes.add("titulo");
+        }
+        if (!java.util.Objects.equals(previousDescription, updatedBudget.getDescription())) {
+            changes.add("descripcion");
+        }
+        if (!java.util.Objects.equals(previousAmount, updatedBudget.getAmount())
+                || !java.util.Objects.equals(previousCurrency, updatedBudget.getCurrency())) {
+            changes.add("importe");
+        }
+        if (!java.util.Objects.equals(previousPdfUrl, updatedBudget.getPdfUrl())) {
+            changes.add("PDF");
+        }
+
+        if (changes.isEmpty()) {
+            return "Borrador revisado sin cambios visibles.";
+        }
+        return "Borrador actualizado: " + String.join(", ", changes) + ".";
     }
 
     private String normalizeCurrency(String currency) {

@@ -106,8 +106,8 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
         vesselId: draft.vesselId,
         ownerName: draft.newClientName,
         vesselName: draft.newVesselName,
-        fileName: draft.fileName,
-        bytes: draft.fileBytes,
+        fileName: draft.fileName!,
+        bytes: draft.fileBytes!,
       );
       await budgetService.createBudget(
         token,
@@ -152,6 +152,79 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
     setState(() {
       _isCreating = false;
     });
+  }
+
+  Future<void> _editBudget(Budget budget) async {
+    final draft = await showDialog<_BudgetDraft>(
+      context: context,
+      builder: (_) => _CreateBudgetDialog(
+        owners: _owners,
+        vessels: _vessels,
+        initialBudget: budget,
+        titleText: 'Editar borrador',
+        submitLabel: 'Guardar cambios',
+      ),
+    );
+    if (!mounted || draft == null) {
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    final budgetService = context.read<BudgetService>();
+    if (token == null) {
+      return;
+    }
+
+    try {
+      var pdfUrl = draft.existingPdfUrl ?? budget.pdfUrl;
+      if (draft.fileBytes != null &&
+          draft.fileBytes!.isNotEmpty &&
+          draft.fileName != null) {
+        final uploaded = await budgetService.uploadBudgetPdf(
+          token,
+          ownerId: draft.ownerId,
+          ownerName: draft.newClientName,
+          fileName: draft.fileName!,
+          bytes: draft.fileBytes!,
+        );
+        pdfUrl = uploaded.fileUrl;
+      }
+
+      await budgetService.updateBudgetDraft(
+        token,
+        budgetId: budget.id,
+        ownerId: draft.ownerId,
+        contactEmail: draft.contactEmail,
+        newClientName: draft.newClientName,
+        title: draft.title,
+        description: draft.description,
+        amount: draft.amount,
+        currency: draft.currency,
+        pdfUrl: pdfUrl,
+      );
+      await _loadData();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Borrador actualizado. Ya puedes revisarlo o enviarlo.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se pudo actualizar el borrador. Inténtalo de nuevo.',
+          ),
+        ),
+      );
+    }
   }
 
   Future<void> _sendBudget(Budget budget) async {
@@ -362,6 +435,12 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
               budget.status == 'ACCEPTED' || budget.status == 'REJECTED',
         )
         .length;
+    final draftBudgets = _budgets
+        .where((budget) => budget.status == 'DRAFT')
+        .toList(growable: false);
+    final otherBudgets = _budgets
+        .where((budget) => budget.status != 'DRAFT')
+        .toList(growable: false);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -429,10 +508,11 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                   },
                 ),
                 const SizedBox(height: 20),
-                const NavalgoSectionHeader(
+                NavalgoSectionHeader(
                   title: 'Listado',
-                  subtitle:
-                      'Desde aqu\u00ED controlas el estado del presupuesto y abres el PDF cuando lo necesites.',
+                  subtitle: draftCount > 0
+                      ? 'Los borradores se muestran separados para que no se queden sin enviar por error.'
+                      : 'Desde aqu\u00ED controlas el estado del presupuesto y abres el PDF cuando lo necesites.',
                 ),
                 const SizedBox(height: 12),
                 if (_isLoading)
@@ -445,20 +525,92 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
                       'A\u00FAn no hay presupuestos creados. Usa el bot\u00F3n de arriba para preparar el primero.',
                     ),
                   )
-                else
-                  ..._budgets.map(
-                    (budget) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: _BudgetCard(
-                        budget: budget,
-                        onOpenPdf: () => _openPdf(budget),
-                        onSend: budget.status == 'DRAFT'
-                            ? () => _sendBudget(budget)
-                            : null,
-                        onDelete: () => _deleteBudget(budget),
+                else ...[
+                  if (draftBudgets.isNotEmpty) ...[
+                    NavalgoPanel(
+                      tint: NavalgoColors.sand.withValues(alpha: 0.16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: NavalgoColors.sand.withValues(alpha: 0.22),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.edit_document,
+                              color: NavalgoColors.deepSea,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  draftCount == 1
+                                      ? 'Tienes 1 borrador pendiente de enviar'
+                                      : 'Tienes $draftCount borradores pendientes de enviar',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        color: NavalgoColors.deepSea,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  'Revísalos, cambia el PDF o el correo si hace falta y envíalos solo cuando estén listos.',
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(color: NavalgoColors.deepSea),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    const NavalgoSectionHeader(
+                      title: 'Borradores pendientes',
+                      subtitle:
+                          'Estos presupuestos todavía no han salido al cliente.',
+                    ),
+                    const SizedBox(height: 12),
+                    ...draftBudgets.map(
+                      (budget) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _BudgetCard(
+                          budget: budget,
+                          onOpenPdf: () => _openPdf(budget),
+                          onEdit: () => _editBudget(budget),
+                          onSend: () => _sendBudget(budget),
+                          onDelete: () => _deleteBudget(budget),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (otherBudgets.isNotEmpty) ...[
+                    if (draftBudgets.isNotEmpty) const SizedBox(height: 8),
+                    const NavalgoSectionHeader(
+                      title: 'Enviados y resueltos',
+                      subtitle:
+                          'Aqu\u00ED se quedan los presupuestos que ya salieron al cliente o que ya recibieron respuesta.',
+                    ),
+                    const SizedBox(height: 12),
+                    ...otherBudgets.map(
+                      (budget) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _BudgetCard(
+                          budget: budget,
+                          onOpenPdf: () => _openPdf(budget),
+                          onDelete: () => _deleteBudget(budget),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
           ),
@@ -472,12 +624,14 @@ class _BudgetCard extends StatelessWidget {
   const _BudgetCard({
     required this.budget,
     required this.onOpenPdf,
+    this.onEdit,
     this.onSend,
     this.onDelete,
   });
 
   final Budget budget;
   final VoidCallback onOpenPdf;
+  final VoidCallback? onEdit;
   final VoidCallback? onSend;
   final VoidCallback? onDelete;
 
@@ -486,11 +640,43 @@ class _BudgetCard extends StatelessWidget {
     final amountLabel = budget.amount == null
         ? 'Importe pendiente'
         : '${budget.amount!.toStringAsFixed(2)} ${budget.currency}';
+    final isDraft = budget.status == 'DRAFT';
 
     return NavalgoPanel(
+      tint: isDraft ? NavalgoColors.sand.withValues(alpha: 0.12) : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isDraft) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: NavalgoColors.deepSea,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.pending_actions_outlined,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Borrador no enviado. Aún puedes cambiar el PDF, el correo y revisar el contenido antes de mandarlo.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ],
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -561,6 +747,12 @@ class _BudgetCard extends StatelessWidget {
                 icon: const Icon(Icons.picture_as_pdf_outlined),
                 label: const Text('Ver PDF'),
               ),
+              if (onEdit != null)
+                OutlinedButton.icon(
+                  onPressed: onEdit,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Editar borrador'),
+                ),
               if (onSend != null)
                 FilledButton.icon(
                   onPressed: onSend,
@@ -628,10 +820,19 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _CreateBudgetDialog extends StatefulWidget {
-  const _CreateBudgetDialog({required this.owners, required this.vessels});
+  const _CreateBudgetDialog({
+    required this.owners,
+    required this.vessels,
+    this.initialBudget,
+    this.titleText = 'Nuevo presupuesto',
+    this.submitLabel = 'Crear borrador',
+  });
 
   final List<Owner> owners;
   final List<Vessel> vessels;
+  final Budget? initialBudget;
+  final String titleText;
+  final String submitLabel;
 
   @override
   State<_CreateBudgetDialog> createState() => _CreateBudgetDialogState();
@@ -652,8 +853,10 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
   @override
   void initState() {
     super.initState();
-    _ownerId = null;
-    _contactEmailCtrl.text = '';
+    _ownerId = widget.initialBudget?.ownerId;
+    _titleCtrl.text = widget.initialBudget?.title ?? '';
+    _descriptionCtrl.text = widget.initialBudget?.description ?? '';
+    _contactEmailCtrl.text = widget.initialBudget?.ownerEmail ?? '';
     _searchCtrl.addListener(_handleSearchChanged);
   }
 
@@ -728,7 +931,8 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
       return;
     }
     final fileBytes = _pickedFileBytes;
-    if (_pickedFile == null || fileBytes == null || fileBytes.isEmpty) {
+    if (widget.initialBudget == null &&
+        (_pickedFile == null || fileBytes == null || fileBytes.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Adjunta un PDF para el presupuesto.')),
       );
@@ -761,8 +965,9 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
             : _descriptionCtrl.text.trim(),
         amount: null,
         currency: 'EUR',
-        fileName: _pickedFile!.name,
+        fileName: _pickedFile?.name,
         fileBytes: fileBytes,
+        existingPdfUrl: widget.initialBudget?.pdfUrl,
       ),
     );
   }
@@ -778,7 +983,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
     final contentMaxHeight = screenSize.height - 140;
 
     return AlertDialog(
-      title: const Text('Nuevo presupuesto'),
+      title: Text(widget.titleText),
       content: SizedBox(
         width: maxDialogWidth > 560 ? 560 : maxDialogWidth,
         child: Form(
@@ -851,9 +1056,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                         final owner = selectedOwner.isEmpty
                             ? null
                             : selectedOwner.first;
-                        if (_contactEmailCtrl.text.trim().isEmpty) {
-                          _contactEmailCtrl.text = owner?.email ?? '';
-                        }
+                        _contactEmailCtrl.text = owner?.email ?? '';
                       });
                     },
                   ),
@@ -925,13 +1128,24 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                       width: 240,
                       child: Text(
                         _pickedFile == null
-                            ? 'Adjuntar PDF'
+                            ? widget.initialBudget == null
+                                  ? 'Adjuntar PDF'
+                                  : 'Sustituir PDF'
                             : _pickedFile!.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
+                  if (widget.initialBudget != null && _pickedFile == null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Si no adjuntas un PDF nuevo, se mantendrá el documento actual del borrador.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: NavalgoColors.storm,
+                      ),
+                    ),
+                  ],
                   if (filteredOwners.isEmpty &&
                       _searchCtrl.text.trim().isNotEmpty) ...[
                     const SizedBox(height: 12),
@@ -953,7 +1167,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancelar'),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Crear borrador')),
+        FilledButton(onPressed: _submit, child: Text(widget.submitLabel)),
       ],
     );
   }
@@ -970,8 +1184,9 @@ class _BudgetDraft {
     this.description,
     this.amount,
     required this.currency,
-    required this.fileName,
-    required this.fileBytes,
+    this.fileName,
+    this.fileBytes,
+    this.existingPdfUrl,
   });
 
   final int? ownerId;
@@ -983,6 +1198,7 @@ class _BudgetDraft {
   final String? description;
   final double? amount;
   final String currency;
-  final String fileName;
-  final List<int> fileBytes;
+  final String? fileName;
+  final List<int>? fileBytes;
+  final String? existingPdfUrl;
 }

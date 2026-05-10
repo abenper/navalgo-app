@@ -58,6 +58,35 @@ class BudgetService {
     return Budget.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<Budget> updateBudgetDraft(
+    String token, {
+    required int budgetId,
+    int? ownerId,
+    String? contactEmail,
+    String? newClientName,
+    required String title,
+    String? description,
+    double? amount,
+    String currency = 'EUR',
+    required String pdfUrl,
+  }) async {
+    final data = await _apiClient.put(
+      '/budgets/$budgetId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'ownerId': ownerId,
+        'contactEmail': contactEmail,
+        'newClientName': newClientName,
+        'title': title,
+        'description': description,
+        'amount': amount,
+        'currency': currency,
+        'pdfUrl': pdfUrl,
+      },
+    );
+    return Budget.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<Uint8List> downloadBudgetPdf(String token, String pdfUrl) async {
     final resolvedUrl = media.resolveMediaUrl(pdfUrl);
     return _apiClient.getBytesFromAbsoluteUrl(

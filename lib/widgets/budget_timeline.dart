@@ -132,6 +132,8 @@ class _BudgetTimelineEventTile extends StatelessWidget {
 
   static ({String label, Color color}) _eventScheme(String type) {
     switch (type) {
+      case 'UPDATED':
+        return (label: 'Borrador actualizado', color: NavalgoColors.harbor);
       case 'SENT':
         return (label: 'Enviado al cliente', color: NavalgoColors.sand);
       case 'ACCEPTED':
