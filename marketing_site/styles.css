@@ -1,5 +1,7 @@
 :root {
   --bg: #05141b;
+  --content-max: 1310px;
+  --content-gutter: 18px;
   --panel: rgba(8, 30, 39, 0.9);
   --panel-soft: rgba(255, 255, 255, 0.05);
   --line: rgba(255, 255, 255, 0.1);
@@ -9,7 +11,7 @@
   --accent-strong: #1da89f;
   --gold: #efc36c;
   --coral: #ff7d73;
-  --shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
+  --shadow: 0 14px 34px rgba(0, 0, 0, 0.18);
   --radius-xl: 34px;
   --radius-lg: 26px;
   --radius-md: 18px;
@@ -21,6 +23,7 @@
 
 html {
   scroll-behavior: smooth;
+  background-color: #081922;
 }
 
 body {
@@ -30,23 +33,9 @@ body {
   overflow-x: hidden;
   font-family: "Manrope", sans-serif;
   color: var(--text);
+  background-color: #081922;
   background:
-    radial-gradient(circle at top right, rgba(63, 95, 141, 0.18), transparent 30%),
-    radial-gradient(circle at top left, rgba(16, 62, 84, 0.14), transparent 24%),
     linear-gradient(180deg, #0b1e2b 0%, #081823 52%, #06131b 100%);
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 18% 14%, rgba(24, 73, 94, 0.14), transparent 30%),
-    radial-gradient(circle at 82% 10%, rgba(65, 82, 138, 0.14), transparent 26%),
-    radial-gradient(circle at 50% 32%, rgba(8, 27, 39, 0.38), transparent 54%);
-  opacity: 0.88;
 }
 
 a {
@@ -56,7 +45,7 @@ a {
 
 .site-shell {
   position: relative;
-  width: min(1420px, calc(100% - 36px));
+  width: 100%;
   margin: 0 auto;
   padding: 0 0 56px;
   overflow: visible;
@@ -67,10 +56,15 @@ a {
   position: relative;
   z-index: 1;
   padding-top: 18px;
+  padding-bottom: 18px;
   width: 100vw;
   margin-left: calc(50% - 50vw);
-  padding-left: max(18px, calc((100vw - 1540px) / 2 + 18px));
-  padding-right: max(18px, calc((100vw - 1540px) / 2 + 18px));
+}
+
+.site-shell > main > * {
+  width: min(var(--content-max), calc(100vw - (var(--content-gutter) * 2)));
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .site-shell > main::before {
@@ -78,7 +72,6 @@ a {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 50% 8%, rgba(70, 90, 150, 0.22), transparent 22%),
     linear-gradient(180deg, #102535 0%, #0d2230 36%, #0a1d29 72%, #081922 100%);
   z-index: -1;
   pointer-events: none;
@@ -90,42 +83,12 @@ a {
   top: 0;
   left: 0;
   width: 100%;
-  height: 520px;
+  height: 360px;
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 18% 20%, rgba(99, 214, 203, 0.08), transparent 24%),
-    radial-gradient(circle at 82% 10%, rgba(106, 120, 208, 0.16), transparent 24%);
-  opacity: 0.88;
-  filter: blur(22px);
-}
-
-.site-shell::before {
-  content: "";
-  position: absolute;
-  inset: 88px -8vw 18px;
-  z-index: 0;
-  pointer-events: none;
-  border-radius: 72px;
-  background:
-    radial-gradient(circle at 18% 8%, rgba(33, 84, 105, 0.18), transparent 24%),
-    radial-gradient(circle at 84% 10%, rgba(82, 96, 164, 0.16), transparent 22%),
-    linear-gradient(180deg, rgba(12, 31, 43, 0.76) 0%, rgba(8, 22, 31, 0.42) 40%, rgba(3, 12, 18, 0) 100%);
-  filter: blur(32px);
-  opacity: 0.9;
-}
-
-.ambient-grid {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 46px 46px;
-  opacity: 0.32;
-  mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.72), transparent 92%);
+    radial-gradient(circle at 76% 8%, rgba(106, 120, 208, 0.12), transparent 24%);
+  opacity: 0.72;
 }
 
 .topbar,
@@ -149,16 +112,15 @@ a {
   justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
-  min-height: 108px;
+  min-height: 88px;
   width: 100vw;
   margin-left: calc(50% - 50vw);
-  padding: 20px max(22px, calc((100vw - 1540px) / 2 + 24px));
-  border-radius: 0 0 28px 28px;
+  padding: 14px max(var(--content-gutter), calc((100vw - var(--content-max)) / 2 + var(--content-gutter)));
+  border-radius: 0;
   border-left: none;
   border-right: none;
   border-top: none;
   background: rgba(7, 22, 30, 0.92);
-  backdrop-filter: blur(16px);
 }
 
 .brand {
@@ -178,14 +140,14 @@ a {
   display: block;
   width: auto;
   max-width: min(42vw, 200px);
-  height: 40px;
+  height: 34px;
   object-fit: contain;
 }
 
 .brand-subtitle {
-  margin-top: 6px;
+  margin-top: 4px;
   color: var(--muted);
-  font-size: 0.92rem;
+  font-size: 0.82rem;
 }
 
 .main-nav {
@@ -200,7 +162,7 @@ a {
 }
 
 .main-nav a {
-  font-size: 1.08rem;
+  font-size: 1rem;
 }
 
 .topbar-actions,
@@ -251,8 +213,8 @@ a {
 }
 
 .topbar-login {
-  min-width: 128px;
-  min-height: 54px;
+  min-width: 116px;
+  min-height: 48px;
 }
 
 .hero-card,
@@ -262,7 +224,6 @@ a {
   margin-top: 18px;
   border-radius: var(--radius-xl);
   background: var(--panel);
-  backdrop-filter: blur(14px);
 }
 
 .hero-card {
@@ -271,22 +232,7 @@ a {
   overflow: hidden;
   padding: 26px 18px 22px;
   background:
-    radial-gradient(circle at 78% 20%, rgba(109, 117, 204, 0.24), transparent 24%),
-    radial-gradient(circle at 20% 20%, rgba(99, 214, 203, 0.12), transparent 26%),
     linear-gradient(135deg, #11172f 0%, #1d2f4f 42%, #081921 100%);
-}
-
-.hero-card::before {
-  content: "";
-  position: absolute;
-  inset: -22% -10% auto;
-  height: 68%;
-  z-index: -1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 18% 28%, rgba(99, 214, 203, 0.14), transparent 30%),
-    radial-gradient(circle at 82% 18%, rgba(113, 118, 210, 0.18), transparent 26%);
-  filter: blur(34px);
 }
 
 .eyebrow {
@@ -351,7 +297,6 @@ a {
   height: 12px;
   border-radius: 999px;
   background: linear-gradient(180deg, var(--accent), var(--accent-strong));
-  box-shadow: 0 0 0 6px rgba(99, 214, 203, 0.12);
 }
 
 .hero-actions {
@@ -392,7 +337,7 @@ a {
   height: 250px;
   border-radius: 50%;
   background: radial-gradient(circle, rgba(99, 214, 203, 0.28), transparent 68%);
-  filter: blur(18px);
+  opacity: 0.84;
 }
 
 .device-card {
@@ -416,7 +361,7 @@ a {
   padding: 11px;
   border-radius: 34px;
   background: linear-gradient(180deg, #d8dce5 0%, #f7f7fb 100%);
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.2);
 }
 
 .device-notch {
@@ -791,7 +736,6 @@ a {
   gap: 18px;
   padding: 26px 18px;
   background:
-    radial-gradient(circle at right top, rgba(99, 214, 203, 0.18), transparent 32%),
     linear-gradient(135deg, #10203d 0%, #0a2a35 100%);
 }
 
@@ -895,20 +839,27 @@ a {
   font-size: 0.92rem;
 }
 
-@media (min-width: 720px) {
-  .site-shell {
-    width: min(1480px, calc(100% - 48px));
-  }
+.mini-strip,
+.section-block,
+.cta-band,
+.footer {
+  content-visibility: auto;
+  contain-intrinsic-size: 700px;
+}
 
-  .site-shell > main {
-    padding-left: max(24px, calc((100vw - 1540px) / 2 + 24px));
-    padding-right: max(24px, calc((100vw - 1540px) / 2 + 24px));
+@media (min-width: 720px) {
+  :root {
+    --content-gutter: 24px;
   }
 
   .hero-actions,
   .cta-actions {
     flex-direction: row;
     flex-wrap: wrap;
+  }
+
+  .site-shell > main {
+    padding-bottom: 28px;
   }
 
   .mini-strip,
@@ -942,7 +893,7 @@ a {
 
 @media (min-width: 720px) and (max-width: 979px) {
   .topbar {
-    min-height: 96px;
+    min-height: 84px;
     padding-inline: max(18px, calc((100vw - 960px) / 2 + 20px));
   }
 
@@ -1007,13 +958,8 @@ a {
 }
 
 @media (min-width: 980px) {
-  .site-shell {
-    width: min(1540px, calc(100% - 56px));
-  }
-
-  .site-shell > main {
-    padding-left: max(28px, calc((100vw - 1540px) / 2 + 28px));
-    padding-right: max(28px, calc((100vw - 1540px) / 2 + 28px));
+  :root {
+    --content-gutter: 28px;
   }
 
   .site-shell > main::before {
@@ -1027,7 +973,6 @@ a {
     background:
       radial-gradient(circle at 16% 18%, rgba(99, 214, 203, 0.1), transparent 26%),
       radial-gradient(circle at 84% 10%, rgba(109, 117, 204, 0.18), transparent 24%);
-    filter: blur(26px);
   }
 
   .main-nav {
@@ -1035,14 +980,18 @@ a {
   }
 
   .topbar {
-    min-height: 116px;
-    padding: 22px max(28px, calc((100vw - 1540px) / 2 + 28px));
+    min-height: 92px;
+    padding: 16px max(var(--content-gutter), calc((100vw - var(--content-max)) / 2 + var(--content-gutter)));
+  }
+
+  .site-shell > main {
+    padding-bottom: 40px;
   }
 
   .hero-card {
     display: grid;
-    grid-template-columns: minmax(0, 1.08fr) minmax(560px, 760px);
-    gap: 54px;
+    grid-template-columns: minmax(0, 1.02fr) minmax(520px, 700px);
+    gap: 46px;
     align-items: center;
     min-height: 720px;
     padding: 48px 42px 36px;
@@ -1054,13 +1003,13 @@ a {
 
   .hero-card h1 {
     max-width: 11ch;
-    font-size: clamp(4rem, 5.8vw, 6.6rem);
+    font-size: clamp(3.6rem, 5.2vw, 5.9rem);
   }
 
   .hero-text {
-    max-width: 46ch;
+    max-width: 42ch;
     margin-top: 22px;
-    font-size: 1.12rem;
+    font-size: 1.04rem;
   }
 
   .hero-list {
@@ -1089,7 +1038,7 @@ a {
   .hero-glow {
     inset: auto 2% 20% 8%;
     height: 320px;
-    filter: blur(28px);
+    opacity: 0.8;
   }
 
   .device-shell {
@@ -1202,7 +1151,7 @@ a {
   .hero-glow {
     inset: auto 8% 16% 10%;
     height: 260px;
-    filter: blur(24px);
+    opacity: 0.78;
   }
 
   .device-shell {
@@ -1243,8 +1192,8 @@ a {
   }
 
   .hero-card {
-    grid-template-columns: minmax(0, 1.12fr) minmax(620px, 820px);
-    gap: 64px;
+    grid-template-columns: minmax(0, 1.04fr) minmax(560px, 760px);
+    gap: 54px;
     padding-inline: 48px;
   }
 
@@ -1267,6 +1216,10 @@ a {
 }
 
 @media (max-width: 719px) {
+  :root {
+    --content-gutter: 10px;
+  }
+
   .site-shell {
     width: 100%;
     padding: 10px 10px 40px;
@@ -1276,8 +1229,7 @@ a {
     width: 100vw;
     margin-left: calc(50% - 50vw);
     padding-top: 12px;
-    padding-left: 10px;
-    padding-right: 10px;
+    padding-bottom: 20px;
   }
 
   .hero-card,
@@ -1309,9 +1261,9 @@ a {
     justify-content: space-between;
     flex-wrap: nowrap;
     gap: 10px;
-    min-height: 76px;
-    padding: 12px 14px;
-    border-radius: 0 0 20px 20px;
+    min-height: 68px;
+    padding: 10px 14px;
+    border-radius: 0;
   }
 
   .brand {
@@ -1321,7 +1273,7 @@ a {
 
   .brand-logo {
     max-width: min(44vw, 156px);
-    height: 30px;
+    height: 26px;
   }
 
   .topbar-actions {
