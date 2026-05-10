@@ -10,6 +10,7 @@ import '../common/login_screen.dart';
 import '../worker/worker_shell_screen.dart';
 import 'client_budgets_screen.dart';
 import 'client_dashboard_screen.dart';
+import 'client_vessels_screen.dart';
 
 class ClientShellScreen extends StatefulWidget {
   const ClientShellScreen({super.key});
@@ -103,12 +104,7 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
           });
         },
       ),
-      const _ClientPlaceholderScreen(
-        title: 'Flota del cliente',
-        body:
-            'Aqui apareceran las embarcaciones asociadas a tu cuenta para poder consultar sus trabajos y documentacion.',
-        icon: Icons.directions_boat_filled_outlined,
-      ),
+      const ClientVesselsScreen(),
       const ClientBudgetsScreen(),
     ];
 
@@ -228,77 +224,6 @@ class _ClientShellScreenState extends State<ClientShellScreen> {
                     ),
                   ],
                 ),
-        );
-      },
-    );
-  }
-}
-
-class _ClientPlaceholderScreen extends StatelessWidget {
-  const _ClientPlaceholderScreen({
-    required this.title,
-    required this.body,
-    required this.icon,
-  });
-
-  final String title;
-  final String body;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 420;
-        return Center(
-          child: Padding(
-            padding: EdgeInsets.all(compact ? 16 : 24),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 680),
-              child: Container(
-                padding: EdgeInsets.all(compact ? 20 : 28),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(compact ? 24 : 28),
-                  border: Border.all(color: NavalgoColors.border),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: compact ? 56 : 64,
-                      height: compact ? 56 : 64,
-                      decoration: BoxDecoration(
-                        color: NavalgoColors.tide.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Icon(
-                        icon,
-                        color: NavalgoColors.tide,
-                        size: compact ? 28 : 30,
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    Text(
-                      title,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall
-                          ?.copyWith(
-                            color: NavalgoColors.deepSea,
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      body,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
         );
       },
     );

@@ -8,6 +8,7 @@ import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import 'client_vessels_screen.dart';
 
 class ClientBudgetsScreen extends StatefulWidget {
   const ClientBudgetsScreen({super.key});
@@ -67,8 +68,16 @@ class _ClientBudgetsScreenState extends State<ClientBudgetsScreen> {
     }
   }
 
-  Future<void> _openPdf(String pdfUrl) async {
-    final uri = Uri.tryParse(pdfUrl);
+  Future<void> _openBudget(Budget budget) async {
+    final vessel = await ensureClientHasVessel(
+      context,
+      suggestedVesselName: budget.vesselName,
+    );
+    if (!mounted || vessel == null) {
+      return;
+    }
+
+    final uri = Uri.tryParse(budget.pdfUrl);
     if (uri == null) {
       AppToast.error(context, 'No se pudo abrir el presupuesto.');
       return;
@@ -238,7 +247,7 @@ class _ClientBudgetsScreenState extends State<ClientBudgetsScreen> {
                   child: _ClientBudgetCard(
                     budget: budget,
                     saving: _isSaving,
-                    onOpenPdf: () => _openPdf(budget.pdfUrl),
+                    onOpenPdf: () => _openBudget(budget),
                     onAccept: budget.status == 'SENT'
                         ? () => _respondToBudget(budget, 'ACCEPTED')
                         : null,

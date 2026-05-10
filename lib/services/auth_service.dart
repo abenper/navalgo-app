@@ -32,10 +32,19 @@ class AuthService {
   Future<void> completeRegistration({
     required String token,
     required String password,
+    String? vesselName,
+    String? vesselRegistrationNumber,
+    String? vesselModel,
   }) async {
     await _apiClient.post(
       '/auth/registration-invitations/complete',
-      body: {'token': token, 'password': password},
+      body: {
+        'token': token,
+        'password': password,
+        'vesselName': vesselName,
+        'vesselRegistrationNumber': vesselRegistrationNumber,
+        'vesselModel': vesselModel,
+      },
     );
   }
 
@@ -44,6 +53,9 @@ class AuthService {
     required String email,
     required String password,
     String? phone,
+    String? vesselName,
+    String? vesselRegistrationNumber,
+    String? vesselModel,
   }) async {
     await _apiClient.post(
       '/auth/clients/signup',
@@ -52,6 +64,9 @@ class AuthService {
         'email': email,
         'password': password,
         'phone': phone,
+        'vesselName': vesselName,
+        'vesselRegistrationNumber': vesselRegistrationNumber,
+        'vesselModel': vesselModel,
       },
     );
   }
@@ -242,7 +257,8 @@ class AuthService {
       if (serverMessage == 'Usuario inactivo') {
         return 'Tu cuenta está desactivada. Contacta con el administrador.';
       }
-      if (serverMessage == 'Debes confirmar tu correo electronico antes de iniciar sesion') {
+      if (serverMessage ==
+          'Debes confirmar tu correo electronico antes de iniciar sesion') {
         return 'Debes confirmar tu correo electrónico antes de iniciar sesión.';
       }
     }

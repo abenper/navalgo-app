@@ -28,6 +28,10 @@ class CompleteRegistrationScreen extends StatefulWidget {
 
 class _CompleteRegistrationScreenState
     extends State<CompleteRegistrationScreen> {
+  final TextEditingController _vesselNameController = TextEditingController();
+  final TextEditingController _vesselRegistrationController =
+      TextEditingController();
+  final TextEditingController _vesselModelController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController =
       TextEditingController();
@@ -49,6 +53,9 @@ class _CompleteRegistrationScreenState
 
   @override
   void dispose() {
+    _vesselNameController.dispose();
+    _vesselRegistrationController.dispose();
+    _vesselModelController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -102,6 +109,11 @@ class _CompleteRegistrationScreenState
       await context.read<AuthService>().completeRegistration(
         token: widget.token,
         password: password,
+        vesselName: _vesselNameController.text.trim(),
+        vesselRegistrationNumber: _vesselRegistrationController.text.trim(),
+        vesselModel: _vesselModelController.text.trim().isEmpty
+            ? null
+            : _vesselModelController.text.trim(),
       );
       if (!mounted) {
         return;
@@ -122,6 +134,10 @@ class _CompleteRegistrationScreenState
   }
 
   String? _validatePassword(String password, String confirmPassword) {
+    if (_vesselNameController.text.trim().isEmpty ||
+        _vesselRegistrationController.text.trim().isEmpty) {
+      return 'Indica el nombre y la matrícula de la embarcación.';
+    }
     if (password.length < 12) {
       return 'La contraseña debe tener al menos 12 caracteres.';
     }
@@ -184,6 +200,10 @@ class _CompleteRegistrationScreenState
                   else
                     _RegistrationCard(
                       invitationInfo: _invitationInfo!,
+                      vesselNameController: _vesselNameController,
+                      vesselRegistrationController:
+                          _vesselRegistrationController,
+                      vesselModelController: _vesselModelController,
                       passwordController: _passwordController,
                       confirmPasswordController: _confirmPasswordController,
                       obscurePassword: _obscurePassword,
@@ -311,6 +331,9 @@ class _SuccessCard extends StatelessWidget {
 class _RegistrationCard extends StatelessWidget {
   const _RegistrationCard({
     required this.invitationInfo,
+    required this.vesselNameController,
+    required this.vesselRegistrationController,
+    required this.vesselModelController,
     required this.passwordController,
     required this.confirmPasswordController,
     required this.obscurePassword,
@@ -323,6 +346,9 @@ class _RegistrationCard extends StatelessWidget {
   });
 
   final RegistrationInvitationInfo invitationInfo;
+  final TextEditingController vesselNameController;
+  final TextEditingController vesselRegistrationController;
+  final TextEditingController vesselModelController;
   final TextEditingController passwordController;
   final TextEditingController confirmPasswordController;
   final bool obscurePassword;
@@ -353,6 +379,33 @@ class _RegistrationCard extends StatelessWidget {
             Text(
               'Enlace válido hasta ${_formatDateTime(invitationInfo.expiresAt)}',
               style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: vesselNameController,
+              enabled: !isSubmitting,
+              decoration: const InputDecoration(
+                labelText: 'Nombre de la embarcación',
+                prefixIcon: Icon(Icons.directions_boat_outlined),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: vesselRegistrationController,
+              enabled: !isSubmitting,
+              decoration: const InputDecoration(
+                labelText: 'Matrícula de la embarcación',
+                prefixIcon: Icon(Icons.badge_outlined),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: vesselModelController,
+              enabled: !isSubmitting,
+              decoration: const InputDecoration(
+                labelText: 'Modelo de la embarcación',
+                prefixIcon: Icon(Icons.precision_manufacturing_outlined),
+              ),
             ),
             const SizedBox(height: 20),
             TextField(

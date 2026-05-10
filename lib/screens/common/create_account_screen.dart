@@ -33,6 +33,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
+  final _vesselNameCtrl = TextEditingController();
+  final _vesselRegistrationCtrl = TextEditingController();
+  final _vesselModelCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
   final _confirmCtrl = TextEditingController();
   bool _acceptedPrivacy = false;
@@ -52,6 +55,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _phoneCtrl.dispose();
+    _vesselNameCtrl.dispose();
+    _vesselRegistrationCtrl.dispose();
+    _vesselModelCtrl.dispose();
     _passwordCtrl.dispose();
     _confirmCtrl.dispose();
     super.dispose();
@@ -61,10 +67,20 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     final name = _nameCtrl.text.trim();
     final email = _emailCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
+    final vesselName = _vesselNameCtrl.text.trim();
+    final vesselRegistration = _vesselRegistrationCtrl.text.trim();
+    final vesselModel = _vesselModelCtrl.text.trim();
     final password = _passwordCtrl.text;
     final confirm = _confirmCtrl.text;
 
-    final validation = _validate(name, email, password, confirm);
+    final validation = _validate(
+      name,
+      email,
+      vesselName,
+      vesselRegistration,
+      password,
+      confirm,
+    );
     if (validation != null) {
       setState(() {
         _error = validation;
@@ -83,6 +99,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
         email: email,
         password: password,
         phone: phone.isEmpty ? null : phone,
+        vesselName: vesselName,
+        vesselRegistrationNumber: vesselRegistration,
+        vesselModel: vesselModel.isEmpty ? null : vesselModel,
       );
       if (!mounted) {
         return;
@@ -105,6 +124,8 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
   String? _validate(
     String name,
     String email,
+    String vesselName,
+    String vesselRegistration,
     String password,
     String confirm,
   ) {
@@ -113,6 +134,9 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
     }
     if (!email.contains('@')) {
       return 'Introduce un correo electrónico válido.';
+    }
+    if (vesselName.isEmpty || vesselRegistration.isEmpty) {
+      return 'Indica el nombre y la matrícula de la embarcación.';
     }
     if (password.length < 12 ||
         !RegExp(r'[A-Z]').hasMatch(password) ||
@@ -199,6 +223,27 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                         ),
                         const SizedBox(height: 12),
                         TextField(
+                          controller: _vesselNameCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Nombre de la embarcación',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _vesselRegistrationCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Matrícula de la embarcación',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: _vesselModelCtrl,
+                          decoration: const InputDecoration(
+                            labelText: 'Modelo de la embarcación',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextField(
                           controller: _passwordCtrl,
                           obscureText: true,
                           decoration: const InputDecoration(
@@ -235,10 +280,11 @@ class _CreateAccountScreenState extends State<CreateAccountScreen> {
                                 : () {
                                     Navigator.of(context).push(
                                       MaterialPageRoute(
-                                        builder: (_) => const PrivacyPolicyScreen(
-                                          initialAudience:
-                                              PrivacyAudience.client,
-                                        ),
+                                        builder: (_) =>
+                                            const PrivacyPolicyScreen(
+                                              initialAudience:
+                                                  PrivacyAudience.client,
+                                            ),
                                       ),
                                     );
                                   },
