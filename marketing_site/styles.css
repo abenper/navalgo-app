@@ -253,9 +253,9 @@ a {
 }
 
 .hero-card h1 {
-  max-width: 10ch;
-  font-size: clamp(2.45rem, 10vw, 5rem);
-  line-height: 0.96;
+  max-width: 9.6ch;
+  font-size: clamp(2.35rem, 8vw, 5rem);
+  line-height: 0.94;
 }
 
 .hero-text,
@@ -267,10 +267,10 @@ a {
 }
 
 .hero-text {
-  max-width: 40ch;
+  max-width: 46ch;
   margin: 16px 0 0;
   font-size: 1rem;
-  line-height: 1.7;
+  line-height: 1.62;
 }
 
 .hero-list {
@@ -284,7 +284,7 @@ a {
 .hero-list li {
   position: relative;
   padding-left: 26px;
-  line-height: 1.55;
+  line-height: 1.48;
   color: #edf6f8;
 }
 
@@ -605,6 +605,12 @@ a {
   margin-top: 22px;
 }
 
+.before-after-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 22px;
+}
+
 .feature-card,
 .role-card,
 .module-card,
@@ -615,11 +621,97 @@ a {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.state-card {
+  padding: 24px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.state-card-alert {
+  background: linear-gradient(180deg, rgba(255, 125, 115, 0.08), rgba(255, 255, 255, 0.03));
+}
+
+.state-card-calm {
+  background: linear-gradient(180deg, rgba(99, 214, 203, 0.1), rgba(255, 255, 255, 0.03));
+}
+
+.state-label {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.state-card-alert .state-label {
+  color: #ffd7d4;
+  background: rgba(255, 125, 115, 0.14);
+}
+
+.state-card-calm .state-label {
+  color: #d8fffb;
+  background: rgba(99, 214, 203, 0.16);
+}
+
+.state-list {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.state-list li {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  line-height: 1.55;
+  color: #eef6f8;
+}
+
+.state-list li::before {
+  width: 20px;
+  flex: 0 0 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.state-card-alert .state-list li::before {
+  content: "×";
+  color: var(--coral);
+}
+
+.state-card-calm .state-list li::before {
+  content: "✓";
+  color: var(--accent);
+}
+
 .feature-card-featured,
 .role-card-featured,
 .security-card-featured,
 .price-card-featured {
   background: linear-gradient(180deg, rgba(99, 214, 203, 0.13), rgba(255, 255, 255, 0.04));
+}
+
+.benefit-card {
+  min-height: 100%;
+}
+
+.benefit-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 14px;
+  color: #06252c;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), #9cf7ee);
 }
 
 .feature-kicker {
@@ -669,6 +761,81 @@ a {
 .module-card strong {
   display: block;
   font-family: "Sora", sans-serif;
+}
+
+.workflow-flow {
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+  align-items: center;
+}
+
+.workflow-old,
+.workflow-new {
+  padding: 22px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.workflow-old {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.workflow-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border-radius: 18px;
+  color: var(--accent);
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: rgba(99, 214, 203, 0.08);
+}
+
+.workflow-new {
+  text-align: center;
+}
+
+.workflow-new strong {
+  display: block;
+  margin-top: 16px;
+  font-family: "Sora", sans-serif;
+  font-size: 1.05rem;
+  line-height: 1.4;
+}
+
+.workflow-new p {
+  max-width: 44ch;
+  margin: 12px auto 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.tool-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.tool-chip-old {
+  color: #ffd8d5;
+  border: 1px solid rgba(255, 125, 115, 0.28);
+  background: rgba(255, 125, 115, 0.08);
+  text-decoration: line-through;
+  text-decoration-thickness: 2px;
+}
+
+.tool-chip-new {
+  color: #052129;
+  background: linear-gradient(135deg, var(--accent), #9cf7ee);
 }
 
 .check-list {
@@ -870,8 +1037,19 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .before-after-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .case-block .feature-grid > .feature-card:last-child {
+    grid-column: 1 / -1;
+    justify-self: center;
+    width: 100%;
+    max-width: calc((100% - 14px) / 2);
   }
 
   .role-card-featured,
@@ -883,6 +1061,10 @@ a {
   .cta-band {
     grid-template-columns: 1.2fr 0.9fr;
     align-items: center;
+  }
+
+  .workflow-flow {
+    grid-template-columns: minmax(0, 1fr) 88px minmax(0, 1.15fr);
   }
 
   .footer-top {
@@ -1002,8 +1184,8 @@ a {
   }
 
   .hero-card h1 {
-    max-width: 11ch;
-    font-size: clamp(3.6rem, 5.2vw, 5.9rem);
+    max-width: 9.8ch;
+    font-size: clamp(3.4rem, 4.8vw, 5.4rem);
   }
 
   .hero-text {
@@ -1057,6 +1239,10 @@ a {
 
   .roles-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .benefits-block .roles-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .modules-grid {
@@ -1116,8 +1302,8 @@ a {
   }
 
   .hero-card h1 {
-    max-width: 9.5ch;
-    font-size: clamp(3.4rem, 7vw, 5rem);
+    max-width: 10ch;
+    font-size: clamp(3rem, 6vw, 4.6rem);
   }
 
   .hero-text {
@@ -1292,22 +1478,21 @@ a {
   .hero-card {
     width: 100%;
     max-width: 100%;
-    padding: 16px 12px 14px;
+    padding: 18px 14px 16px;
     border-radius: 24px;
   }
 
   .hero-card h1 {
-    max-width: 8.6ch;
-    font-size: clamp(1.92rem, 9vw, 2.85rem);
-    line-height: 0.98;
+    max-width: 9.4ch;
+    font-size: clamp(2.12rem, 8.4vw, 3.05rem);
+    line-height: 0.95;
   }
 
   .hero-text {
-    max-width: 28ch;
+    max-width: 34ch;
     margin-top: 14px;
-    font-size: 0.88rem;
-    line-height: 1.55;
-    overflow-wrap: anywhere;
+    font-size: 0.93rem;
+    line-height: 1.58;
   }
 
   .hero-list {
@@ -1316,9 +1501,8 @@ a {
   }
 
   .hero-list li {
-    line-height: 1.38;
-    font-size: 0.86rem;
-    overflow-wrap: anywhere;
+    line-height: 1.42;
+    font-size: 0.89rem;
   }
 
   .hero-list li:nth-child(4) {
@@ -1346,8 +1530,7 @@ a {
   .hero-tag-row span {
     width: 100%;
     justify-content: center;
-    overflow-wrap: anywhere;
-    font-size: 0.84rem;
+    font-size: 0.86rem;
   }
 
   .hero-tag-row span:last-child {
@@ -1516,12 +1699,12 @@ a {
 
 @media (max-width: 420px) {
   .hero-card h1 {
-    max-width: 8.1ch;
-    font-size: clamp(1.82rem, 9.2vw, 2.6rem);
+    max-width: 9ch;
+    font-size: clamp(2rem, 8.8vw, 2.7rem);
   }
 
   .hero-text {
-    max-width: 26ch;
+    max-width: 31ch;
   }
 
   .device-shell {
