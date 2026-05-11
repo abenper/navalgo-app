@@ -141,7 +141,7 @@ public class ResendEmailService {
         payload.put("subject", "Confirma tu cuenta");
         payload.put("html", buildEmailVerificationHtml(clientName, verificationLink, privacyPolicyLink));
         payload.put("text", buildEmailVerificationText(clientName, verificationLink, privacyPolicyLink));
-        return sendEmail(payload, "No se pudo enviar el email de verificacion");
+        return sendEmail(payload, "No se pudo enviar el email de verificación");
     }
 
     public boolean sendPasswordReset(String accountName,
@@ -150,10 +150,10 @@ public class ResendEmailService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("from", fromAddress);
         payload.put("to", List.of(accountEmail));
-        payload.put("subject", "Restablece tu contrasena");
+        payload.put("subject", "Restablece tu contraseña");
         payload.put("html", buildPasswordResetHtml(accountName, resetLink));
         payload.put("text", buildPasswordResetText(accountName, resetLink));
-        return sendEmail(payload, "No se pudo enviar el email para restablecer la contrasena");
+        return sendEmail(payload, "No se pudo enviar el email para restablecer la contraseña");
     }
 
     private boolean sendEmail(Map<String, Object> payload, String failureMessage) {
@@ -538,12 +538,12 @@ public class ResendEmailService {
     private String buildPasswordResetHtml(String accountName, String resetLink) {
         return """
                 <div style="font-family:Arial,sans-serif;line-height:1.6;color:#17324d;">
-                  <h2 style="margin-bottom:12px;">Restablece tu contrasena</h2>
+                  <h2 style="margin-bottom:12px;">Restablece tu contraseña</h2>
                   <p>Hola, %s:</p>
-                  <p>Hemos recibido una solicitud para cambiar la contrasena de tu cuenta en Naval-GO.</p>
+                  <p>Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Naval-GO.</p>
                   <p style="margin:24px 0;">
                     <a href="%s" style="background:#0f5d8c;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:8px;display:inline-block;font-weight:700;">
-                      Cambiar contrasena
+                      Cambiar contraseña
                     </a>
                   </p>
                   <p>Si el boton no funciona, copia y pega esta URL en tu navegador:</p>
@@ -563,7 +563,7 @@ public class ResendEmailService {
         return """
                 Hola, %s:
 
-                Hemos recibido una solicitud para cambiar la contrasena de tu cuenta en Naval-GO.
+                Hemos recibido una solicitud para cambiar la contraseña de tu cuenta en Naval-GO.
                 Usa este enlace:
                 %s
 
