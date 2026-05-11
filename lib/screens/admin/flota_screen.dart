@@ -964,15 +964,27 @@ class _OwnerDialogState extends State<_OwnerDialog> {
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
-              label: 'Documento (DNI/NIF)',
+              label: _type == 'COMPANY'
+                  ? 'Documento (CIF/NIF)'
+                  : 'Documento (DNI/NIF)',
               child: TextFormField(
                 controller: _docCtrl,
                 textInputAction: TextInputAction.next,
                 decoration: NavalgoFormStyles.inputDecoration(
                   context,
-                  label: 'Documento (DNI/NIF)',
+                  label: _type == 'COMPANY'
+                      ? 'Documento (CIF/NIF)'
+                      : 'Documento (DNI/NIF)',
                   prefixIcon: const Icon(Icons.description_outlined),
                 ),
+                validator: (value) {
+                  if ((value?.trim() ?? '').isEmpty) {
+                    return _type == 'COMPANY'
+                        ? 'Indica el CIF o NIF de la empresa.'
+                        : 'Indica el DNI o NIF del cliente.';
+                  }
+                  return null;
+                },
               ),
             ),
             const SizedBox(height: 14),

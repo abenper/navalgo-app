@@ -24,6 +24,11 @@ class ApiException implements Exception {
       return message;
     }
 
+    final validationMessage = _extractValidationMessage();
+    if (validationMessage != null && validationMessage.isNotEmpty) {
+      return validationMessage;
+    }
+
     final normalized = (serverMessage ?? details ?? '').trim().toLowerCase();
     if (normalized.isNotEmpty) {
       if (normalized.contains('ya existe una cuenta con ese correo')) {
@@ -69,6 +74,36 @@ class ApiException implements Exception {
     }
 
     return message;
+  }
+
+  String? _extractValidationMessage() {
+    final raw = details?.trim();
+    if (raw == null || raw.isEmpty) {
+      return null;
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+
+      final fieldErrors = decoded['fieldErrors'];
+      if (fieldErrors is! Map) {
+        return null;
+      }
+
+      for (final entry in fieldErrors.entries) {
+        final value = entry.value?.toString().trim();
+        if (value != null && value.isNotEmpty) {
+          return value;
+        }
+      }
+    } catch (_) {
+      return null;
+    }
+
+    return null;
   }
 
   String? get serverMessage {
