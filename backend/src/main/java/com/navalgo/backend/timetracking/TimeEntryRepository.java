@@ -21,4 +21,5 @@ public interface TimeEntryRepository extends JpaRepository<TimeEntry, Long> {
     );
     List<TimeEntry> findByClockOutIsNullOrderByClockInAsc();
     List<TimeEntry> findByClockOutIsNullAndPlannedClockOutLessThanEqualOrderByPlannedClockOutAsc(Instant cutoff);
+    void deleteByWorkerId(Long workerId);
 }

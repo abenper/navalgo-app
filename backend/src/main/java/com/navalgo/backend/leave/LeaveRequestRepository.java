@@ -17,4 +17,5 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequestEntity
             LocalDate endDateInclusive,
             LocalDate startDateInclusive
     );
+    void deleteByWorkerId(Long workerId);
 }

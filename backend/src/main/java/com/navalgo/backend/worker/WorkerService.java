@@ -1,15 +1,28 @@
 package com.navalgo.backend.worker;
 
+import com.navalgo.backend.auth.EmailVerificationTokenRepository;
+import com.navalgo.backend.auth.PasswordResetTokenRepository;
 import com.navalgo.backend.auth.RefreshTokenService;
+import com.navalgo.backend.auth.RefreshTokenRepository;
 import com.navalgo.backend.auth.RegistrationInvitation;
 import com.navalgo.backend.auth.RegistrationInvitationRepository;
 import com.navalgo.backend.auth.RegistrationInvitationService;
+import com.navalgo.backend.budget.BudgetRepository;
 import com.navalgo.backend.common.InputSanitizer;
 import com.navalgo.backend.common.Role;
+import com.navalgo.backend.leave.LeaveRequestRepository;
+import com.navalgo.backend.notification.NotificationRepository;
+import com.navalgo.backend.notification.WorkerPushTokenRepository;
+import com.navalgo.backend.timetracking.TimeAdjustmentRequestRepository;
+import com.navalgo.backend.timetracking.TimeEntryRepository;
+import com.navalgo.backend.workorder.MaterialRevisionRequestRepository;
+import com.navalgo.backend.workorder.WorkOrderAttachmentRepository;
+import com.navalgo.backend.workorder.WorkOrderChecklistItemRepository;
 import com.navalgo.backend.workorder.WorkOrderRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
@@ -26,27 +39,63 @@ public class WorkerService {
     private final WorkerRepository workerRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final WorkOrderRepository workOrderRepository;
     private final InputSanitizer inputSanitizer;
     private final RegistrationInvitationService registrationInvitationService;
     private final RegistrationInvitationRepository registrationInvitationRepository;
+    private final EmailVerificationTokenRepository emailVerificationTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final NotificationRepository notificationRepository;
+    private final WorkerPushTokenRepository workerPushTokenRepository;
+    private final LeaveRequestRepository leaveRequestRepository;
+    private final TimeAdjustmentRequestRepository timeAdjustmentRequestRepository;
+    private final TimeEntryRepository timeEntryRepository;
+    private final WorkOrderAttachmentRepository workOrderAttachmentRepository;
+    private final WorkOrderChecklistItemRepository workOrderChecklistItemRepository;
+    private final MaterialRevisionRequestRepository materialRevisionRequestRepository;
+    private final BudgetRepository budgetRepository;
     private final SecureRandom secureRandom = new SecureRandom();
     private static final String PASSWORD_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789@#$%";
 
     public WorkerService(WorkerRepository workerRepository,
                          PasswordEncoder passwordEncoder,
                          RefreshTokenService refreshTokenService,
+                         RefreshTokenRepository refreshTokenRepository,
                          WorkOrderRepository workOrderRepository,
                          InputSanitizer inputSanitizer,
                          RegistrationInvitationService registrationInvitationService,
-                         RegistrationInvitationRepository registrationInvitationRepository) {
+                         RegistrationInvitationRepository registrationInvitationRepository,
+                         EmailVerificationTokenRepository emailVerificationTokenRepository,
+                         PasswordResetTokenRepository passwordResetTokenRepository,
+                         NotificationRepository notificationRepository,
+                         WorkerPushTokenRepository workerPushTokenRepository,
+                         LeaveRequestRepository leaveRequestRepository,
+                         TimeAdjustmentRequestRepository timeAdjustmentRequestRepository,
+                         TimeEntryRepository timeEntryRepository,
+                         WorkOrderAttachmentRepository workOrderAttachmentRepository,
+                         WorkOrderChecklistItemRepository workOrderChecklistItemRepository,
+                         MaterialRevisionRequestRepository materialRevisionRequestRepository,
+                         BudgetRepository budgetRepository) {
         this.workerRepository = workerRepository;
         this.passwordEncoder = passwordEncoder;
         this.refreshTokenService = refreshTokenService;
+        this.refreshTokenRepository = refreshTokenRepository;
         this.workOrderRepository = workOrderRepository;
         this.inputSanitizer = inputSanitizer;
         this.registrationInvitationService = registrationInvitationService;
         this.registrationInvitationRepository = registrationInvitationRepository;
+        this.emailVerificationTokenRepository = emailVerificationTokenRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.notificationRepository = notificationRepository;
+        this.workerPushTokenRepository = workerPushTokenRepository;
+        this.leaveRequestRepository = leaveRequestRepository;
+        this.timeAdjustmentRequestRepository = timeAdjustmentRequestRepository;
+        this.timeEntryRepository = timeEntryRepository;
+        this.workOrderAttachmentRepository = workOrderAttachmentRepository;
+        this.workOrderChecklistItemRepository = workOrderChecklistItemRepository;
+        this.materialRevisionRequestRepository = materialRevisionRequestRepository;
+        this.budgetRepository = budgetRepository;
     }
 
     public List<WorkerDto> findAll() {
@@ -133,10 +182,32 @@ public class WorkerService {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
         ensureCanManageTarget(worker, requesterEmail);
+        ensureNoProtectedBusinessHistory(workerId);
+
         refreshTokenService.revokeAllForWorker(workerId);
+        registrationInvitationRepository.deleteByWorker_Id(workerId);
+        emailVerificationTokenRepository.deleteByWorker_Id(workerId);
+        passwordResetTokenRepository.deleteByWorker_Id(workerId);
+        refreshTokenRepository.deleteByWorkerId(workerId);
+        workerPushTokenRepository.deleteByWorkerId(workerId);
+        notificationRepository.deleteByWorkerId(workerId);
         workOrderRepository.removeWorkerFromAllWorkOrders(workerId);
         workOrderRepository.clearSignedByWorker(workerId);
-        workerRepository.deleteById(workerId);
+        workOrderAttachmentRepository.clearUploadedByWorker(workerId);
+        workOrderChecklistItemRepository.clearCheckedByWorker(workerId);
+        timeAdjustmentRequestRepository.clearReviewedByWorker(workerId);
+        materialRevisionRequestRepository.clearReviewedByWorker(workerId);
+        timeAdjustmentRequestRepository.deleteByWorkerId(workerId);
+        leaveRequestRepository.deleteByWorkerId(workerId);
+        timeEntryRepository.deleteByWorkerId(workerId);
+        try {
+            workerRepository.delete(worker);
+            workerRepository.flush();
+        } catch (DataIntegrityViolationException exception) {
+            throw new IllegalArgumentException(
+                    "No se puede eliminar el trabajador porque conserva historico de negocio asociado. Desactivalo si necesitas mantener esa trazabilidad."
+            );
+        }
     }
 
     @Transactional
@@ -237,6 +308,29 @@ public class WorkerService {
         if (target.getRole() == Role.ADMIN && !isSuperAdmin(requesterEmail)) {
             throw new org.springframework.security.access.AccessDeniedException("Solo el superadmin puede modificar cuentas de administrador");
         }
+    }
+
+    private void ensureNoProtectedBusinessHistory(Long workerId) {
+        boolean hasCreatedBudgets = budgetRepository.existsByCreatedByWorkerId(workerId);
+        boolean hasRequestedMaterialRevisions = materialRevisionRequestRepository.existsByRequestedByWorkerId(workerId);
+
+        if (!hasCreatedBudgets && !hasRequestedMaterialRevisions) {
+            return;
+        }
+
+        if (hasCreatedBudgets && hasRequestedMaterialRevisions) {
+            throw new IllegalArgumentException(
+                    "No se puede eliminar el trabajador porque ha creado presupuestos y solicitudes de revision de material. Desactivalo si necesitas conservar ese historico."
+            );
+        }
+        if (hasCreatedBudgets) {
+            throw new IllegalArgumentException(
+                    "No se puede eliminar el trabajador porque ha creado presupuestos. Desactivalo si necesitas conservar ese historico."
+            );
+        }
+        throw new IllegalArgumentException(
+                "No se puede eliminar el trabajador porque ha creado solicitudes de revision de material. Desactivalo si necesitas conservar ese historico."
+        );
     }
 
     private boolean isSuperAdmin(String email) {

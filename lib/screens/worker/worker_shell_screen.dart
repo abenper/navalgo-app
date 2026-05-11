@@ -17,7 +17,7 @@ import '../commercial/commercial_shell_screen.dart';
 import '../common/login_screen.dart';
 import '../common/privacy_policy_screen.dart';
 import 'fichaje_screen.dart';
-import 'vacaciones_screen.dart';
+import 'ausencias_screen.dart';
 import 'worker_dashboard_screen.dart';
 
 class WorkerShellScreen extends StatefulWidget {

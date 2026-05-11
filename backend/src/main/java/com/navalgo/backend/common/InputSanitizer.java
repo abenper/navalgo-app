@@ -44,6 +44,18 @@ public class InputSanitizer {
         return normalized;
     }
 
+    public String optionalEmail(String value) {
+        String normalized = optionalText(value, 255);
+        if (normalized == null) {
+            return null;
+        }
+        normalized = normalized.toLowerCase(Locale.ROOT);
+        if (!normalized.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
+            throw new IllegalArgumentException("El email no es valido");
+        }
+        return normalized;
+    }
+
     public String optionalUrl(String value, int maxLength) {
         String normalized = optionalText(value, maxLength);
         if (normalized == null) {

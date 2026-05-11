@@ -81,7 +81,7 @@ public class FleetController {
         owner.setDisplayName(inputSanitizer.requiredText(request.displayName(), "El nombre del propietario", 255));
         owner.setDocumentId(inputSanitizer.requiredText(request.documentId(), "El documento", 255));
         owner.setPhone(inputSanitizer.optionalText(request.phone(), 255));
-        String normalizedEmail = inputSanitizer.email(request.email());
+        String normalizedEmail = normalizeOwnerEmail(request.type(), request.email());
         ensureOwnerEmailAvailable(normalizedEmail, owner.getId());
         owner.setEmail(normalizedEmail);
 
@@ -127,7 +127,7 @@ public class FleetController {
         owner.setDisplayName(inputSanitizer.requiredText(request.displayName(), "El nombre del propietario", 255));
         owner.setDocumentId(inputSanitizer.requiredText(request.documentId(), "El documento", 255));
         owner.setPhone(inputSanitizer.optionalText(request.phone(), 255));
-        String normalizedEmail = inputSanitizer.email(request.email());
+        String normalizedEmail = normalizeOwnerEmail(request.type(), request.email());
         ensureOwnerEmailAvailable(normalizedEmail, owner.getId());
         owner.setEmail(normalizedEmail);
 
@@ -470,12 +470,22 @@ public class FleetController {
     }
 
     private void ensureOwnerEmailAvailable(String email, Long ownerId) {
+        if (email == null || email.isBlank()) {
+            return;
+        }
         boolean exists = ownerId == null
                 ? ownerRepository.existsByEmailIgnoreCaseAndArchivedFalse(email)
                 : ownerRepository.existsByEmailIgnoreCaseAndIdNotAndArchivedFalse(email, ownerId);
         if (exists) {
             throw new IllegalArgumentException("Ya existe un cliente con ese correo electronico");
         }
+    }
+
+    private String normalizeOwnerEmail(OwnerType ownerType, String email) {
+        if (ownerType == OwnerType.COMPANY) {
+            return inputSanitizer.optionalEmail(email);
+        }
+        return inputSanitizer.email(email);
     }
 
     private void archiveOwner(Owner owner, List<Vessel> activeVessels) {

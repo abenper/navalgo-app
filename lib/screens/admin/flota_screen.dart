@@ -833,14 +833,14 @@ class _OwnerInput {
     required this.displayName,
     required this.documentId,
     this.phone,
-    required this.email,
+    this.email,
   });
 
   final String type;
   final String displayName;
   final String documentId;
   final String? phone;
-  final String email;
+  final String? email;
 }
 
 class _OwnerDialog extends StatefulWidget {
@@ -905,16 +905,18 @@ class _OwnerDialogState extends State<_OwnerDialog> {
 
             Navigator.pop(
               context,
-              _OwnerInput(
-                type: _type,
-                displayName: _nameCtrl.text.trim(),
-                documentId: _docCtrl.text.trim(),
-                phone: _phoneCtrl.text.trim().isEmpty
-                    ? null
-                    : _phoneCtrl.text.trim(),
-                email: _emailCtrl.text.trim(),
-              ),
-            );
+                _OwnerInput(
+                  type: _type,
+                  displayName: _nameCtrl.text.trim(),
+                  documentId: _docCtrl.text.trim(),
+                  phone: _phoneCtrl.text.trim().isEmpty
+                      ? null
+                      : _phoneCtrl.text.trim(),
+                  email: _emailCtrl.text.trim().isEmpty
+                      ? null
+                      : _emailCtrl.text.trim(),
+                ),
+              );
           },
         ),
       ],
@@ -1001,8 +1003,11 @@ class _OwnerDialogState extends State<_OwnerDialog> {
                 ),
                 validator: (value) {
                   final trimmed = value?.trim() ?? '';
-                  if (trimmed.isEmpty) {
+                  if (trimmed.isEmpty && _type == 'PERSON') {
                     return 'Indica el correo del cliente.';
+                  }
+                  if (trimmed.isEmpty) {
+                    return null;
                   }
                   if (!trimmed.contains('@') || !trimmed.contains('.')) {
                     return 'Introduce un correo válido.';

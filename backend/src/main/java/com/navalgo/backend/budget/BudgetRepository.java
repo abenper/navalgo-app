@@ -10,4 +10,5 @@ public interface BudgetRepository extends JpaRepository<Budget, Long> {
     List<Budget> findByOriginBudgetIdOrderByCreatedAtAsc(Long originBudgetId);
     boolean existsByOwnerId(Long ownerId);
     boolean existsByVesselId(Long vesselId);
+    boolean existsByCreatedByWorkerId(Long workerId);
 }

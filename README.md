@@ -22,6 +22,14 @@ La guía principal está en:
 - `backend/DEPLOYMENT.md`
 - `backend/VPS_DEPLOY.md`
 
+## Documentacion academica
+
+- `docs/pmdm/README.md`
+- `docs/di/README.md`
+- `docs/hlc/README.md`
+- `docs/ada/README.md`
+- `docs/sge/README.md`
+
 ## Desarrollo Flutter
 
 ```bash

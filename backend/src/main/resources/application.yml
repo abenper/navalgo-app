@@ -69,6 +69,11 @@ app:
     service-account-json: ${APP_FIREBASE_SERVICE_ACCOUNT_JSON:}
   auth:
     registration-invitation-ttl-hours: ${APP_AUTH_REGISTRATION_INVITATION_TTL_HOURS:72}
+  retention:
+    read-notifications-days: ${APP_RETENTION_READ_NOTIFICATIONS_DAYS:90}
+    refresh-tokens-days: ${APP_RETENTION_REFRESH_TOKENS_DAYS:30}
+    inactive-push-tokens-days: ${APP_RETENTION_INACTIVE_PUSH_TOKENS_DAYS:90}
+    auth-artifacts-days: ${APP_RETENTION_AUTH_ARTIFACTS_DAYS:30}
   email:
     enabled: ${APP_EMAIL_ENABLED:false}
     from: ${APP_EMAIL_FROM:Naval-GO <no-reply@naval-go.com>}
@@ -81,3 +86,4 @@ app:
     time-tracking-missing-clock-in-cron: ${APP_SCHEDULING_TIME_TRACKING_MISSING_CLOCK_IN_CRON:0 0 8 * * MON-FRI}
     time-tracking-open-shift-reminder-cron: ${APP_SCHEDULING_TIME_TRACKING_OPEN_SHIFT_REMINDER_CRON:0 0 16 * * MON-FRI}
     time-tracking-auto-close-cron: ${APP_SCHEDULING_TIME_TRACKING_AUTO_CLOSE_CRON:0 */5 * * * *}
+    data-retention-cron: ${APP_SCHEDULING_DATA_RETENTION_CRON:0 30 3 1 * *}

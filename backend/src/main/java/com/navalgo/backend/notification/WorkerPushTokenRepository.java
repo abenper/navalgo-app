@@ -2,6 +2,7 @@ package com.navalgo.backend.notification;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -12,4 +13,6 @@ public interface WorkerPushTokenRepository extends JpaRepository<WorkerPushToken
     List<WorkerPushToken> findByWorkerIdAndPlatformAndActiveTrueOrderByLastSeenAtDesc(Long workerId, String platform);
     List<WorkerPushToken> findByActiveTrueOrderByLastSeenAtDesc();
     List<WorkerPushToken> findByTokenIn(Collection<String> tokens);
+    void deleteByWorkerId(Long workerId);
+    long deleteByActiveFalseAndLastSeenAtBefore(Instant lastSeenAt);
 }

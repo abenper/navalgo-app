@@ -12,7 +12,7 @@ class WorkerServiceTransactionTest {
     void createUsesWritableTransaction() throws NoSuchMethodException {
         AnnotationTransactionAttributeSource transactionSource = new AnnotationTransactionAttributeSource();
         TransactionAttribute transactionAttribute = transactionSource.getTransactionAttribute(
-                WorkerService.class.getMethod("create", CreateWorkerRequest.class),
+                WorkerService.class.getMethod("create", CreateWorkerRequest.class, String.class),
                 WorkerService.class
         );
 

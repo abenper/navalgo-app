@@ -17,7 +17,7 @@ import '../common/login_screen.dart';
 import '../common/privacy_policy_screen.dart';
 import 'commercial_budgets_screen.dart';
 import '../worker/fichaje_screen.dart';
-import '../worker/vacaciones_screen.dart';
+import '../worker/ausencias_screen.dart';
 import '../worker/worker_dashboard_screen.dart';
 import '../worker/worker_shell_screen.dart';
 

@@ -8,6 +8,11 @@ import '../models/work_order.dart';
 import 'network/api_client.dart';
 
 class WorkOrderMediaService {
+  WorkOrderMediaService({http.Client? httpClient})
+    : _httpClient = httpClient ?? http.Client();
+
+  final http.Client _httpClient;
+
   /// Upload one file to /work-orders/uploads (web-only, enforced by backend).
   Future<WorkOrderAttachmentItem> uploadMedia(
     String token, {
@@ -55,7 +60,7 @@ class WorkOrderMediaService {
       ),
     );
 
-    final streamed = await request.send();
+    final streamed = await _httpClient.send(request);
     final response = await http.Response.fromStream(streamed);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -109,7 +114,7 @@ class WorkOrderMediaService {
       ),
     );
 
-    final streamed = await request.send();
+    final streamed = await _httpClient.send(request);
     final response = await http.Response.fromStream(streamed);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -162,7 +167,7 @@ class WorkOrderMediaService {
       ),
     );
 
-    final streamed = await request.send();
+    final streamed = await _httpClient.send(request);
     final response = await http.Response.fromStream(streamed);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -225,7 +230,7 @@ class WorkOrderMediaService {
       );
     }
 
-    final streamed = await request.send();
+    final streamed = await _httpClient.send(request);
     final response = await http.Response.fromStream(streamed);
 
     if (response.statusCode < 200 || response.statusCode >= 300) {

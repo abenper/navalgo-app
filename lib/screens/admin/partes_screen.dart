@@ -3389,7 +3389,7 @@ class _WorkerAssignmentListState extends State<_WorkerAssignmentList> {
                 child: filteredWorkers.isEmpty
                     ? Center(
                         child: Text(
-                          'No hay trabajadores que coincidan con la bÃºsqueda.',
+                          'No hay trabajadores que coincidan con la b\u00FAsqueda.',
                           style: Theme.of(context).textTheme.bodyMedium,
                           textAlign: TextAlign.center,
                         ),
@@ -4596,8 +4596,8 @@ class _MaterialTemplateAssignmentFieldState
                                 const SizedBox(height: 4),
                                 Text(
                                   selectedTemplate == null
-                                      ? 'Pulsa para buscar una plantilla por nombre o por tipo de revisiÃ³n.'
-                                      : '${_materialTemplateTypeLabel(selectedTemplate.templateType)} Â· ${selectedTemplate.effectiveItemCount} items',
+                                      ? 'Pulsa para buscar una plantilla por nombre o por tipo de revisi\u00F3n.'
+                                      : '${_materialTemplateTypeLabel(selectedTemplate.templateType)} \u00B7 ${selectedTemplate.effectiveItemCount} items',
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodyMedium

@@ -310,7 +310,9 @@ class _EquipoScreenState extends State<EquipoScreen> {
         return;
       }
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo eliminar: $e')),
+        SnackBar(
+          content: Text('No se pudo eliminar: ${_describeError(e)}'),
+        ),
       );
     }
   }
