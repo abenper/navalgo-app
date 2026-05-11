@@ -29,6 +29,7 @@ La guía principal está en:
 - `docs/hlc/README.md`
 - `docs/ada/README.md`
 - `docs/sge/README.md`
+- `docs/entrega/README.md`
 
 ## Desarrollo Flutter
 
