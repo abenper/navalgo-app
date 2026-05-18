@@ -280,14 +280,6 @@ class _AdminTimeTrackingOverviewScreenState
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              NavalgoPageIntro(
-                eyebrow: 'CONTROL HORARIO',
-                title: 'Vista global de plantilla',
-                subtitle:
-                    'Pensada para inspección y revisión rápida. Solo se resaltan incidencias reales: jornadas abiertas, cierres forzados y ajustes pendientes.',
-                trailing: _OverviewLegend(overview: overview),
-              ),
-              const SizedBox(height: 18),
               _buildMetrics(context, overview),
               const SizedBox(height: 18),
               _buildFilters(context),
@@ -319,45 +311,43 @@ class _AdminTimeTrackingOverviewScreenState
           physics: const NeverScrollableScrollPhysics(),
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: crossAxisCount == 1 ? 2.6 : 1.55,
+          childAspectRatio: crossAxisCount == 1
+              ? 2.4
+              : crossAxisCount == 2
+              ? 1.85
+              : crossAxisCount == 3
+              ? 1.7
+              : 1.55,
           children: [
             NavalgoMetricCard(
               label: 'Trabajadores monitorizados',
               value: '${overview.totalWorkers}',
               icon: const Icon(Icons.groups_2_outlined),
               accent: NavalgoColors.tide,
-              note: 'Incluye perfiles técnicos y comerciales activos.',
             ),
             NavalgoMetricCard(
               label: 'Jornadas abiertas',
               value: '${overview.openShiftWorkers}',
               icon: const Icon(Icons.lock_open_outlined),
               accent: NavalgoColors.kelp,
-              note:
-                  'Trabajadores que siguen con la jornada abierta ahora mismo.',
             ),
             NavalgoMetricCard(
               label: 'Ajustes pendientes',
               value: '${overview.pendingAdjustments}',
               icon: const Icon(Icons.pending_actions_outlined),
               accent: NavalgoColors.sand,
-              note: 'Solicitudes todavía sin revisar por administración.',
             ),
             NavalgoMetricCard(
               label: 'Cierres forzados',
               value: '${overview.forcedClosures}',
               icon: const Icon(Icons.warning_amber_rounded),
               accent: NavalgoColors.coral,
-              note:
-                  'Solo cuenta cierres por olvido o incidencia. Los autocierres normales por hora prevista no aparecen aquí.',
             ),
             NavalgoMetricCard(
               label: 'Trabajadores con incidencias',
               value: '${overview.workersWithIncidents}',
               icon: const Icon(Icons.fact_check_outlined),
               accent: NavalgoColors.harbor,
-              note:
-                  'Suma de jornadas abiertas, cierres forzados o ajustes pendientes.',
             ),
           ],
         );
@@ -687,81 +677,6 @@ class _AuditEvent {
   final DateTime when;
   final String title;
   final String detail;
-}
-
-class _OverviewLegend extends StatelessWidget {
-  const _OverviewLegend({required this.overview});
-
-  final _OverviewData overview;
-
-  @override
-  Widget build(BuildContext context) {
-    return NavalgoPanel(
-      tint: Colors.white.withValues(alpha: 0.12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Lectura rápida',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 10),
-          _LegendLine(
-            label: 'Plantilla visible',
-            value: '${overview.totalWorkers}',
-          ),
-          _LegendLine(
-            label: 'Con incidencias',
-            value: '${overview.workersWithIncidents}',
-          ),
-          _LegendLine(
-            label: 'Ajustes pendientes',
-            value: '${overview.pendingAdjustments}',
-          ),
-          _LegendLine(
-            label: 'Cierres forzados',
-            value: '${overview.forcedClosures}',
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _LegendLine extends StatelessWidget {
-  const _LegendLine({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withValues(alpha: 0.82),
-              ),
-            ),
-          ),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _AuditEventCard extends StatelessWidget {
