@@ -61,4 +61,60 @@ void main() {
     expect(result.workSite, 'WORKSHOP');
     expect(result.plannedClockOut, DateTime.parse('2026-05-11T17:30:00Z'));
   });
+
+  test(
+    'TimeTrackingService.createManualTimeEntry sends expected payload',
+    () async {
+      final clockIn = DateTime.utc(2026, 5, 12, 8, 0);
+      final clockOut = DateTime.utc(2026, 5, 12, 15, 0);
+
+      final client = FakeBaseClient((http.BaseRequest request) async {
+        expect(request.method, 'POST');
+        expect(
+          request.url.toString(),
+          'https://example.com/api/time-entries/admin/manual-entry',
+        );
+        expect(request.headers['Authorization'], 'Bearer admin-token');
+
+        final rawBody = await request.finalize().bytesToString();
+        final body = jsonDecode(rawBody) as Map<String, dynamic>;
+        expect(body['workerId'], 9);
+        expect(body['clockIn'], clockIn.toIso8601String());
+        expect(body['clockOut'], clockOut.toIso8601String());
+        expect(body['plannedClockOut'], clockOut.toIso8601String());
+        expect(body['workSite'], 'WORKSHOP');
+
+        return jsonStreamedResponse(request, <String, dynamic>{
+          'id': 44,
+          'workerId': 9,
+          'workerName': 'Marina Lopez',
+          'clockIn': clockIn.toIso8601String(),
+          'clockOut': clockOut.toIso8601String(),
+          'workSite': 'WORKSHOP',
+          'plannedClockOut': clockOut.toIso8601String(),
+        });
+      });
+
+      final service = TimeTrackingService(
+        apiClient: ApiClient(
+          baseUrl: 'https://example.com/api',
+          httpClient: client,
+        ),
+      );
+
+      final result = await service.createManualTimeEntry(
+        'admin-token',
+        workerId: 9,
+        clockIn: clockIn,
+        clockOut: clockOut,
+        plannedClockOut: clockOut,
+        workSite: 'WORKSHOP',
+      );
+
+      expect(result.id, 44);
+      expect(result.workerId, 9);
+      expect(result.clockIn, clockIn);
+      expect(result.clockOut, clockOut);
+    },
+  );
 }

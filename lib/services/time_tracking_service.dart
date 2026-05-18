@@ -117,6 +117,28 @@ class TimeTrackingService {
     return TimeEntry.fromJson(data as Map<String, dynamic>);
   }
 
+  Future<TimeEntry> createManualTimeEntry(
+    String token, {
+    required int workerId,
+    required DateTime clockIn,
+    required DateTime clockOut,
+    DateTime? plannedClockOut,
+    required String workSite,
+  }) async {
+    final data = await _apiClient.post(
+      '/time-entries/admin/manual-entry',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'workerId': workerId,
+        'clockIn': clockIn.toUtc().toIso8601String(),
+        'clockOut': clockOut.toUtc().toIso8601String(),
+        'plannedClockOut': plannedClockOut?.toUtc().toIso8601String(),
+        'workSite': workSite,
+      },
+    );
+    return TimeEntry.fromJson(data as Map<String, dynamic>);
+  }
+
   Future<List<TimeAdjustmentRequest>> getAdjustmentRequests(
     String token, {
     String? status,

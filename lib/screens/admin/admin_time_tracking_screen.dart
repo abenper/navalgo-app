@@ -109,7 +109,8 @@ class _WorkerJornadaAdjustmentScreenState
   Future<void> _editEntry(TimeEntry entry) async {
     final input = await showDialog<_EditTimeEntryInput>(
       context: context,
-      builder: (context) => _EditTimeEntryDialog(entry: entry, role: widget.worker.role),
+      builder: (context) =>
+          _EditTimeEntryDialog(entry: entry, role: widget.worker.role),
     );
     if (!mounted || input == null) {
       return;
@@ -145,6 +146,68 @@ class _WorkerJornadaAdjustmentScreenState
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  Future<void> _createManualEntry() async {
+    final input = await showDialog<_EditTimeEntryInput>(
+      context: context,
+      builder: (context) => _EditTimeEntryDialog(
+        entry: _buildDraftEntry(),
+        role: widget.worker.role,
+        isCreating: true,
+      ),
+    );
+    if (!mounted || input == null || input.clockOut == null) {
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null || token.isEmpty) {
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      await context.read<TimeTrackingService>().createManualTimeEntry(
+        token,
+        workerId: widget.worker.id,
+        clockIn: input.clockIn,
+        clockOut: input.clockOut!,
+        plannedClockOut: input.plannedClockOut,
+        workSite: input.workSite,
+      );
+      await _load();
+      if (!mounted) {
+        return;
+      }
+      AppToast.success(context, 'Jornada registrada manualmente.');
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      AppToast.error(context, 'No se pudo registrar la jornada: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+  }
+
+  TimeEntry _buildDraftEntry() {
+    final now = DateTime.now();
+    final workDate = DateTime(now.year, now.month, now.day);
+    final defaultClockIn = workDate.add(const Duration(hours: 8));
+    final defaultClockOut = workDate.add(const Duration(hours: 15));
+
+    return TimeEntry(
+      id: 0,
+      workerId: widget.worker.id,
+      workerName: widget.worker.fullName,
+      clockIn: defaultClockIn,
+      clockOut: defaultClockOut,
+      workSite: 'WORKSHOP',
+      plannedClockOut: defaultClockOut,
+    );
   }
 
   Future<void> _reviewAdjustmentRequest(
@@ -349,11 +412,7 @@ class _WorkerJornadaAdjustmentScreenState
               if (stacked)
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    identity,
-                    const SizedBox(height: 16),
-                    score,
-                  ],
+                  children: [identity, const SizedBox(height: 16), score],
                 )
               else
                 Row(
@@ -383,7 +442,9 @@ class _WorkerJornadaAdjustmentScreenState
           color: _isCommercial ? NavalgoColors.harbor : NavalgoColors.tide,
         ),
         NavalgoStatusChip(
-          label: insight.currentlyClockedIn ? 'Jornada abierta' : 'Jornada cerrada',
+          label: insight.currentlyClockedIn
+              ? 'Jornada abierta'
+              : 'Jornada cerrada',
           color: insight.currentlyClockedIn
               ? NavalgoColors.kelp
               : NavalgoColors.storm,
@@ -398,7 +459,10 @@ class _WorkerJornadaAdjustmentScreenState
     );
   }
 
-  Widget _buildQualityFactors(BuildContext context, WorkerTimeTrackingInsight insight) {
+  Widget _buildQualityFactors(
+    BuildContext context,
+    WorkerTimeTrackingInsight insight,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -456,7 +520,9 @@ class _WorkerJornadaAdjustmentScreenState
                   value: '${insight.approvedNonVacationAbsenceDaysThisYear}',
                   icon: const Icon(Icons.event_busy_outlined),
                   accent: NavalgoColors.coral,
-                  note: _absenceComparisonLabel(insight.absenceVsAveragePercent),
+                  note: _absenceComparisonLabel(
+                    insight.absenceVsAveragePercent,
+                  ),
                 ),
               ],
             );
@@ -493,9 +559,8 @@ class _WorkerJornadaAdjustmentScreenState
                       children: [
                         Text(
                           factor.label,
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w900,
-                          ),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w900),
                         ),
                         const SizedBox(height: 4),
                         Text(factor.detail),
@@ -511,7 +576,10 @@ class _WorkerJornadaAdjustmentScreenState
     );
   }
 
-  Widget _buildRoleSummary(BuildContext context, WorkerTimeTrackingInsight insight) {
+  Widget _buildRoleSummary(
+    BuildContext context,
+    WorkerTimeTrackingInsight insight,
+  ) {
     return _isOperationalWorker
         ? _buildOperationalSummary(context, insight)
         : _buildCommercialSummary(context, insight);
@@ -552,8 +620,9 @@ class _WorkerJornadaAdjustmentScreenState
     final todayTarget = 8 * 60.0;
     final monthTarget = 160 * 60.0;
     final yearTarget = 1760 * 60.0;
-    final absenceRatio =
-        (insight.absenceVsAveragePercent.abs() / 100).clamp(0, 1).toDouble();
+    final absenceRatio = (insight.absenceVsAveragePercent.abs() / 100)
+        .clamp(0, 1)
+        .toDouble();
 
     return NavalgoPanel(
       padding: const EdgeInsets.all(20),
@@ -562,9 +631,9 @@ class _WorkerJornadaAdjustmentScreenState
         children: [
           Text(
             'Actividad comercial',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
           ),
           const SizedBox(height: 8),
           Text(
@@ -583,7 +652,10 @@ class _WorkerJornadaAdjustmentScreenState
           _ActivityProgressRow(
             label: 'Ritmo mensual',
             valueLabel: _formatMinutes(insight.workedMinutesThisMonth),
-            progress: (insight.workedMinutesThisMonth / monthTarget).clamp(0, 1),
+            progress: (insight.workedMinutesThisMonth / monthTarget).clamp(
+              0,
+              1,
+            ),
             color: NavalgoColors.harbor,
             caption: 'Objetivo visual de 160 horas',
           ),
@@ -598,7 +670,9 @@ class _WorkerJornadaAdjustmentScreenState
           const SizedBox(height: 14),
           _ActivityProgressRow(
             label: 'Ausencias frente a la media',
-            valueLabel: _absenceComparisonLabel(insight.absenceVsAveragePercent),
+            valueLabel: _absenceComparisonLabel(
+              insight.absenceVsAveragePercent,
+            ),
             progress: absenceRatio,
             color: insight.absenceVsAveragePercent > 0
                 ? NavalgoColors.coral
@@ -621,9 +695,9 @@ class _WorkerJornadaAdjustmentScreenState
               Expanded(
                 child: Text(
                   'Solicitudes pendientes de ajuste',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
               ),
               NavalgoStatusChip(
@@ -655,10 +729,15 @@ class _WorkerJornadaAdjustmentScreenState
                   workDateLabel: _formatAdjustmentDate(request.workDate),
                   requestedHoursLabel:
                       '${requestedClockIn == null ? '--:--' : _formatAdjustmentHour(requestedClockIn)} - ${requestedClockOut == null ? '--:--' : _formatAdjustmentHour(requestedClockOut)}',
-                  workSiteLabel: _workSiteLabel(request.workSite, widget.worker.role),
+                  workSiteLabel: _workSiteLabel(
+                    request.workSite,
+                    widget.worker.role,
+                  ),
                   busy: _adjustmentBusy,
-                  onApprove: () => _reviewAdjustmentRequest(request, approve: true),
-                  onReject: () => _reviewAdjustmentRequest(request, approve: false),
+                  onApprove: () =>
+                      _reviewAdjustmentRequest(request, approve: true),
+                  onReject: () =>
+                      _reviewAdjustmentRequest(request, approve: false),
                 ),
               );
             }),
@@ -668,11 +747,15 @@ class _WorkerJornadaAdjustmentScreenState
   }
 
   Widget _buildEntries(BuildContext context) {
-    final openEntries = _entries.where((entry) => entry.clockOut == null).length;
-    final autoClosedEntries =
-        _entries.where((entry) => entry.autoCloseReason != null).length;
-    final travelEntries =
-        _entries.where((entry) => entry.workSite == 'TRAVEL').length;
+    final openEntries = _entries
+        .where((entry) => entry.clockOut == null)
+        .length;
+    final autoClosedEntries = _entries
+        .where((entry) => entry.autoCloseReason != null)
+        .length;
+    final travelEntries = _entries
+        .where((entry) => entry.workSite == 'TRAVEL')
+        .length;
 
     return NavalgoPanel(
       padding: const EdgeInsets.all(20),
@@ -687,9 +770,9 @@ class _WorkerJornadaAdjustmentScreenState
                   _isCommercial
                       ? 'Jornadas del comercial'
                       : 'Jornadas del trabajador',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
                 ),
               ),
               if (_isSaving)
@@ -728,19 +811,30 @@ class _WorkerJornadaAdjustmentScreenState
             ],
           ),
           const SizedBox(height: 16),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton.icon(
+              onPressed: _isSaving ? null : _createManualEntry,
+              icon: const Icon(Icons.add_alarm_outlined),
+              label: const Text('Registrar jornada manual'),
+            ),
+          ),
+          const SizedBox(height: 16),
           if (_entries.isEmpty)
             Text('Todavía no hay jornadas registradas para este $_roleLabel.')
           else
-            ..._entries.take(45).map(
-              (entry) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _TimeEntryAdminCard(
-                  entry: entry,
-                  onEdit: () => _editEntry(entry),
-                  role: widget.worker.role,
+            ..._entries
+                .take(45)
+                .map(
+                  (entry) => Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: _TimeEntryAdminCard(
+                      entry: entry,
+                      onEdit: () => _editEntry(entry),
+                      role: widget.worker.role,
+                    ),
+                  ),
                 ),
-              ),
-            ),
         ],
       ),
     );
@@ -834,9 +928,9 @@ class _QualityGauge extends StatelessWidget {
               const SizedBox(height: 4),
               Text(
                 'Calidad',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: NavalgoColors.storm,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(color: NavalgoColors.storm),
               ),
             ],
           ),
@@ -937,7 +1031,9 @@ class _HeroScoreCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(child: _QualityGauge(score: score, color: color, compact: true)),
+          Center(
+            child: _QualityGauge(score: score, color: color, compact: true),
+          ),
           const SizedBox(height: 14),
           Text(
             currentlyClockedIn ? 'Jornada abierta' : 'Jornada cerrada',
@@ -948,10 +1044,12 @@ class _HeroScoreCard extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            isCommercial ? 'Seguimiento del perfil comercial' : 'Seguimiento del perfil técnico',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: NavalgoColors.storm,
-            ),
+            isCommercial
+                ? 'Seguimiento del perfil comercial'
+                : 'Seguimiento del perfil técnico',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.storm),
           ),
         ],
       ),
@@ -1005,7 +1103,8 @@ class _ResolvedPeriodCard extends StatelessWidget {
               ),
               _EntrySummaryChip(
                 icon: Icons.insights_outlined,
-                label: '${row.averageWorkedHoursPerOrder.toStringAsFixed(1)} h/parte',
+                label:
+                    '${row.averageWorkedHoursPerOrder.toStringAsFixed(1)} h/parte',
                 color: NavalgoColors.sand,
               ),
             ],
@@ -1017,7 +1116,8 @@ class _ResolvedPeriodCard extends StatelessWidget {
                 '${workedHours.toStringAsFixed(1)} h / ${row.loggedLaborHours.toStringAsFixed(1)} h',
             progress: progress,
             color: NavalgoColors.tide,
-            caption: 'La barra toma como referencia el mayor de los dos valores.',
+            caption:
+                'La barra toma como referencia el mayor de los dos valores.',
           ),
         ],
       ),
@@ -1080,9 +1180,9 @@ class _ActivityProgressRow extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           caption,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: NavalgoColors.storm,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: NavalgoColors.storm),
         ),
       ],
     );
@@ -1204,10 +1304,7 @@ class _TimeEntryAdminCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              NavalgoStatusChip(
-                label: statusLabel,
-                color: statusColor,
-              ),
+              NavalgoStatusChip(label: statusLabel, color: statusColor),
             ],
           ),
           const SizedBox(height: 16),
@@ -1246,7 +1343,7 @@ class _TimeEntryAdminCard extends StatelessWidget {
             NavalgoStatusChip(
               label: entry.autoCloseReason == 'PLANNED_END_TIME'
                   ? 'Autocierre por hora prevista'
-                  : 'Autocierre fin del dia',
+                  : 'Autocierre con salida 15:00',
               color: NavalgoColors.sand,
             ),
           ],
@@ -1420,10 +1517,15 @@ class _EditTimeEntryInput {
 }
 
 class _EditTimeEntryDialog extends StatefulWidget {
-  const _EditTimeEntryDialog({required this.entry, required this.role});
+  const _EditTimeEntryDialog({
+    required this.entry,
+    required this.role,
+    this.isCreating = false,
+  });
 
   final TimeEntry entry;
   final String? role;
+  final bool isCreating;
 
   @override
   State<_EditTimeEntryDialog> createState() => _EditTimeEntryDialogState();
@@ -1529,7 +1631,7 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
       eyebrow: 'CONTROL HORARIO',
-      title: 'Ajustar jornada',
+      title: widget.isCreating ? 'Registrar jornada' : 'Ajustar jornada',
       maxWidth: 620,
       bodyInPanel: false,
       actions: [
@@ -1538,7 +1640,7 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         NavalgoGradientButton(
-          label: 'Guardar ajuste',
+          label: widget.isCreating ? 'Registrar jornada' : 'Guardar ajuste',
           icon: Icons.save_outlined,
           onPressed: _submit,
         ),
@@ -1613,7 +1715,8 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
                         onTap: () async {
                           final picked = await showTimePicker(
                             context: context,
-                            initialTime: _clockOutTime ??
+                            initialTime:
+                                _clockOutTime ??
                                 const TimeOfDay(hour: 17, minute: 0),
                           );
                           if (!mounted || picked == null) {
@@ -1639,7 +1742,8 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
                     onTap: () async {
                       final picked = await showTimePicker(
                         context: context,
-                        initialTime: _plannedClockOutTime ??
+                        initialTime:
+                            _plannedClockOutTime ??
                             const TimeOfDay(hour: 17, minute: 0),
                       );
                       if (!mounted || picked == null) {
@@ -1666,10 +1770,15 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
                     items: [
                       DropdownMenuItem(
                         value: 'WORKSHOP',
-                        child: Text(widget.role == 'COMERCIAL' ? 'Oficina' : 'Taller'),
+                        child: Text(
+                          widget.role == 'COMERCIAL' ? 'Oficina' : 'Taller',
+                        ),
                       ),
                       if (widget.role != 'COMERCIAL')
-                        const DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
+                        const DropdownMenuItem(
+                          value: 'TRAVEL',
+                          child: Text('Viaje'),
+                        ),
                     ],
                     onChanged: (value) {
                       if (value == null) {
@@ -1720,10 +1829,11 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
                         Expanded(
                           child: Text(
                             _error!,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: NavalgoColors.deepSea,
-                              fontWeight: FontWeight.w700,
-                            ),
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: NavalgoColors.deepSea,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
                         ),
                       ],
@@ -1750,14 +1860,29 @@ class _EditTimeEntryDialogState extends State<_EditTimeEntryDialog> {
     }
 
     final clockIn = combine(_clockInTime);
-    final clockOut = _clockOutTime == null ? null : combine(_clockOutTime!);
-    final plannedClockOut = _plannedClockOutTime == null
-        ? null
-        : combine(_plannedClockOutTime!);
+    DateTime? combineEndTime(TimeOfDay? time) {
+      if (time == null) {
+        return null;
+      }
+      var combined = combine(time);
+      if (combined.isBefore(clockIn)) {
+        combined = combined.add(const Duration(days: 1));
+      }
+      return combined;
+    }
+
+    final clockOut = combineEndTime(_clockOutTime);
+    final plannedClockOut = combineEndTime(_plannedClockOutTime);
 
     if (clockOut != null && clockOut.isBefore(clockIn)) {
       setState(() {
         _error = 'La salida no puede ser anterior a la entrada.';
+      });
+      return;
+    }
+    if (widget.isCreating && clockOut == null) {
+      setState(() {
+        _error = 'Para registrar una jornada manual debes indicar la salida.';
       });
       return;
     }
@@ -1802,10 +1927,7 @@ class _TimePickerTile extends StatelessWidget {
 }
 
 class _EditSummaryPill extends StatelessWidget {
-  const _EditSummaryPill({
-    required this.icon,
-    required this.label,
-  });
+  const _EditSummaryPill({required this.icon, required this.label});
 
   final IconData icon;
   final String label;

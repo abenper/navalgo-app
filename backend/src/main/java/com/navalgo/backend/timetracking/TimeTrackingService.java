@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.EnumSet;
 
 @Service
 @Transactional(readOnly = true)
@@ -98,6 +99,31 @@ public class TimeTrackingService {
     }
 
     @Transactional
+    public TimeEntryDto createManualEntry(CreateTimeEntryRequest request) {
+        Worker worker = workerRepository.findById(request.workerId())
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+
+        validateEntryRange(request.clockIn(), request.clockOut(), request.plannedClockOut());
+
+        if (request.clockOut() == null) {
+            throw new IllegalArgumentException(
+                    "Debes indicar la hora de salida para asignar una jornada manual"
+            );
+        }
+
+        TimeEntry entry = new TimeEntry();
+        entry.setWorker(worker);
+        entry.setClockIn(request.clockIn());
+        entry.setClockOut(request.clockOut());
+        entry.setPlannedClockOut(request.plannedClockOut());
+        entry.setWorkSite(request.workSite());
+        entry.setAutoClosedAt(null);
+        entry.setAutoCloseReason(null);
+
+        return TimeEntryDto.from(timeEntryRepository.save(entry));
+    }
+
+    @Transactional
     public TimeEntryDto updateEntry(Long entryId, UpdateTimeEntryRequest request) {
         TimeEntry entry = timeEntryRepository.findById(entryId)
                 .orElseThrow(() -> new EntityNotFoundException("Jornada no encontrada"));
@@ -123,7 +149,9 @@ public class TimeTrackingService {
         Instant now = Instant.now();
         YearMonth currentMonth = YearMonth.from(today);
 
-        List<Worker> workers = workerRepository.findByRoleAndActiveTrueOrderByFullNameAsc(Role.WORKER);
+        List<Worker> workers = workerRepository.findByRoleInAndActiveTrueOrderByFullNameAsc(
+                EnumSet.of(Role.WORKER, Role.COMERCIAL)
+        );
         Map<Long, Long> absenceDaysByWorker = new HashMap<>();
         for (Worker worker : workers) {
             absenceDaysByWorker.put(worker.getId(), calculateApprovedNonVacationAbsenceDaysThisYear(worker.getId(), today));
@@ -147,7 +175,9 @@ public class TimeTrackingService {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
 
-        List<Worker> activeWorkers = workerRepository.findByRoleAndActiveTrueOrderByFullNameAsc(Role.WORKER);
+        List<Worker> activeWorkers = workerRepository.findByRoleInAndActiveTrueOrderByFullNameAsc(
+                EnumSet.of(Role.WORKER, Role.COMERCIAL)
+        );
         Map<Long, Long> absenceDaysByWorker = new HashMap<>();
         Map<Long, Double> throughputByWorker = new HashMap<>();
         Map<Long, Double> signatureCompletionByWorker = new HashMap<>();

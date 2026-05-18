@@ -26,7 +26,8 @@ import java.util.List;
 public class TimeTrackingReminderService {
 
     private static final Logger log = LoggerFactory.getLogger(TimeTrackingReminderService.class);
-    private static final LocalTime FORCE_CLOSE_TIME = LocalTime.of(22, 0);
+    private static final LocalTime FORCE_CLOSE_DEADLINE = LocalTime.of(23, 59);
+    private static final LocalTime FORCE_CLOSE_RECORDED_CLOCK_OUT = LocalTime.of(15, 0);
 
     private final NotificationService notificationService;
     private final TimeEntryRepository timeEntryRepository;
@@ -162,7 +163,10 @@ public class TimeTrackingReminderService {
         for (TimeEntry entry : entries) {
             ZonedDateTime clockInDateTime = entry.getClockIn().atZone(zoneId);
             ZonedDateTime forceCloseAt = clockInDateTime.toLocalDate()
-                    .atTime(FORCE_CLOSE_TIME)
+                    .atTime(FORCE_CLOSE_DEADLINE)
+                    .atZone(zoneId);
+            ZonedDateTime recordedClockOut = clockInDateTime.toLocalDate()
+                    .atTime(FORCE_CLOSE_RECORDED_CLOCK_OUT)
                     .atZone(zoneId);
 
             if (now.isBefore(forceCloseAt.toInstant())) {
@@ -171,7 +175,7 @@ public class TimeTrackingReminderService {
 
             closeEntry(
                     entry,
-                    forceCloseAt.toInstant(),
+                    recordedClockOut.toInstant(),
                     now,
                     TimeEntryAutoCloseReason.END_OF_DAY_FORCE_CLOSE
             );
