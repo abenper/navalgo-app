@@ -141,6 +141,9 @@ class _AdminTimeTrackingOverviewScreenState
                 WorkerTimeTrackingStats(
                   workerId: worker.id,
                   workerName: worker.fullName,
+                  workerRole: worker.role,
+                  photoUrl: worker.photoUrl,
+                  qualityScore: 0,
                   currentlyClockedIn: openEntry != null,
                   workedMinutesToday: 0,
                   workedMinutesThisMonth: 0,
@@ -482,7 +485,7 @@ class _AdminTimeTrackingOverviewScreenState
     var workersWithIncidents = 0;
 
     for (final snapshot in snapshots) {
-      if (snapshot.stats.currentlyClockedIn) {
+      if (snapshot.isCurrentlyClockedIn) {
         openShiftWorkers++;
       }
       pendingAdjustments += snapshot.pendingAdjustmentCount;
@@ -519,7 +522,7 @@ class _AdminTimeTrackingOverviewScreenState
         case _AuditFilter.incidents:
           return snapshot.hasIncidents;
         case _AuditFilter.openShifts:
-          return snapshot.stats.currentlyClockedIn;
+          return snapshot.isCurrentlyClockedIn;
         case _AuditFilter.pendingAdjustments:
           return snapshot.pendingAdjustmentCount > 0;
         case _AuditFilter.forcedClosures:
@@ -628,14 +631,41 @@ class _WorkerAuditSnapshot {
   final DateTime? latestForcedClosureAt;
 
   bool get hasIncidents =>
-      stats.currentlyClockedIn ||
+      isCurrentlyClockedIn ||
       pendingAdjustmentCount > 0 ||
       forcedClosureCount > 0;
 
   int get incidentScore =>
-      (stats.currentlyClockedIn ? 4 : 0) +
+      (isCurrentlyClockedIn ? 4 : 0) +
       (pendingAdjustmentCount > 0 ? 2 : 0) +
       (forcedClosureCount > 0 ? 1 : 0);
+
+  bool get isCurrentlyClockedIn =>
+      openEntry != null || stats.currentlyClockedIn;
+
+  int get workedMinutesToday {
+    final now = DateTime.now();
+    return _sumWorkedMinutes(
+      entries,
+      (workDate) =>
+          workDate.year == now.year &&
+          workDate.month == now.month &&
+          workDate.day == now.day,
+    );
+  }
+
+  int get workedMinutesThisMonth {
+    final now = DateTime.now();
+    return _sumWorkedMinutes(
+      entries,
+      (workDate) => workDate.year == now.year && workDate.month == now.month,
+    );
+  }
+
+  int get workedMinutesThisYear {
+    final now = DateTime.now();
+    return _sumWorkedMinutes(entries, (workDate) => workDate.year == now.year);
+  }
 
   DateTime get latestRelevantRequestDate =>
       latestPendingRequestAt ?? DateTime.now();
@@ -859,7 +889,7 @@ class _WorkerAuditCard extends StatelessWidget {
                               : 'Trabajador',
                           color: NavalgoColors.tide,
                         ),
-                        if (snapshot.stats.currentlyClockedIn)
+                        if (snapshot.isCurrentlyClockedIn)
                           const NavalgoStatusChip(
                             label: 'Jornada abierta',
                             color: NavalgoColors.kelp,
@@ -886,11 +916,13 @@ class _WorkerAuditCard extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              OutlinedButton.icon(
-                onPressed: onOpenDetail,
-                icon: const Icon(Icons.visibility_outlined),
-                label: const Text('Ver detalle'),
+              const SizedBox(width: 8),
+              Flexible(
+                child: OutlinedButton.icon(
+                  onPressed: onOpenDetail,
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: const Text('Detalle'),
+                ),
               ),
             ],
           ),
@@ -901,27 +933,27 @@ class _WorkerAuditCard extends StatelessWidget {
             children: [
               _MiniMetricChip(
                 label: 'Hoy',
-                value: _formatMinutes(snapshot.stats.workedMinutesToday),
+                value: _formatMinutes(snapshot.workedMinutesToday),
                 color: NavalgoColors.tide,
               ),
               _MiniMetricChip(
                 label: 'Mes',
-                value: _formatMinutes(snapshot.stats.workedMinutesThisMonth),
+                value: _formatMinutes(snapshot.workedMinutesThisMonth),
                 color: NavalgoColors.harbor,
               ),
               _MiniMetricChip(
-                label: 'Año',
-                value: _formatMinutes(snapshot.stats.workedMinutesThisYear),
+                label: 'Ano',
+                value: _formatMinutes(snapshot.workedMinutesThisYear),
                 color: NavalgoColors.kelp,
               ),
               _MiniMetricChip(
-                label: 'Ausencias no vacacionales',
+                label: 'Ausencias',
                 value:
                     '${snapshot.stats.approvedNonVacationAbsenceDaysThisYear}',
                 color: NavalgoColors.coral,
               ),
               _MiniMetricChip(
-                label: 'Histórico de ajustes',
+                label: 'Ajustes',
                 value: '${snapshot.adjustmentHistoryCount}',
                 color: NavalgoColors.sand,
               ),
@@ -978,16 +1010,22 @@ class _MiniMetricChip extends StatelessWidget {
         children: [
           Text(
             label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(
               context,
             ).textTheme.labelMedium?.copyWith(color: NavalgoColors.storm),
           ),
           const SizedBox(height: 4),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: NavalgoColors.deepSea,
-              fontWeight: FontWeight.w800,
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              value,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                color: NavalgoColors.deepSea,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
         ],
@@ -1042,6 +1080,29 @@ TimeEntry? _firstWhereOrNull(
     }
   }
   return null;
+}
+
+int _sumWorkedMinutes(
+  List<TimeEntry> entries,
+  bool Function(DateTime workDate) matchesDate,
+) {
+  final now = DateTime.now();
+  var totalMinutes = 0;
+
+  for (final entry in entries) {
+    final clockIn = entry.clockIn.toLocal();
+    if (!matchesDate(clockIn)) {
+      continue;
+    }
+
+    final clockOut = entry.clockOut?.toLocal() ?? now;
+    if (!clockOut.isAfter(clockIn)) {
+      continue;
+    }
+    totalMinutes += clockOut.difference(clockIn).inMinutes;
+  }
+
+  return totalMinutes;
 }
 
 String _latestEntryLabel(WorkerProfile worker, TimeEntry entry) {

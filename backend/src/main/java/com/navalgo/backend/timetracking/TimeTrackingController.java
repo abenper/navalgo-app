@@ -60,7 +60,7 @@ public class TimeTrackingController {
     }
 
     @GetMapping("/admin/worker-stats")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<WorkerTimeTrackingStatsDto>> workerStats() {
         return ResponseEntity.ok(service.getWorkerStats());
     }

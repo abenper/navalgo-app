@@ -81,6 +81,13 @@ app:
     resend:
       api-key: ${APP_EMAIL_RESEND_API_KEY:}
       api-url: ${APP_EMAIL_RESEND_API_URL:https://api.resend.com/emails}
+  whatsapp:
+    enabled: ${APP_WHATSAPP_ENABLED:false}
+    verify-token: ${APP_WHATSAPP_VERIFY_TOKEN:}
+    api-token: ${APP_WHATSAPP_API_TOKEN:}
+    phone-number-id: ${APP_WHATSAPP_PHONE_NUMBER_ID:}
+    api-version: ${APP_WHATSAPP_API_VERSION:v20.0}
+    graph-base-url: ${APP_WHATSAPP_GRAPH_BASE_URL:https://graph.facebook.com}
   scheduling:
     work-order-close-reminders-cron: ${APP_SCHEDULING_WORK_ORDER_CLOSE_REMINDERS_CRON:0 0 9 * * *}
     time-tracking-missing-clock-in-cron: ${APP_SCHEDULING_TIME_TRACKING_MISSING_CLOCK_IN_CRON:0 0 8 * * MON-FRI}

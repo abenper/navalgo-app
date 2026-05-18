@@ -1,5 +1,8 @@
 package com.navalgo.backend.timetracking;
 
+import com.navalgo.backend.budget.Budget;
+import com.navalgo.backend.budget.BudgetRepository;
+import com.navalgo.backend.budget.BudgetStatus;
 import com.navalgo.backend.common.Role;
 import com.navalgo.backend.leave.LeaveRequestEntity;
 import com.navalgo.backend.leave.LeaveRequestRepository;
@@ -38,15 +41,18 @@ public class TimeTrackingService {
     private final TimeEntryRepository timeEntryRepository;
     private final WorkOrderRepository workOrderRepository;
     private final WorkerRepository workerRepository;
+    private final BudgetRepository budgetRepository;
 
     public TimeTrackingService(LeaveRequestRepository leaveRequestRepository,
                                TimeEntryRepository timeEntryRepository,
                                WorkOrderRepository workOrderRepository,
-                               WorkerRepository workerRepository) {
+                               WorkerRepository workerRepository,
+                               BudgetRepository budgetRepository) {
         this.leaveRequestRepository = leaveRequestRepository;
         this.timeEntryRepository = timeEntryRepository;
         this.workOrderRepository = workOrderRepository;
         this.workerRepository = workerRepository;
+        this.budgetRepository = budgetRepository;
     }
 
     @Transactional
@@ -153,16 +159,36 @@ public class TimeTrackingService {
                 EnumSet.of(Role.WORKER, Role.COMERCIAL)
         );
         Map<Long, Long> absenceDaysByWorker = new HashMap<>();
+        Map<Long, Double> productivityByWorker = new HashMap<>();
+        Map<Long, Double> completionByWorker = new HashMap<>();
+        Map<Long, Double> closeDisciplineByWorker = new HashMap<>();
         for (Worker worker : workers) {
             absenceDaysByWorker.put(worker.getId(), calculateApprovedNonVacationAbsenceDaysThisYear(worker.getId(), today));
+            productivityByWorker.put(worker.getId(), calculateProductivityBasis(worker, now));
+            completionByWorker.put(worker.getId(), calculateCompletionBasis(worker));
+            closeDisciplineByWorker.put(worker.getId(), calculateCloseDisciplineBasis(worker.getId()));
         }
 
-        double averageAbsenceDays = absenceDaysByWorker.isEmpty()
-                ? 0.0
-                : absenceDaysByWorker.values().stream().mapToLong(Long::longValue).average().orElse(0.0);
+        Map<Role, Double> averageAbsenceDaysByRole = averageLongByRole(workers, absenceDaysByWorker);
+        Map<Role, Double> averageProductivityByRole = averageDoubleByRole(workers, productivityByWorker);
+        Map<Role, Double> averageCompletionByRole = averageDoubleByRole(workers, completionByWorker);
+        Map<Role, Double> averageCloseDisciplineByRole = averageDoubleByRole(workers, closeDisciplineByWorker);
 
         return workers.stream()
-                .map(worker -> buildStats(worker, today, currentMonth, now, averageAbsenceDays, absenceDaysByWorker))
+                .map(worker -> buildStats(
+                        worker,
+                        today,
+                        currentMonth,
+                        now,
+                        averageAbsenceDaysByRole,
+                        averageProductivityByRole,
+                        averageCompletionByRole,
+                        averageCloseDisciplineByRole,
+                        absenceDaysByWorker,
+                        productivityByWorker,
+                        completionByWorker,
+                        closeDisciplineByWorker
+                ))
                 .toList();
     }
 
@@ -179,47 +205,54 @@ public class TimeTrackingService {
                 EnumSet.of(Role.WORKER, Role.COMERCIAL)
         );
         Map<Long, Long> absenceDaysByWorker = new HashMap<>();
-        Map<Long, Double> throughputByWorker = new HashMap<>();
-        Map<Long, Double> signatureCompletionByWorker = new HashMap<>();
+        Map<Long, Double> productivityByWorker = new HashMap<>();
+        Map<Long, Double> completionByWorker = new HashMap<>();
         Map<Long, Double> closeDisciplineByWorker = new HashMap<>();
 
         for (Worker item : activeWorkers) {
             absenceDaysByWorker.put(item.getId(), calculateApprovedNonVacationAbsenceDaysThisYear(item.getId(), today));
-            throughputByWorker.put(item.getId(), calculateThroughputScoreBasis(item.getId(), now));
-            signatureCompletionByWorker.put(item.getId(), calculateSignatureCompletionBasis(item.getId()));
+            productivityByWorker.put(item.getId(), calculateProductivityBasis(item, now));
+            completionByWorker.put(item.getId(), calculateCompletionBasis(item));
             closeDisciplineByWorker.put(item.getId(), calculateCloseDisciplineBasis(item.getId()));
         }
 
-        double averageAbsenceDays = averageLong(absenceDaysByWorker.values());
-        double averageThroughput = averageDouble(throughputByWorker.values());
-        double averageSignatureCompletion = averageDouble(signatureCompletionByWorker.values());
-        double averageCloseDiscipline = averageDouble(closeDisciplineByWorker.values());
+        Map<Role, Double> averageAbsenceDaysByRole = averageLongByRole(activeWorkers, absenceDaysByWorker);
+        Map<Role, Double> averageProductivityByRole = averageDoubleByRole(activeWorkers, productivityByWorker);
+        Map<Role, Double> averageCompletionByRole = averageDoubleByRole(activeWorkers, completionByWorker);
+        Map<Role, Double> averageCloseDisciplineByRole = averageDoubleByRole(activeWorkers, closeDisciplineByWorker);
 
         WorkerTimeTrackingStatsDto summary = buildStats(
                 worker,
                 today,
                 currentMonth,
                 now,
-                averageAbsenceDays,
-                absenceDaysByWorker
+                averageAbsenceDaysByRole,
+                averageProductivityByRole,
+                averageCompletionByRole,
+                averageCloseDisciplineByRole,
+                absenceDaysByWorker,
+                productivityByWorker,
+                completionByWorker,
+                closeDisciplineByWorker
         );
 
+        Role role = worker.getRole();
         double absenceFactor = invertAgainstAverage(
                 absenceDaysByWorker.getOrDefault(workerId, 0L),
-                averageAbsenceDays,
+                averageAbsenceDaysByRole.getOrDefault(role, 0.0),
                 100.0
         );
         double throughputFactor = scoreRelativeToAverage(
-                throughputByWorker.getOrDefault(workerId, 0.0),
-                averageThroughput
+                productivityByWorker.getOrDefault(workerId, 0.0),
+                averageProductivityByRole.getOrDefault(role, 0.0)
         );
         double signatureFactor = scoreRelativeToAverage(
-                signatureCompletionByWorker.getOrDefault(workerId, 0.0),
-                averageSignatureCompletion
+                completionByWorker.getOrDefault(workerId, 0.0),
+                averageCompletionByRole.getOrDefault(role, 0.0)
         );
         double disciplineFactor = scoreRelativeToAverage(
                 closeDisciplineByWorker.getOrDefault(workerId, 0.0),
-                averageCloseDiscipline
+                averageCloseDisciplineByRole.getOrDefault(role, 0.0)
         );
 
         List<WorkerPerformanceFactorDto> factors = List.of(
@@ -228,13 +261,12 @@ public class TimeTrackingService {
                         absenceFactor,
                         summary.approvedNonVacationAbsenceDaysThisYear()
                                 + " dia(s) este año frente a una media de "
-                                + formatOneDecimal(averageAbsenceDays)
+                                + formatOneDecimal(averageAbsenceDaysByRole.getOrDefault(role, 0.0))
                 ),
                 new WorkerPerformanceFactorDto(
-                        "Partes por hora",
+                        role == Role.COMERCIAL ? "Actividad comercial" : "Partes por hora",
                         throughputFactor,
-                        formatOneDecimal(throughputByWorker.getOrDefault(workerId, 0.0))
-                                + " partes cerrados por cada 10 horas de trabajo"
+                        buildProductivityDetail(role, productivityByWorker.getOrDefault(workerId, 0.0))
                 ),
                 new WorkerPerformanceFactorDto(
                         "Cierres sin incidencia",
@@ -243,22 +275,16 @@ public class TimeTrackingService {
                                 + "% de jornadas sin cierre forzado"
                 ),
                 new WorkerPerformanceFactorDto(
-                        "Firmas completas",
+                        role == Role.COMERCIAL ? "Seguimiento comercial" : "Firmas completas",
                         signatureFactor,
-                        formatOneDecimal(signatureCompletionByWorker.getOrDefault(workerId, 0.0))
-                                + "% de partes cerrados con firma cliente/trabajador"
+                        buildCompletionDetail(role, completionByWorker.getOrDefault(workerId, 0.0))
                 )
         );
-
-        double qualityScore = factors.stream()
-                .mapToDouble(WorkerPerformanceFactorDto::score)
-                .average()
-                .orElse(0.0);
 
         return new WorkerTimeTrackingInsightDto(
                 summary.workerId(),
                 summary.workerName(),
-                qualityScore,
+                summary.qualityScore(),
                 summary.currentlyClockedIn(),
                 summary.workedMinutesToday(),
                 summary.workedMinutesThisMonth(),
@@ -313,9 +339,16 @@ public class TimeTrackingService {
                                                   LocalDate today,
                                                   YearMonth currentMonth,
                                                   Instant now,
-                                                  double averageAbsenceDays,
-                                                  Map<Long, Long> absenceDaysByWorker) {
+                                                  Map<Role, Double> averageAbsenceDaysByRole,
+                                                  Map<Role, Double> averageProductivityByRole,
+                                                  Map<Role, Double> averageCompletionByRole,
+                                                  Map<Role, Double> averageCloseDisciplineByRole,
+                                                  Map<Long, Long> absenceDaysByWorker,
+                                                  Map<Long, Double> productivityByWorker,
+                                                  Map<Long, Double> completionByWorker,
+                                                  Map<Long, Double> closeDisciplineByWorker) {
         List<TimeEntry> entries = timeEntryRepository.findByWorkerIdOrderByClockInDesc(worker.getId());
+        Role role = worker.getRole();
 
         long workedMinutesToday = 0;
         long workedMinutesThisMonth = 0;
@@ -342,13 +375,31 @@ public class TimeTrackingService {
         }
 
         long absenceDays = absenceDaysByWorker.getOrDefault(worker.getId(), 0L);
+        double averageAbsenceDays = averageAbsenceDaysByRole.getOrDefault(role, 0.0);
         double absenceVsAveragePercent = averageAbsenceDays <= 0.0
                 ? 0.0
                 : ((absenceDays - averageAbsenceDays) / averageAbsenceDays) * 100.0;
+        double absenceFactor = invertAgainstAverage(absenceDays, averageAbsenceDays, 100.0);
+        double throughputFactor = scoreRelativeToAverage(
+                productivityByWorker.getOrDefault(worker.getId(), 0.0),
+                averageProductivityByRole.getOrDefault(role, 0.0)
+        );
+        double signatureFactor = scoreRelativeToAverage(
+                completionByWorker.getOrDefault(worker.getId(), 0.0),
+                averageCompletionByRole.getOrDefault(role, 0.0)
+        );
+        double disciplineFactor = scoreRelativeToAverage(
+                closeDisciplineByWorker.getOrDefault(worker.getId(), 0.0),
+                averageCloseDisciplineByRole.getOrDefault(role, 0.0)
+        );
+        double qualityScore = (absenceFactor + throughputFactor + signatureFactor + disciplineFactor) / 4.0;
 
         return new WorkerTimeTrackingStatsDto(
                 worker.getId(),
                 worker.getFullName(),
+                worker.getRole().name(),
+                worker.getPhotoUrl(),
+                qualityScore,
                 currentlyClockedIn,
                 workedMinutesToday,
                 workedMinutesThisMonth,
@@ -428,6 +479,17 @@ public class TimeTrackingService {
         return completedOrders.size() / (workedMinutes / 600.0);
     }
 
+    private double calculateCommercialActivityBasis(Long workerId, Instant now) {
+        List<Budget> budgets = budgetRepository.findByCreatedByWorkerIdOrderByCreatedAtDesc(workerId);
+        long workedMinutes = timeEntryRepository.findByWorkerIdOrderByClockInDesc(workerId).stream()
+                .mapToLong(entry -> durationMinutes(entry, now))
+                .sum();
+        if (workedMinutes <= 0) {
+            return 0.0;
+        }
+        return budgets.size() / (workedMinutes / 600.0);
+    }
+
     private double calculateSignatureCompletionBasis(Long workerId) {
         List<WorkOrder> completedOrders = workOrderRepository.findByAssignedWorkersIdOrderByCreatedAtDesc(workerId).stream()
                 .filter(order -> order.getStatus() == WorkOrderStatus.DONE)
@@ -439,6 +501,18 @@ public class TimeTrackingService {
                 .filter(order -> order.getSignedAt() != null && order.getClientSignedAt() != null)
                 .count();
         return (completeSignatures * 100.0) / completedOrders.size();
+    }
+
+    private double calculateCommercialPipelineBasis(Long workerId) {
+        List<Budget> budgets = budgetRepository.findByCreatedByWorkerIdOrderByCreatedAtDesc(workerId);
+        if (budgets.isEmpty()) {
+            return 75.0;
+        }
+
+        long progressedBudgets = budgets.stream()
+                .filter(budget -> budget.getStatus() != BudgetStatus.DRAFT)
+                .count();
+        return (progressedBudgets * 100.0) / budgets.size();
     }
 
     private double calculateCloseDisciplineBasis(Long workerId) {
@@ -538,13 +612,55 @@ public class TimeTrackingService {
         return values.isEmpty() ? 0.0 : values.stream().mapToLong(Long::longValue).average().orElse(0.0);
     }
 
+    private Map<Role, Double> averageLongByRole(List<Worker> workers, Map<Long, Long> valuesByWorkerId) {
+        Map<Role, List<Long>> grouped = new HashMap<>();
+        for (Worker worker : workers) {
+            grouped.computeIfAbsent(worker.getRole(), ignored -> new ArrayList<>())
+                    .add(valuesByWorkerId.getOrDefault(worker.getId(), 0L));
+        }
+
+        Map<Role, Double> averages = new HashMap<>();
+        for (Map.Entry<Role, List<Long>> entry : grouped.entrySet()) {
+            averages.put(entry.getKey(), averageLong(entry.getValue()));
+        }
+        return averages;
+    }
+
     private double averageDouble(java.util.Collection<Double> values) {
         return values.isEmpty() ? 0.0 : values.stream().mapToDouble(Double::doubleValue).average().orElse(0.0);
     }
 
+    private Map<Role, Double> averageDoubleByRole(List<Worker> workers, Map<Long, Double> valuesByWorkerId) {
+        Map<Role, List<Double>> grouped = new HashMap<>();
+        for (Worker worker : workers) {
+            grouped.computeIfAbsent(worker.getRole(), ignored -> new ArrayList<>())
+                    .add(valuesByWorkerId.getOrDefault(worker.getId(), 0.0));
+        }
+
+        Map<Role, Double> averages = new HashMap<>();
+        for (Map.Entry<Role, List<Double>> entry : grouped.entrySet()) {
+            averages.put(entry.getKey(), averageDouble(entry.getValue()));
+        }
+        return averages;
+    }
+
+    private double calculateProductivityBasis(Worker worker, Instant now) {
+        if (worker.getRole() == Role.COMERCIAL) {
+            return calculateCommercialActivityBasis(worker.getId(), now);
+        }
+        return calculateThroughputScoreBasis(worker.getId(), now);
+    }
+
+    private double calculateCompletionBasis(Worker worker) {
+        if (worker.getRole() == Role.COMERCIAL) {
+            return calculateCommercialPipelineBasis(worker.getId());
+        }
+        return calculateSignatureCompletionBasis(worker.getId());
+    }
+
     private double scoreRelativeToAverage(double value, double average) {
         if (average <= 0.0) {
-            return 100.0;
+            return value <= 0.0 ? 75.0 : 100.0;
         }
         double ratio = value / average;
         return clampScore(70.0 + ((ratio - 1.0) * 30.0));
@@ -564,5 +680,19 @@ public class TimeTrackingService {
 
     private String formatOneDecimal(double value) {
         return String.format(Locale.US, "%.1f", value);
+    }
+
+    private String buildProductivityDetail(Role role, double value) {
+        if (role == Role.COMERCIAL) {
+            return formatOneDecimal(value) + " presupuestos creados por cada 10 horas fichadas";
+        }
+        return formatOneDecimal(value) + " partes cerrados por cada 10 horas de trabajo";
+    }
+
+    private String buildCompletionDetail(Role role, double value) {
+        if (role == Role.COMERCIAL) {
+            return formatOneDecimal(value) + "% de presupuestos movidos fuera de borrador";
+        }
+        return formatOneDecimal(value) + "% de partes cerrados con firma cliente/trabajador";
     }
 }

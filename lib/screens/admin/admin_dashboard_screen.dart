@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../models/time_entry.dart';
 import '../../services/leave_service.dart';
 import '../../services/time_tracking_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/work_orders_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import '../../widgets/team_leaderboard_panel.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -23,7 +25,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _workersClockedToday = 0;
   List<String> _workersClockedTodayNames = <String>[];
   int _pendingLeaves = 0;
-  int _approvedLeavesToday = 0;
+  List<WorkerTimeTrackingStats> _topWorkers = const <WorkerTimeTrackingStats>[];
 
   @override
   void initState() {
@@ -55,23 +57,26 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final loadWorkOrdersFuture = workOrdersVm.loadWorkOrders();
       final leavesFuture = leaveService.getLeaveRequests(token);
       final todaySummaryFuture = timeTrackingService.getTodaySummary(token);
+      final workerStatsFuture = timeTrackingService.getWorkerStats(token);
       await Future.wait<dynamic>([
         loadWorkOrdersFuture,
         leavesFuture,
         todaySummaryFuture,
+        workerStatsFuture,
       ]);
       final leaves = await leavesFuture;
       final todaySummary = await todaySummaryFuture;
-
-      final now = DateTime.now();
-      final approvedToday = leaves.where((item) {
-        if (item.status != 'APPROVED') {
-          return false;
-        }
-        return item.startDate.year == now.year &&
-            item.startDate.month == now.month &&
-            item.startDate.day == now.day;
-      }).length;
+      final workerStats = await workerStatsFuture;
+      final topWorkers = workerStats.toList()
+        ..sort((a, b) {
+          final scoreCompare = b.qualityScore.compareTo(a.qualityScore);
+          if (scoreCompare != 0) {
+            return scoreCompare;
+          }
+          return a.workerName.toLowerCase().compareTo(
+            b.workerName.toLowerCase(),
+          );
+        });
 
       if (!mounted) {
         return;
@@ -93,7 +98,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _pendingLeaves = leaves
             .where((item) => item.status == 'PENDING')
             .length;
-        _approvedLeavesToday = approvedToday;
+        _topWorkers = topWorkers.take(3).toList(growable: false);
         _isLoading = false;
       });
     } catch (e) {
@@ -109,7 +114,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: _loadData,
@@ -155,7 +159,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         NavalgoColors.coral,
                       ),
                       _buildStatCard(
-                        'Mecánicos activos hoy',
+                        'Personal activo hoy',
                         '$_workersClockedToday',
                         const Icon(Icons.engineering),
                         NavalgoColors.tide,
@@ -174,41 +178,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              NavalgoPanel(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 18,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: NavalgoColors.kelp.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        Icons.event_available,
-                        color: NavalgoColors.kelp,
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Text(
-                        'Ausencias aprobadas hoy',
-                        style: textTheme.titleMedium,
-                      ),
-                    ),
-                    Text(
-                      '$_approvedLeavesToday',
-                      style: textTheme.headlineMedium?.copyWith(
-                        color: NavalgoColors.kelp,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildLeaderboardCard(),
             ],
           ],
         ),
@@ -229,6 +199,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       icon: icon,
       accent: color,
       note: note,
+    );
+  }
+
+  Widget _buildLeaderboardCard() {
+    final token = context.read<SessionViewModel>().token;
+
+    return TeamLeaderboardPanel(
+      entries: _topWorkers,
+      token: token,
+      title: 'Top 3 del equipo',
+      subtitle:
+          'Ranking conjunto entre comerciales y taller según la puntuación global de rendimiento.',
     );
   }
 }

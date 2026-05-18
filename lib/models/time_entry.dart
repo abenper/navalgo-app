@@ -82,6 +82,9 @@ class WorkerTimeTrackingStats {
   const WorkerTimeTrackingStats({
     required this.workerId,
     required this.workerName,
+    required this.workerRole,
+    required this.photoUrl,
+    required this.qualityScore,
     required this.currentlyClockedIn,
     required this.workedMinutesToday,
     required this.workedMinutesThisMonth,
@@ -92,6 +95,9 @@ class WorkerTimeTrackingStats {
 
   final int workerId;
   final String workerName;
+  final String workerRole;
+  final String? photoUrl;
+  final double qualityScore;
   final bool currentlyClockedIn;
   final int workedMinutesToday;
   final int workedMinutesThisMonth;
@@ -103,6 +109,9 @@ class WorkerTimeTrackingStats {
     return WorkerTimeTrackingStats(
       workerId: json['workerId'] as int,
       workerName: json['workerName'] as String? ?? 'Trabajador',
+      workerRole: json['workerRole'] as String? ?? 'WORKER',
+      photoUrl: json['photoUrl'] as String?,
+      qualityScore: (json['qualityScore'] as num?)?.toDouble() ?? 0,
       currentlyClockedIn: json['currentlyClockedIn'] as bool? ?? false,
       workedMinutesToday: json['workedMinutesToday'] as int? ?? 0,
       workedMinutesThisMonth: json['workedMinutesThisMonth'] as int? ?? 0,
@@ -150,9 +159,7 @@ class WorkerResolvedWorkOrderStatsRow {
   final double loggedLaborHours;
   final double averageWorkedHoursPerOrder;
 
-  factory WorkerResolvedWorkOrderStatsRow.fromJson(
-    Map<String, dynamic> json,
-  ) {
+  factory WorkerResolvedWorkOrderStatsRow.fromJson(Map<String, dynamic> json) {
     return WorkerResolvedWorkOrderStatsRow(
       label: json['label'] as String? ?? '',
       completedWorkOrders: json['completedWorkOrders'] as int? ?? 0,
@@ -208,15 +215,15 @@ class WorkerTimeTrackingInsight {
           (json['absenceVsAveragePercent'] as num?)?.toDouble() ?? 0,
       qualityFactors: rawFactors is List
           ? rawFactors
-              .whereType<Map<String, dynamic>>()
-              .map(WorkerPerformanceFactor.fromJson)
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map(WorkerPerformanceFactor.fromJson)
+                .toList()
           : const <WorkerPerformanceFactor>[],
       resolvedWorkOrderStats: rawRows is List
           ? rawRows
-              .whereType<Map<String, dynamic>>()
-              .map(WorkerResolvedWorkOrderStatsRow.fromJson)
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map(WorkerResolvedWorkOrderStatsRow.fromJson)
+                .toList()
           : const <WorkerResolvedWorkOrderStatsRow>[],
     );
   }

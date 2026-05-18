@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/budget.dart';
 import '../../models/leave_request.dart';
+import '../../models/time_entry.dart';
 import '../../services/budget_service.dart';
 import '../../services/leave_service.dart';
 import '../../services/time_tracking_service.dart';
@@ -10,6 +11,7 @@ import '../../theme/navalgo_theme.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/work_orders_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import '../../widgets/team_leaderboard_panel.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
   const WorkerDashboardScreen({super.key});
@@ -28,6 +30,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   int _totalBudgets = 0;
   int _pendingBudgetResponses = 0;
   List<String> _recentBudgetLabels = <String>[];
+  List<WorkerTimeTrackingStats> _topWorkers = const <WorkerTimeTrackingStats>[];
 
   @override
   void initState() {
@@ -73,13 +76,16 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       final budgetsFuture = isCommercial
           ? budgetService.getBudgets(token)
           : Future<List<Budget>>.value(const <Budget>[]);
+      final workerStatsFuture = timeService.getWorkerStats(token);
       await Future.wait<dynamic>([
         balanceFuture,
         entriesFuture,
         workOrdersFuture,
         budgetsFuture,
+        workerStatsFuture,
       ]);
       final balance = await balanceFuture;
+      final workerStats = await workerStatsFuture;
 
       var myTasks = 0;
       var urgentTasks = 0;
@@ -136,6 +142,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         return;
       }
 
+      final topWorkers = workerStats.toList()
+        ..sort((a, b) {
+          final scoreCompare = b.qualityScore.compareTo(a.qualityScore);
+          if (scoreCompare != 0) {
+            return scoreCompare;
+          }
+          return a.workerName.toLowerCase().compareTo(
+            b.workerName.toLowerCase(),
+          );
+        });
+
       setState(() {
         _balance = balance;
         _myTasks = myTasks;
@@ -144,6 +161,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         _totalBudgets = totalBudgets;
         _pendingBudgetResponses = pendingBudgetResponses;
         _recentBudgetLabels = recentBudgetLabels;
+        _topWorkers = topWorkers.take(3).toList(growable: false);
         _isLoading = false;
       });
     } catch (e) {
@@ -224,6 +242,18 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         children: cards,
                       );
                     },
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                sliver: SliverToBoxAdapter(
+                  child: TeamLeaderboardPanel(
+                    entries: _topWorkers,
+                    token: context.read<SessionViewModel>().token,
+                    title: 'Top 3 del equipo',
+                    subtitle:
+                        'Compites con todo el equipo, incluyendo comerciales y taller.',
                   ),
                 ),
               ),

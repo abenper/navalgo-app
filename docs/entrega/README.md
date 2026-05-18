@@ -4,6 +4,7 @@ Este bloque reúne el material final para preparar la defensa y congelar una ver
 
 ## Contenido
 
+- [manual-usuario-integral.md](./manual-usuario-integral.md): manual de usuario completo y unificado para administradores, trabajadores, comerciales y clientes.
 - [capturas-entrega.md](./capturas-entrega.md): inventario de capturas, estado actual y tomas pendientes.
 - [guion-demo-5-7-min.md](./guion-demo-5-7-min.md): demo corta con orden, tiempos y frases de apoyo.
 - [guion-defensa.md](./guion-defensa.md): defensa oral centrada en problema, solución, arquitectura, pruebas y seguridad.

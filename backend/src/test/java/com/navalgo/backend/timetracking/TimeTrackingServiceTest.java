@@ -1,5 +1,6 @@
 package com.navalgo.backend.timetracking;
 
+import com.navalgo.backend.budget.BudgetRepository;
 import com.navalgo.backend.leave.LeaveRequestRepository;
 import com.navalgo.backend.workorder.WorkOrderRepository;
 import com.navalgo.backend.worker.Worker;
@@ -34,13 +35,17 @@ class TimeTrackingServiceTest {
     @Mock
     private WorkerRepository workerRepository;
 
+    @Mock
+    private BudgetRepository budgetRepository;
+
     @Test
     void createManualEntryCreatesClosedEntryForWorker() {
         TimeTrackingService service = new TimeTrackingService(
                 leaveRequestRepository,
                 timeEntryRepository,
                 workOrderRepository,
-                workerRepository
+                workerRepository,
+                budgetRepository
         );
         Worker worker = worker(7L, "Pablo Mecanico");
         Instant clockIn = Instant.parse("2026-05-14T08:00:00Z");
@@ -85,7 +90,8 @@ class TimeTrackingServiceTest {
                 leaveRequestRepository,
                 timeEntryRepository,
                 workOrderRepository,
-                workerRepository
+                workerRepository,
+                budgetRepository
         );
         Worker worker = worker(9L, "Laura Marina");
         CreateTimeEntryRequest request = new CreateTimeEntryRequest(
