@@ -6,7 +6,7 @@ module.exports = {
   document_title: 'Manual de Usuario NavalGO',
   pdf_options: {
     format: 'A4',
-    printBackground: true,
+    printBackground: false,
     displayHeaderFooter: true,
     margin: {
       top: '18mm',

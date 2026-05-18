@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/worker_profile.dart';
+import '../../services/worker_photo_service.dart';
 import '../../services/time_tracking_service.dart';
 import '../../services/network/api_exception.dart';
 import '../../services/worker_service.dart';
 import '../../theme/navalgo_theme.dart';
+import '../../utils/app_toast.dart';
+import '../../utils/media_url.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../viewmodels/workers_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
+import '../../widgets/profile_photo_crop_dialog.dart';
 import 'admin_time_tracking_screen.dart';
 
 const String _superAdminEmail = 'admin@naval-go.com';
@@ -310,9 +315,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
         return;
       }
       messenger.showSnackBar(
-        SnackBar(
-          content: Text('No se pudo eliminar: ${_describeError(e)}'),
-        ),
+        SnackBar(content: Text('No se pudo eliminar: ${_describeError(e)}')),
       );
     }
   }
@@ -430,6 +433,80 @@ class _EquipoScreenState extends State<EquipoScreen> {
     );
   }
 
+  Future<void> _changeWorkerPhoto(WorkerProfile worker) async {
+    final currentEmail = context.read<SessionViewModel>().user?.email;
+    if (!_canManageAdminAccount(worker, currentEmail)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Solo el superadmin puede modificar la foto de otro administrador',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final token = context.read<SessionViewModel>().token;
+    if (token == null || token.isEmpty) {
+      AppToast.warning(context, 'No hay sesion activa.');
+      return;
+    }
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 82,
+      maxWidth: 800,
+    );
+    if (picked == null || !mounted) {
+      return;
+    }
+
+    final bytes = await picked.readAsBytes();
+    if (!mounted) {
+      return;
+    }
+
+    final croppedBytes = await showProfilePhotoCropDialog(
+      context,
+      imageBytes: bytes,
+    );
+    if (croppedBytes == null || !mounted) {
+      return;
+    }
+
+    final messenger = ScaffoldMessenger.of(context);
+    final photoService = context.read<WorkerPhotoService>();
+    final workersViewModel = context.read<WorkersViewModel>();
+
+    try {
+      await photoService.uploadPhoto(
+        token,
+        workerId: worker.id,
+        fileName: _buildProfilePhotoFileName(picked.name),
+        bytes: croppedBytes,
+        mimeType: 'image/png',
+      );
+      await workersViewModel.loadWorkers();
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Foto de perfil actualizada para ${worker.fullName}'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      final message = e.toString().replaceFirst('Exception: ', '');
+      messenger.showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar la foto: $message')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<WorkersViewModel>();
@@ -509,6 +586,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
                               canManageAdminAccount:
                                   worker.role != 'ADMIN' || canManageAdmins,
                               onEdit: () => _openEditWorkerDialog(worker),
+                              onChangePhoto: () => _changeWorkerPhoto(worker),
                               onToggleActive: () =>
                                   _toggleActive(worker, !worker.active),
                               onResetPassword: () => _resetPassword(worker),
@@ -533,6 +611,18 @@ class _EquipoScreenState extends State<EquipoScreen> {
     final yy = date.year.toString();
     return '$dd/$mm/$yy';
   }
+
+  String _buildProfilePhotoFileName(String rawName) {
+    final trimmed = rawName.trim();
+    if (trimmed.isEmpty) {
+      return 'avatar.png';
+    }
+
+    final dotIndex = trimmed.lastIndexOf('.');
+    final baseName = dotIndex > 0 ? trimmed.substring(0, dotIndex) : trimmed;
+    final safeBaseName = baseName.trim().isEmpty ? 'avatar' : baseName.trim();
+    return '$safeBaseName.png';
+  }
 }
 
 class _WorkerCard extends StatelessWidget {
@@ -542,6 +632,7 @@ class _WorkerCard extends StatelessWidget {
     required this.pendingAdjustmentCount,
     required this.canManageAdminAccount,
     required this.onEdit,
+    required this.onChangePhoto,
     required this.onToggleActive,
     required this.onResetPassword,
     required this.onAdjustSchedule,
@@ -553,6 +644,7 @@ class _WorkerCard extends StatelessWidget {
   final int pendingAdjustmentCount;
   final bool canManageAdminAccount;
   final VoidCallback onEdit;
+  final VoidCallback onChangePhoto;
   final VoidCallback onToggleActive;
   final VoidCallback onResetPassword;
   final VoidCallback onAdjustSchedule;
@@ -566,6 +658,10 @@ class _WorkerCard extends StatelessWidget {
     final registrationColor = worker.registrationCompleted
         ? NavalgoColors.harbor
         : NavalgoColors.sand;
+    final token = context.select<SessionViewModel, String?>(
+      (session) => session.token,
+    );
+    final resolvedPhotoUrl = resolveMediaUrl(worker.photoUrl);
     return NavalgoPanel(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -573,13 +669,52 @@ class _WorkerCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor: NavalgoColors.mist,
-                child: Icon(
-                  _workerRoleIcon(worker.role),
-                  color: NavalgoColors.tide,
-                ),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: NavalgoColors.mist,
+                    foregroundImage: resolvedPhotoUrl.isNotEmpty
+                        ? NetworkImage(
+                            resolvedPhotoUrl,
+                            headers: buildMediaHeaders(token),
+                          )
+                        : null,
+                    child: resolvedPhotoUrl.isEmpty
+                        ? Icon(
+                            _workerRoleIcon(worker.role),
+                            color: NavalgoColors.tide,
+                          )
+                        : null,
+                  ),
+                  if (canManageAdminAccount)
+                    Positioned(
+                      right: -6,
+                      bottom: -6,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: onChangePhoto,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Ink(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: NavalgoColors.deepSea,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(
+                              Icons.photo_camera_outlined,
+                              size: 14,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -680,6 +815,11 @@ class _WorkerCard extends StatelessWidget {
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined),
                   label: const Text('Editar'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: onChangePhoto,
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: const Text('Cambiar foto'),
                 ),
                 OutlinedButton.icon(
                   onPressed: onToggleActive,

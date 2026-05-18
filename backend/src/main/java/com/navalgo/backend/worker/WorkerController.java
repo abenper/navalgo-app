@@ -110,7 +110,8 @@ public class WorkerController {
         boolean isAdmin = authentication.getAuthorities().stream()
                 .anyMatch(a -> "ROLE_ADMIN".equals(a.getAuthority()));
         String email = authentication.getName();
-        UploadedAttachmentDto uploaded = mediaService.uploadProfilePhoto(file, email);
+        String photoOwnerEmail = workerService.resolvePhotoOwnerEmail(id, isAdmin, email);
+        UploadedAttachmentDto uploaded = mediaService.uploadProfilePhoto(file, photoOwnerEmail);
         WorkerDto updated = workerService.updatePhoto(id, uploaded.fileUrl(), isAdmin, email);
         return ResponseEntity.ok(updated);
     }

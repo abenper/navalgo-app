@@ -271,12 +271,17 @@ public class WorkerService {
     public WorkerDto updatePhoto(Long workerId, String photoUrl, boolean isAdmin, String requesterEmail) {
         Worker worker = workerRepository.findById(workerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
-        if (!isAdmin && !worker.getEmail().equalsIgnoreCase(requesterEmail)) {
-            throw new org.springframework.security.access.AccessDeniedException("Solo puedes actualizar tu propia foto");
-        }
+        ensureCanUpdatePhoto(worker, isAdmin, requesterEmail);
         worker.setPhotoUrl(photoUrl);
         Worker saved = workerRepository.save(worker);
         return WorkerDto.from(saved, isRegistrationCompleted(saved.getId()));
+    }
+
+    public String resolvePhotoOwnerEmail(Long workerId, boolean isAdmin, String requesterEmail) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        ensureCanUpdatePhoto(worker, isAdmin, requesterEmail);
+        return worker.getEmail();
     }
 
     private boolean isRegistrationCompleted(Long workerId) {
@@ -308,6 +313,16 @@ public class WorkerService {
         if (target.getRole() == Role.ADMIN && !isSuperAdmin(requesterEmail)) {
             throw new org.springframework.security.access.AccessDeniedException("Solo el superadmin puede modificar cuentas de administrador");
         }
+    }
+
+    private void ensureCanUpdatePhoto(Worker worker, boolean isAdmin, String requesterEmail) {
+        if (worker.getEmail().equalsIgnoreCase(requesterEmail)) {
+            return;
+        }
+        if (!isAdmin) {
+            throw new org.springframework.security.access.AccessDeniedException("Solo puedes actualizar tu propia foto");
+        }
+        ensureCanManageTarget(worker, requesterEmail);
     }
 
     private void ensureNoProtectedBusinessHistory(Long workerId) {
