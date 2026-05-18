@@ -185,6 +185,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: CustomScrollView(

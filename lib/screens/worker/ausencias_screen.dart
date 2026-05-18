@@ -973,7 +973,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     final color = _statusColor(req.status);
     final statusLabel = _statusLabel(req.status);
     final workerActions = _buildWorkerRequestActions(req);
-    final adminActions = _isAdmin ? _buildAdminRequestActions(req) : const <Widget>[];
+    final adminActions = _isAdmin
+        ? _buildAdminRequestActions(req)
+        : const <Widget>[];
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -1035,11 +1037,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
                 ],
                 if (adminActions.isNotEmpty) ...[
                   const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: adminActions,
-                  ),
+                  Wrap(spacing: 8, runSpacing: 8, children: adminActions),
                 ],
                 if (workerActions != null) ...[
                   const SizedBox(height: 12),
@@ -1054,7 +1052,9 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
   }
 
   Widget _buildAdminMobileSummary() {
-    final pendingCount = _requests.where((item) => item.status == 'PENDING').length;
+    final pendingCount = _requests
+        .where((item) => item.status == 'PENDING')
+        .length;
     final approvedCount = _requests
         .where((item) => item.status == 'APPROVED')
         .length;
@@ -1152,11 +1152,15 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
         _isAdmin && MediaQuery.sizeOf(context).width < 900;
 
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_error != null) {
       return Scaffold(
+        backgroundColor: Colors.transparent,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -1178,6 +1182,7 @@ class _AusenciasScreenState extends State<AusenciasScreen> {
     }
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         onRefresh: _loadData,
         child: ListView(

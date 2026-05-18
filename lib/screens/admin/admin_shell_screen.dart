@@ -11,6 +11,7 @@ import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../client/client_shell_screen.dart';
+import '../commercial/commercial_budgets_screen.dart';
 import '../commercial/commercial_shell_screen.dart';
 import '../common/privacy_policy_screen.dart';
 import '../common/login_screen.dart';
@@ -39,6 +40,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     const AdminDashboardScreen(),
     const PartesScreen(),
     const MaterialTemplatesScreen(),
+    const CommercialBudgetsScreen(),
     const FlotaScreen(),
     const EquipoScreen(),
     const AdminTimeTrackingOverviewScreen(),
@@ -49,6 +51,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     'Panel',
     'Partes',
     'Plantillas',
+    'Presupuestos',
     'Flota',
     'Equipo',
     'Fichaje',
@@ -59,6 +62,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     Icons.dashboard_outlined,
     Icons.assignment_outlined,
     Icons.inventory_2_outlined,
+    Icons.request_quote_outlined,
     Icons.directions_boat_outlined,
     Icons.people_outline,
     Icons.access_time_outlined,
@@ -160,10 +164,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return 1;
       case 'PLANTILLAS':
         return 2;
+      case 'PRESUPUESTOS':
+        return 3;
       case 'FICHAJES':
-        return 5;
-      case 'AUSENCIAS':
         return 6;
+      case 'AUSENCIAS':
+        return 7;
       default:
         return 0;
     }
@@ -831,6 +837,11 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                               icon: Icon(Icons.inventory_2_outlined),
                               selectedIcon: Icon(Icons.inventory_2),
                               label: Text('Plantillas'),
+                            ),
+                            NavigationRailDestination(
+                              icon: Icon(Icons.request_quote_outlined),
+                              selectedIcon: Icon(Icons.request_quote),
+                              label: Text('Presupuestos'),
                             ),
                             NavigationRailDestination(
                               icon: Icon(Icons.directions_boat_outlined),

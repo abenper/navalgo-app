@@ -516,6 +516,7 @@ class _EquipoScreenState extends State<EquipoScreen> {
     final canManageAdmins = _isSuperAdmin(currentUserEmail);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : vm.error != null

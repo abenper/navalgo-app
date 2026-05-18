@@ -178,10 +178,14 @@ class _FichajeScreenState extends State<FichajeScreen> {
       (session) => session.user?.role == 'ADMIN',
     );
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
     if (_error != null) {
       return Scaffold(
+        backgroundColor: Colors.transparent,
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -213,6 +217,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
     );
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -256,9 +261,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
             const SizedBox(height: 12),
             if (_adjustmentRequests.isEmpty)
               const NavalgoPanel(
-                child: Text(
-                  'Todavía no has enviado solicitudes de ajuste.',
-                ),
+                child: Text('Todavía no has enviado solicitudes de ajuste.'),
               )
             else
               ..._adjustmentRequests.map((request) {
@@ -375,9 +378,9 @@ class _FichajeScreenState extends State<FichajeScreen> {
         const SizedBox(height: 8),
         Text(
           _fmtLongDate(_now),
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: NavalgoColors.storm,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleMedium?.copyWith(color: NavalgoColors.storm),
         ),
       ],
     );
@@ -414,11 +417,7 @@ class _FichajeScreenState extends State<FichajeScreen> {
           compact
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    clockBlock,
-                    const SizedBox(height: 18),
-                    actions,
-                  ],
+                  children: [clockBlock, const SizedBox(height: 18), actions],
                 )
               : Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -737,7 +736,6 @@ class _FichajeScreenState extends State<FichajeScreen> {
       }
     }
   }
-
 }
 
 class _TimeAdjustmentRequestInput {
@@ -803,9 +801,7 @@ class _TimeAdjustmentRequestDialogState
           : TimeOfDay.fromDateTime(initialRequest.requestedClockIn!.toLocal());
       _clockOutTime = initialRequest.requestedClockOut == null
           ? null
-          : TimeOfDay.fromDateTime(
-              initialRequest.requestedClockOut!.toLocal(),
-            );
+          : TimeOfDay.fromDateTime(initialRequest.requestedClockOut!.toLocal());
       _workSite = initialRequest.workSite;
       _reasonController.text = initialRequest.reason;
     } else {
@@ -996,8 +992,12 @@ class _TimeAdjustmentRequestDialogState
                           : 'Taller',
                     ),
                   ),
-                  if (context.read<SessionViewModel>().user?.role != 'COMERCIAL')
-                    const DropdownMenuItem(value: 'TRAVEL', child: Text('Viaje')),
+                  if (context.read<SessionViewModel>().user?.role !=
+                      'COMERCIAL')
+                    const DropdownMenuItem(
+                      value: 'TRAVEL',
+                      child: Text('Viaje'),
+                    ),
                 ],
                 onChanged: (value) {
                   if (value == null) {
@@ -1180,10 +1180,7 @@ class _TimeAdjustmentRequestCard extends StatelessWidget {
 }
 
 class _ClockInInput {
-  const _ClockInInput({
-    required this.workSite,
-    this.plannedClockOut,
-  });
+  const _ClockInInput({required this.workSite, this.plannedClockOut});
 
   final String workSite;
   final DateTime? plannedClockOut;
@@ -1282,7 +1279,8 @@ class _ClockInSheetState extends State<_ClockInSheet> {
               onTap: () async {
                 final picked = await showTimePicker(
                   context: context,
-                  initialTime: _plannedClockOutTime ??
+                  initialTime:
+                      _plannedClockOutTime ??
                       const TimeOfDay(hour: 17, minute: 0),
                 );
                 if (!mounted || picked == null) {
@@ -1300,9 +1298,7 @@ class _ClockInSheetState extends State<_ClockInSheet> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   _error!,
-                  style: TextStyle(
-                    color: Theme.of(context).colorScheme.error,
-                  ),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
                 ),
               ),
             ],
@@ -1485,9 +1481,9 @@ class _ClockInfoPill extends StatelessWidget {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
               ),
             ],
           ),

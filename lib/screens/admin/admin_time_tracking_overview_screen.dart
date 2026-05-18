@@ -223,6 +223,7 @@ class _AdminTimeTrackingOverviewScreenState
   Widget build(BuildContext context) {
     if (_isLoading && _snapshots.isEmpty) {
       return const Scaffold(
+        backgroundColor: Colors.transparent,
         body: NavalgoPageBackground(
           child: Center(child: CircularProgressIndicator()),
         ),
@@ -231,6 +232,7 @@ class _AdminTimeTrackingOverviewScreenState
 
     if (_error != null && _snapshots.isEmpty) {
       return Scaffold(
+        backgroundColor: Colors.transparent,
         body: NavalgoPageBackground(
           child: Center(
             child: ConstrainedBox(
@@ -274,6 +276,7 @@ class _AdminTimeTrackingOverviewScreenState
     final overview = _buildOverview(filteredSnapshots);
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: NavalgoPageBackground(
         child: RefreshIndicator(
           onRefresh: _load,

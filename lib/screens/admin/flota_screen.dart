@@ -381,6 +381,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
     );
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: vm.isLoading
           ? const Center(child: CircularProgressIndicator())
           : vm.error != null
@@ -905,18 +906,18 @@ class _OwnerDialogState extends State<_OwnerDialog> {
 
             Navigator.pop(
               context,
-                _OwnerInput(
-                  type: _type,
-                  displayName: _nameCtrl.text.trim(),
-                  documentId: _docCtrl.text.trim(),
-                  phone: _phoneCtrl.text.trim().isEmpty
-                      ? null
-                      : _phoneCtrl.text.trim(),
-                  email: _emailCtrl.text.trim().isEmpty
-                      ? null
-                      : _emailCtrl.text.trim(),
-                ),
-              );
+              _OwnerInput(
+                type: _type,
+                displayName: _nameCtrl.text.trim(),
+                documentId: _docCtrl.text.trim(),
+                phone: _phoneCtrl.text.trim().isEmpty
+                    ? null
+                    : _phoneCtrl.text.trim(),
+                email: _emailCtrl.text.trim().isEmpty
+                    ? null
+                    : _emailCtrl.text.trim(),
+              ),
+            );
           },
         ),
       ],
@@ -2060,10 +2061,7 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
       if (!mounted) {
         return;
       }
-      await openWorkOrderDetailsScreen(
-        context,
-        initialWorkOrder: workOrder,
-      );
+      await openWorkOrderDetailsScreen(context, initialWorkOrder: workOrder);
       if (!mounted) {
         return;
       }
@@ -2301,10 +2299,7 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
 }
 
 class _VesselAnalyticsSection extends StatelessWidget {
-  const _VesselAnalyticsSection({
-    required this.title,
-    required this.child,
-  });
+  const _VesselAnalyticsSection({required this.title, required this.child});
 
   final String title;
   final Widget child;
@@ -2391,9 +2386,8 @@ class _VesselHeaderPanel extends StatelessWidget {
                   children: [
                     Text(
                       vessel.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w900),
                     ),
                     const SizedBox(height: 14),
                     statsCard,
@@ -2406,9 +2400,8 @@ class _VesselHeaderPanel extends StatelessWidget {
                     Expanded(
                       child: Text(
                         vessel.name,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w900,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.w900),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -2426,10 +2419,7 @@ class _VesselHeaderPanel extends StatelessWidget {
 }
 
 class _VesselSummaryChip extends StatelessWidget {
-  const _VesselSummaryChip({
-    required this.icon,
-    required this.label,
-  });
+  const _VesselSummaryChip({required this.icon, required this.label});
 
   final IconData icon;
   final String label;
@@ -2563,9 +2553,9 @@ class _VesselSpecCard extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: NavalgoColors.storm,
-                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.labelLarge?.copyWith(color: NavalgoColors.storm),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -2585,10 +2575,7 @@ class _VesselSpecCard extends StatelessWidget {
 }
 
 class _LatestEngineHourCard extends StatelessWidget {
-  const _LatestEngineHourCard({
-    required this.label,
-    required this.hours,
-  });
+  const _LatestEngineHourCard({required this.label, required this.hours});
 
   final String label;
   final int hours;
@@ -2716,10 +2703,7 @@ class _VesselMetricCard extends StatelessWidget {
 }
 
 class _VesselStatsChart extends StatelessWidget {
-  const _VesselStatsChart({
-    required this.stats,
-    required this.onPointTap,
-  });
+  const _VesselStatsChart({required this.stats, required this.onPointTap});
 
   final VesselStats stats;
   final ValueChanged<VesselEngineHourPoint> onPointTap;
@@ -3026,17 +3010,16 @@ class _StatusPill extends StatelessWidget {
 }
 
 class _VesselEngineHoursChartPainter extends CustomPainter {
-  _VesselEngineHoursChartPainter({
-    required this.series,
-    required this.colors,
-  });
+  _VesselEngineHoursChartPainter({required this.series, required this.colors});
 
   final List<VesselEngineHourSeries> series;
   final List<Color> colors;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final allPoints = series.expand((item) => item.points).toList(growable: false);
+    final allPoints = series
+        .expand((item) => item.points)
+        .toList(growable: false);
     if (allPoints.isEmpty) {
       return;
     }
@@ -3047,10 +3030,12 @@ class _VesselEngineHoursChartPainter extends CustomPainter {
     final maxTime = allPoints
         .map((point) => point.recordedAt.millisecondsSinceEpoch.toDouble())
         .reduce(math.max);
-    final minHours =
-        allPoints.map((point) => point.hours.toDouble()).reduce(math.min);
-    final maxHours =
-        allPoints.map((point) => point.hours.toDouble()).reduce(math.max);
+    final minHours = allPoints
+        .map((point) => point.hours.toDouble())
+        .reduce(math.min);
+    final maxHours = allPoints
+        .map((point) => point.hours.toDouble())
+        .reduce(math.max);
 
     const horizontalPadding = 10.0;
     const verticalPadding = 12.0;
@@ -3104,9 +3089,16 @@ class _VesselEngineHoursChartPainter extends CustomPainter {
         ..style = PaintingStyle.stroke;
       final path = Path();
 
-      for (var pointIndex = 0; pointIndex < engineSeries.points.length; pointIndex++) {
+      for (
+        var pointIndex = 0;
+        pointIndex < engineSeries.points.length;
+        pointIndex++
+      ) {
         final point = engineSeries.points[pointIndex];
-        final offset = Offset(resolveX(point.recordedAt), resolveY(point.hours));
+        final offset = Offset(
+          resolveX(point.recordedAt),
+          resolveY(point.hours),
+        );
         if (pointIndex == 0) {
           path.moveTo(offset.dx, offset.dy);
         } else {
@@ -3117,7 +3109,10 @@ class _VesselEngineHoursChartPainter extends CustomPainter {
       canvas.drawPath(path, linePaint);
 
       for (final point in engineSeries.points) {
-        final center = Offset(resolveX(point.recordedAt), resolveY(point.hours));
+        final center = Offset(
+          resolveX(point.recordedAt),
+          resolveY(point.hours),
+        );
         final incidentColor = _statusColor(point.workOrderStatus);
         final stemPaint = Paint()
           ..color = incidentColor.withValues(alpha: 0.16)
@@ -3150,7 +3145,9 @@ VesselEngineHourPoint? _findNearestChartPoint({
   required Size size,
   required Offset tapPosition,
 }) {
-  final allPoints = series.expand((item) => item.points).toList(growable: false);
+  final allPoints = series
+      .expand((item) => item.points)
+      .toList(growable: false);
   if (allPoints.isEmpty || size.width <= 0 || size.height <= 0) {
     return null;
   }
@@ -3161,10 +3158,12 @@ VesselEngineHourPoint? _findNearestChartPoint({
   final maxTime = allPoints
       .map((point) => point.recordedAt.millisecondsSinceEpoch.toDouble())
       .reduce(math.max);
-  final minHours =
-      allPoints.map((point) => point.hours.toDouble()).reduce(math.min);
-  final maxHours =
-      allPoints.map((point) => point.hours.toDouble()).reduce(math.max);
+  final minHours = allPoints
+      .map((point) => point.hours.toDouble())
+      .reduce(math.min);
+  final maxHours = allPoints
+      .map((point) => point.hours.toDouble())
+      .reduce(math.max);
 
   const horizontalPadding = 10.0;
   const verticalPadding = 12.0;
@@ -3198,7 +3197,10 @@ VesselEngineHourPoint? _findNearestChartPoint({
   const maxTapDistance = 18.0;
 
   for (final point in allPoints) {
-    final pointOffset = Offset(resolveX(point.recordedAt), resolveY(point.hours));
+    final pointOffset = Offset(
+      resolveX(point.recordedAt),
+      resolveY(point.hours),
+    );
     final distance = (tapPosition - pointOffset).distance;
     if (distance > maxTapDistance) {
       continue;
