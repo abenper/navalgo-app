@@ -648,6 +648,78 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     await showChangePasswordFormDialog(context);
   }
 
+  Widget _buildMobileDrawer() {
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: NavalgoColors.border),
+                    ),
+                    child: const NavalgoLogo(
+                      variant: NavalgoLogoVariant.colorBadge,
+                      width: 36,
+                      height: 36,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Area de trabajo',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 12,
+                ),
+                itemCount: _titles.length,
+                itemBuilder: (context, index) {
+                  final selected = index == _selectedIndex;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: ListTile(
+                      leading: Icon(
+                        _sectionIcons[index],
+                        color: selected ? NavalgoColors.tide : null,
+                      ),
+                      title: Text(_titles[index]),
+                      selected: selected,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      selectedTileColor: NavalgoColors.mist,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        _onDestinationSelected(index);
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   List<Widget> _buildLoadedScreens() {
     return List<Widget>.generate(_screens.length, (index) {
       if (_loadedIndices.contains(index)) {
@@ -768,6 +840,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
         }
 
         return Scaffold(
+          drawer: _buildMobileDrawer(),
           appBar: _buildAppBar(context),
           body: Container(
             decoration: const BoxDecoration(
