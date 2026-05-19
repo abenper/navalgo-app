@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -335,6 +336,81 @@ public class TimeTrackingService {
         );
     }
 
+    public TimeEntry requireEntry(Long entryId) {
+        return timeEntryRepository.findById(entryId)
+                .orElseThrow(() -> new EntityNotFoundException("Jornada no encontrada"));
+    }
+
+    @Transactional
+    public TimeEntryDto clockInNowFromWhatsApp(Long workerId, TimeEntryWorkSite workSite) {
+        return clockInFromWhatsApp(workerId, LocalTime.now(ZoneId.systemDefault()), workSite);
+    }
+
+    @Transactional
+    public TimeEntryDto clockInFromWhatsApp(Long workerId,
+                                            LocalTime reportedTime,
+                                            TimeEntryWorkSite workSite) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+
+        if (reportedTime == null) {
+            throw new IllegalArgumentException("Debes indicar una hora valida");
+        }
+
+        ZoneId zoneId = ZoneId.systemDefault();
+        Instant now = Instant.now();
+        Instant reportedClockIn = LocalDate.now(zoneId).atTime(reportedTime).atZone(zoneId).toInstant();
+        if (reportedClockIn.isAfter(now)) {
+            throw new IllegalArgumentException("La hora indicada no puede estar en el futuro");
+        }
+
+        Instant start = LocalDate.now(zoneId).atStartOfDay(zoneId).toInstant();
+        Instant end = LocalDate.now(zoneId).plusDays(1).atStartOfDay(zoneId).toInstant();
+        boolean hasClockedToday = !timeEntryRepository
+                .findByWorkerIdAndClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(workerId, start, end)
+                .isEmpty();
+        if (hasClockedToday) {
+            throw new IllegalArgumentException("Ya existe un fichaje registrado hoy");
+        }
+
+        timeEntryRepository.findFirstByWorkerIdAndClockOutIsNullOrderByClockInDesc(workerId)
+                .ifPresent(entry -> {
+                    throw new IllegalArgumentException("El trabajador ya tiene un fichaje abierto");
+                });
+
+        TimeEntry entry = new TimeEntry();
+        entry.setWorker(worker);
+        entry.setClockIn(reportedClockIn);
+        entry.setWorkSite(workSite == null ? TimeEntryWorkSite.WORKSHOP : workSite);
+        entry.setPlannedClockOut(null);
+        entry.setClockInLatitude(null);
+        entry.setClockInLongitude(null);
+        entry.setCloseReminderSentAt(null);
+        entry.setAutoClosedAt(null);
+        entry.setAutoCloseReason(null);
+        return TimeEntryDto.from(timeEntryRepository.save(entry));
+    }
+
+    public List<TimeEntry> findEntriesForDate(Long workerId, LocalDate workDate) {
+        ZoneId zoneId = ZoneId.systemDefault();
+        Instant start = workDate.atStartOfDay(zoneId).toInstant();
+        Instant end = workDate.plusDays(1).atStartOfDay(zoneId).toInstant();
+        return timeEntryRepository.findByWorkerIdAndClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(
+                workerId,
+                start,
+                end
+        );
+    }
+
+    @Transactional
+    public TimeEntryDto attachClockInLocation(Long entryId, Double latitude, Double longitude) {
+        TimeEntry entry = requireEntry(entryId);
+        validateOptionalLocation(latitude, longitude);
+        entry.setClockInLatitude(latitude);
+        entry.setClockInLongitude(longitude);
+        return TimeEntryDto.from(timeEntryRepository.save(entry));
+    }
+
     private WorkerTimeTrackingStatsDto buildStats(Worker worker,
                                                   LocalDate today,
                                                   YearMonth currentMonth,
@@ -585,6 +661,13 @@ public class TimeTrackingService {
     private void validateClockInLocation(Double latitude, Double longitude) {
         if (latitude == null || longitude == null) {
             throw new IllegalArgumentException("Debes permitir la ubicacion para fichar");
+        }
+        validateOptionalLocation(latitude, longitude);
+    }
+
+    private void validateOptionalLocation(Double latitude, Double longitude) {
+        if (latitude == null || longitude == null) {
+            throw new IllegalArgumentException("La ubicacion no es valida");
         }
         if (latitude < -90.0 || latitude > 90.0) {
             throw new IllegalArgumentException("La latitud del fichaje no es valida");

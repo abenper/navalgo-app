@@ -4,6 +4,8 @@ class WorkerProfile {
     required this.fullName,
     required this.email,
     required this.speciality,
+    this.phonePrefix,
+    this.phone,
     required this.role,
     required this.active,
     required this.mustChangePassword,
@@ -17,6 +19,8 @@ class WorkerProfile {
   final String fullName;
   final String email;
   final String? speciality;
+  final String? phonePrefix;
+  final String? phone;
   final String role;
   final bool active;
   final bool mustChangePassword;
@@ -31,13 +35,16 @@ class WorkerProfile {
       fullName: json['fullName'] as String,
       email: json['email'] as String,
       speciality: json['speciality'] as String?,
+      phonePrefix: json['phonePrefix'] as String?,
+      phone: json['phone'] as String?,
       role: json['role'] as String,
       active: json['active'] as bool,
       mustChangePassword: json['mustChangePassword'] as bool? ?? false,
       registrationCompleted: json['registrationCompleted'] as bool? ?? true,
       canEditWorkOrders: json['canEditWorkOrders'] as bool? ?? false,
       contractStartDate: DateTime.parse(
-        (json['contractStartDate'] as String?) ?? DateTime.now().toIso8601String(),
+        (json['contractStartDate'] as String?) ??
+            DateTime.now().toIso8601String(),
       ),
       photoUrl: json['photoUrl'] as String?,
     );

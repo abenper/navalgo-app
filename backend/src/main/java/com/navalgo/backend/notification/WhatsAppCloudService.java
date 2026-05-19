@@ -14,7 +14,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -38,6 +40,32 @@ public class WhatsAppCloudService {
     }
 
     public boolean sendTextMessage(String toPhone, String message) {
+        Map<String, Object> textNode = new LinkedHashMap<>();
+        textNode.put("preview_url", false);
+        textNode.put("body", message.trim());
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", toPhone.trim());
+        payload.put("type", "text");
+        payload.put("text", textNode);
+        return sendPayload(toPhone, message, payload);
+    }
+
+    public boolean sendQuickReplyButtonMessage(String toPhone,
+                                               String message,
+                                               String buttonId,
+                                               String buttonTitle) {
+        return sendQuickReplyButtonsMessage(
+                toPhone,
+                message,
+                List.of(new QuickReplyButton(buttonId, buttonTitle))
+        );
+    }
+
+    public boolean sendQuickReplyButtonsMessage(String toPhone,
+                                                String message,
+                                                List<QuickReplyButton> buttons) {
         if (!properties.isEnabled()) {
             log.debug("WhatsApp Cloud desactivado. No se envia mensaje a {}", toPhone);
             return false;
@@ -51,15 +79,124 @@ public class WhatsAppCloudService {
             return false;
         }
 
-        Map<String, Object> textNode = new LinkedHashMap<>();
-        textNode.put("preview_url", false);
-        textNode.put("body", message.trim());
+        List<QuickReplyButton> validButtons = buttons == null
+                ? List.of()
+                : buttons.stream()
+                .filter(button -> button != null && hasText(button.id()) && hasText(button.title()))
+                .limit(3)
+                .toList();
+
+        if (validButtons.isEmpty()) {
+            return sendTextMessage(toPhone, message);
+        }
+
+        Map<String, Object> bodyNode = new LinkedHashMap<>();
+        bodyNode.put("text", message.trim());
+
+        Map<String, Object> actionNode = new LinkedHashMap<>();
+        actionNode.put(
+                "buttons",
+                validButtons.stream()
+                        .map(button -> {
+                            Map<String, Object> replyNode = new LinkedHashMap<>();
+                            replyNode.put("id", button.id().trim());
+                            replyNode.put("title", button.title().trim());
+
+                            Map<String, Object> buttonNode = new LinkedHashMap<>();
+                            buttonNode.put("type", "reply");
+                            buttonNode.put("reply", replyNode);
+                            return buttonNode;
+                        })
+                        .toList()
+        );
+
+        Map<String, Object> interactiveNode = new LinkedHashMap<>();
+        interactiveNode.put("type", "button");
+        interactiveNode.put("body", bodyNode);
+        interactiveNode.put("action", actionNode);
 
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("messaging_product", "whatsapp");
         payload.put("to", toPhone.trim());
-        payload.put("type", "text");
-        payload.put("text", textNode);
+        payload.put("type", "interactive");
+        payload.put("interactive", interactiveNode);
+        return sendPayload(toPhone, message, payload);
+    }
+
+    public boolean sendMissingClockInReminderTemplate(String toPhone,
+                                                      List<String> bodyParameters,
+                                                      String quickReplyPayload) {
+        if (!properties.hasMissingClockInTemplateConfigured()) {
+            return false;
+        }
+
+        Map<String, Object> languageNode = new LinkedHashMap<>();
+        languageNode.put("code", properties.getMissingClockInTemplateLanguageCode());
+
+        Map<String, Object> templateNode = new LinkedHashMap<>();
+        templateNode.put("name", properties.getMissingClockInTemplateName());
+        templateNode.put("language", languageNode);
+
+        List<Map<String, Object>> components = new ArrayList<>();
+        if (bodyParameters != null && !bodyParameters.isEmpty()) {
+            List<Map<String, Object>> parameters = bodyParameters.stream()
+                    .filter(this::hasText)
+                    .map(value -> {
+                        Map<String, Object> parameterNode = new LinkedHashMap<>();
+                        parameterNode.put("type", "text");
+                        parameterNode.put("text", value.trim());
+                        return parameterNode;
+                    })
+                    .toList();
+            if (!parameters.isEmpty()) {
+                Map<String, Object> bodyComponentNode = new LinkedHashMap<>();
+                bodyComponentNode.put("type", "body");
+                bodyComponentNode.put("parameters", parameters);
+                components.add(bodyComponentNode);
+            }
+        }
+
+        if (hasText(quickReplyPayload)) {
+            Map<String, Object> buttonParameterNode = new LinkedHashMap<>();
+            buttonParameterNode.put("type", "payload");
+            buttonParameterNode.put("payload", quickReplyPayload.trim());
+
+            Map<String, Object> buttonComponentNode = new LinkedHashMap<>();
+            buttonComponentNode.put("type", "button");
+            buttonComponentNode.put("sub_type", "quick_reply");
+            buttonComponentNode.put("index", "0");
+            buttonComponentNode.put("parameters", java.util.List.of(buttonParameterNode));
+            components.add(buttonComponentNode);
+        }
+
+        if (!components.isEmpty()) {
+            templateNode.put("components", components);
+        }
+
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("messaging_product", "whatsapp");
+        payload.put("to", toPhone.trim());
+        payload.put("type", "template");
+        payload.put("template", templateNode);
+        return sendPayload(toPhone, "template:" + properties.getMissingClockInTemplateName(), payload);
+    }
+
+    public record QuickReplyButton(String id, String title) {
+    }
+
+    private boolean sendPayload(String toPhone, String message, Map<String, Object> payload) {
+        if (!properties.isEnabled()) {
+            log.debug("WhatsApp Cloud desactivado. No se envia mensaje a {}", toPhone);
+            return false;
+        }
+        if (!properties.isConfigured()) {
+            log.warn("WhatsApp Cloud activado pero incompleto. Revisa APP_WHATSAPP_VERIFY_TOKEN, APP_WHATSAPP_API_TOKEN y APP_WHATSAPP_PHONE_NUMBER_ID.");
+            return false;
+        }
+        if (!hasText(toPhone) || !hasText(message)) {
+            log.warn("Mensaje de WhatsApp descartado por telefono o cuerpo vacio.");
+            return false;
+        }
 
         HttpRequest request;
         try {

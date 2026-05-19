@@ -13,6 +13,8 @@ public record CreateWorkerRequest(
         @NotBlank @Email @Size(max = 255) String email,
         @Size(min = 12, max = 128) String password,
         @Size(max = 255) String speciality,
+        @NotBlank @Size(max = 8) String phonePrefix,
+        @NotBlank @Size(max = 32) String phone,
         @NotNull Role role,
         boolean canEditWorkOrders,
         LocalDate contractStartDate

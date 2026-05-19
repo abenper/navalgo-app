@@ -12,6 +12,8 @@ public record UpdateWorkerRequest(
         @NotBlank @Size(max = 255) String fullName,
         @NotBlank @Email @Size(max = 255) String email,
         @Size(max = 255) String speciality,
+        @NotBlank @Size(max = 8) String phonePrefix,
+        @NotBlank @Size(max = 32) String phone,
         @NotNull Role role,
         boolean canEditWorkOrders,
         @NotNull LocalDate contractStartDate

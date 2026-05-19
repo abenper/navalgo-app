@@ -5,6 +5,7 @@ import com.navalgo.backend.notification.NotificationDeliveryOptions;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.notification.ResendEmailService;
+import com.navalgo.backend.notification.WhatsAppClockInFlowService;
 import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import org.slf4j.Logger;
@@ -34,17 +35,20 @@ public class TimeTrackingReminderService {
     private final TimeTrackingService timeTrackingService;
     private final WorkerRepository workerRepository;
     private final ResendEmailService resendEmailService;
+    private final WhatsAppClockInFlowService whatsAppClockInFlowService;
 
     public TimeTrackingReminderService(NotificationService notificationService,
                                        TimeEntryRepository timeEntryRepository,
                                        TimeTrackingService timeTrackingService,
                                        WorkerRepository workerRepository,
-                                       ResendEmailService resendEmailService) {
+                                       ResendEmailService resendEmailService,
+                                       WhatsAppClockInFlowService whatsAppClockInFlowService) {
         this.notificationService = notificationService;
         this.timeEntryRepository = timeEntryRepository;
         this.timeTrackingService = timeTrackingService;
         this.workerRepository = workerRepository;
         this.resendEmailService = resendEmailService;
+        this.whatsAppClockInFlowService = whatsAppClockInFlowService;
     }
 
     @Transactional
@@ -83,6 +87,7 @@ public class TimeTrackingReminderService {
                     NotificationDeliveryOptions.DEFAULT
             );
             sendDirectReminderEmail(worker, "No has fichado hoy", "No has fichado en el dia de hoy.");
+            sendWhatsAppReminder(worker, today);
             worker.setLastMissingClockInReminderDate(today);
             updatedWorkers.add(worker);
         }
@@ -227,6 +232,14 @@ public class TimeTrackingReminderService {
             );
         } catch (RuntimeException exception) {
             log.warn("No se pudo enviar el email directo de recordatorio de fichaje. workerId={}", worker.getId(), exception);
+        }
+    }
+
+    private void sendWhatsAppReminder(Worker worker, LocalDate today) {
+        try {
+            whatsAppClockInFlowService.sendMissingClockInReminder(worker, today);
+        } catch (RuntimeException exception) {
+            log.warn("No se pudo enviar el recordatorio de WhatsApp. workerId={}", worker.getId(), exception);
         }
     }
 }

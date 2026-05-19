@@ -13,6 +13,8 @@ public class WhatsAppCloudProperties {
     private String phoneNumberId = "";
     private String apiVersion = "v20.0";
     private String graphBaseUrl = "https://graph.facebook.com";
+    private String missingClockInTemplateName = "";
+    private String missingClockInTemplateLanguageCode = "es";
 
     public boolean isEnabled() {
         return enabled;
@@ -64,11 +66,35 @@ public class WhatsAppCloudProperties {
                 : "https://graph.facebook.com";
     }
 
+    public String getMissingClockInTemplateName() {
+        return missingClockInTemplateName;
+    }
+
+    public void setMissingClockInTemplateName(String missingClockInTemplateName) {
+        this.missingClockInTemplateName = missingClockInTemplateName == null
+                ? ""
+                : missingClockInTemplateName.trim();
+    }
+
+    public String getMissingClockInTemplateLanguageCode() {
+        return missingClockInTemplateLanguageCode;
+    }
+
+    public void setMissingClockInTemplateLanguageCode(String missingClockInTemplateLanguageCode) {
+        this.missingClockInTemplateLanguageCode = hasText(missingClockInTemplateLanguageCode)
+                ? missingClockInTemplateLanguageCode.trim()
+                : "es";
+    }
+
     public boolean isConfigured() {
         return enabled
                 && hasText(apiToken)
                 && hasText(phoneNumberId)
                 && hasText(verifyToken);
+    }
+
+    public boolean hasMissingClockInTemplateConfigured() {
+        return hasText(missingClockInTemplateName) && hasText(missingClockInTemplateLanguageCode);
     }
 
     private boolean hasText(String value) {

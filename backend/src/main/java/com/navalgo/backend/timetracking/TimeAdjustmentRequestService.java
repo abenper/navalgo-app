@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 
 @Service
@@ -55,6 +56,31 @@ public class TimeAdjustmentRequestService {
     public TimeAdjustmentRequestDto create(Long currentWorkerId, CreateTimeAdjustmentRequest request) {
         Worker worker = workerRepository.findById(currentWorkerId)
                 .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        return createInternal(worker, currentWorkerId, request);
+    }
+
+    @Transactional
+    public TimeAdjustmentRequestDto createFromWhatsApp(Long workerId,
+                                                       LocalDate workDate,
+                                                       Instant requestedClockIn,
+                                                       TimeEntryWorkSite workSite,
+                                                       String reason) {
+        Worker worker = workerRepository.findById(workerId)
+                .orElseThrow(() -> new EntityNotFoundException("Trabajador no encontrado"));
+        CreateTimeAdjustmentRequest request = new CreateTimeAdjustmentRequest(
+                resolveLinkedTimeEntryId(workerId, workDate),
+                workDate,
+                requestedClockIn,
+                null,
+                workSite == null ? TimeEntryWorkSite.WORKSHOP : workSite,
+                reason
+        );
+        return createInternal(worker, workerId, request);
+    }
+
+    private TimeAdjustmentRequestDto createInternal(Worker worker,
+                                                    Long currentWorkerId,
+                                                    CreateTimeAdjustmentRequest request) {
         TimeAdjustmentRequest entity = new TimeAdjustmentRequest();
         entity.setWorker(worker);
         applyEditableFields(entity, currentWorkerId, request);
@@ -242,6 +268,18 @@ public class TimeAdjustmentRequestService {
         if (requestedClockIn != null && requestedClockOut != null && requestedClockOut.isBefore(requestedClockIn)) {
             throw new IllegalArgumentException("La hora de salida no puede ser anterior a la de entrada");
         }
+    }
+
+    private Long resolveLinkedTimeEntryId(Long workerId, LocalDate workDate) {
+        ZoneId zoneId = ZoneId.systemDefault();
+        Instant start = workDate.atStartOfDay(zoneId).toInstant();
+        Instant end = workDate.plusDays(1).atStartOfDay(zoneId).toInstant();
+        List<TimeEntry> entries = timeEntryRepository
+                .findByWorkerIdAndClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(workerId, start, end);
+        if (entries.size() == 1) {
+            return entries.get(0).getId();
+        }
+        return null;
     }
 
     private String formatDate(LocalDate date) {

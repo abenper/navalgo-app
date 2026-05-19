@@ -699,6 +699,8 @@ WorkerProfile _fallbackProfile(User user) {
     fullName: user.name,
     email: user.email,
     speciality: null,
+    phonePrefix: null,
+    phone: null,
     role: user.role,
     active: true,
     mustChangePassword: user.mustChangePassword,

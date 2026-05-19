@@ -25,6 +25,12 @@ public class Worker {
 
     private String speciality;
 
+    @Column(nullable = false)
+    private String phonePrefix;
+
+    @Column(nullable = false)
+    private String phone;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role = Role.WORKER;
@@ -67,6 +73,12 @@ public class Worker {
 
     public String getSpeciality() { return speciality; }
     public void setSpeciality(String speciality) { this.speciality = speciality; }
+
+    public String getPhonePrefix() { return phonePrefix; }
+    public void setPhonePrefix(String phonePrefix) { this.phonePrefix = phonePrefix; }
+
+    public String getPhone() { return phone; }
+    public void setPhone(String phone) { this.phone = phone; }
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }

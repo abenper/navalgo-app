@@ -124,6 +124,8 @@ public class WorkerService {
         worker.setEmail(inputSanitizer.email(request.email()));
         worker.setPasswordHash(passwordEncoder.encode(generateTemporaryPassword(24)));
         worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
+        worker.setPhonePrefix(inputSanitizer.requiredText(request.phonePrefix(), "El prefijo del telefono", 8));
+        worker.setPhone(inputSanitizer.requiredText(request.phone(), "El telefono", 32));
         worker.setRole(request.role());
         worker.setActive(true);
         worker.setMustChangePassword(false);
@@ -152,6 +154,8 @@ public class WorkerService {
         worker.setFullName(inputSanitizer.requiredText(request.fullName(), "El nombre", 255));
         worker.setEmail(inputSanitizer.email(request.email()));
         worker.setSpeciality(inputSanitizer.optionalText(request.speciality(), 255));
+        worker.setPhonePrefix(inputSanitizer.requiredText(request.phonePrefix(), "El prefijo del telefono", 8));
+        worker.setPhone(inputSanitizer.requiredText(request.phone(), "El telefono", 32));
         worker.setRole(request.role());
         worker.setCanEditWorkOrders(request.role() == Role.WORKER && request.canEditWorkOrders());
         worker.setContractStartDate(request.contractStartDate());

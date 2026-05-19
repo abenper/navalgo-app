@@ -43,6 +43,28 @@ IconData _workerRoleIcon(String role) {
   }
 }
 
+String? _validatePhonePrefixValue(String? value) {
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.isEmpty) {
+    return 'Indica el prefijo.';
+  }
+  if (!RegExp(r'^\+\d{1,4}$').hasMatch(trimmed)) {
+    return 'Usa un prefijo valido, por ejemplo +34.';
+  }
+  return null;
+}
+
+String? _validatePhoneValue(String? value) {
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.isEmpty) {
+    return 'Indica el telefono.';
+  }
+  if (!RegExp(r'^[0-9 ]{6,20}$').hasMatch(trimmed)) {
+    return 'Introduce solo digitos.';
+  }
+  return null;
+}
+
 class EquipoScreen extends StatefulWidget {
   const EquipoScreen({super.key});
 
@@ -159,6 +181,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
         fullName: result.fullName,
         email: result.email,
         speciality: result.speciality,
+        phonePrefix: result.phonePrefix,
+        phone: result.phone,
         role: result.role,
         canEditWorkOrders: result.canEditWorkOrders,
         contractStartDate: result.contractStartDate,
@@ -242,6 +266,8 @@ class _EquipoScreenState extends State<EquipoScreen> {
         fullName: result.fullName,
         email: result.email,
         speciality: result.speciality,
+        phonePrefix: result.phonePrefix,
+        phone: result.phone,
         role: result.role,
         canEditWorkOrders: result.canEditWorkOrders,
         contractStartDate: result.contractStartDate,
@@ -976,6 +1002,8 @@ class _CreateWorkerInput {
     required this.fullName,
     required this.email,
     required this.speciality,
+    required this.phonePrefix,
+    required this.phone,
     required this.role,
     required this.canEditWorkOrders,
     required this.contractStartDate,
@@ -984,6 +1012,8 @@ class _CreateWorkerInput {
   final String fullName;
   final String email;
   final String speciality;
+  final String phonePrefix;
+  final String phone;
   final String role;
   final bool canEditWorkOrders;
   final DateTime contractStartDate;
@@ -994,6 +1024,8 @@ class _EditWorkerInput {
     required this.fullName,
     required this.email,
     required this.speciality,
+    required this.phonePrefix,
+    required this.phone,
     required this.role,
     required this.canEditWorkOrders,
     required this.contractStartDate,
@@ -1002,6 +1034,8 @@ class _EditWorkerInput {
   final String fullName;
   final String email;
   final String speciality;
+  final String phonePrefix;
+  final String phone;
   final String role;
   final bool canEditWorkOrders;
   final DateTime contractStartDate;
@@ -1021,6 +1055,8 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
   final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _specialityCtrl = TextEditingController();
+  final _phonePrefixCtrl = TextEditingController(text: '+34');
+  final _phoneCtrl = TextEditingController();
   String _role = 'WORKER';
   bool _canEditWorkOrders = false;
   DateTime _contractStartDate = DateTime.now();
@@ -1030,6 +1066,8 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _specialityCtrl.dispose();
+    _phonePrefixCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
@@ -1116,6 +1154,45 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
+              label: 'Telefono',
+              caption:
+                  'El prefijo y el numero se guardaran por separado para futuras notificaciones.',
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 110,
+                    child: TextFormField(
+                      controller: _phonePrefixCtrl,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      decoration: NavalgoFormStyles.inputDecoration(
+                        context,
+                        label: 'Prefijo',
+                        prefixIcon: const Icon(Icons.flag_outlined),
+                      ),
+                      validator: _validatePhonePrefixValue,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      decoration: NavalgoFormStyles.inputDecoration(
+                        context,
+                        label: 'Telefono',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                      ),
+                      validator: _validatePhoneValue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
               label: 'Rol',
               child: DropdownButtonFormField<String>(
                 initialValue: _role,
@@ -1197,6 +1274,8 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
         fullName: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         speciality: _specialityCtrl.text.trim(),
+        phonePrefix: _phonePrefixCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
         role: _role,
         canEditWorkOrders: _canEditWorkOrders,
         contractStartDate: _contractStartDate,
@@ -1245,6 +1324,8 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _emailCtrl;
   late final TextEditingController _specialityCtrl;
+  late final TextEditingController _phonePrefixCtrl;
+  late final TextEditingController _phoneCtrl;
   late String _role;
   late bool _canEditWorkOrders;
   late DateTime _contractStartDate;
@@ -1257,6 +1338,12 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
     _specialityCtrl = TextEditingController(
       text: widget.worker.speciality ?? '',
     );
+    _phonePrefixCtrl = TextEditingController(
+      text: (widget.worker.phonePrefix?.trim().isNotEmpty ?? false)
+          ? widget.worker.phonePrefix
+          : '+34',
+    );
+    _phoneCtrl = TextEditingController(text: widget.worker.phone ?? '');
     _role = widget.worker.role;
     _canEditWorkOrders = widget.worker.canEditWorkOrders;
     _contractStartDate = widget.worker.contractStartDate;
@@ -1267,6 +1354,8 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
     _nameCtrl.dispose();
     _emailCtrl.dispose();
     _specialityCtrl.dispose();
+    _phonePrefixCtrl.dispose();
+    _phoneCtrl.dispose();
     super.dispose();
   }
 
@@ -1354,6 +1443,45 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
+              label: 'Telefono',
+              caption:
+                  'El prefijo y el numero se guardan por separado y ambos son obligatorios.',
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 110,
+                    child: TextFormField(
+                      controller: _phonePrefixCtrl,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      decoration: NavalgoFormStyles.inputDecoration(
+                        context,
+                        label: 'Prefijo',
+                        prefixIcon: const Icon(Icons.flag_outlined),
+                      ),
+                      validator: _validatePhonePrefixValue,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      textInputAction: TextInputAction.next,
+                      decoration: NavalgoFormStyles.inputDecoration(
+                        context,
+                        label: 'Telefono',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                      ),
+                      validator: _validatePhoneValue,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
               label: 'Rol',
               child: DropdownButtonFormField<String>(
                 initialValue: _role,
@@ -1435,6 +1563,8 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
         fullName: _nameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
         speciality: _specialityCtrl.text.trim(),
+        phonePrefix: _phonePrefixCtrl.text.trim(),
+        phone: _phoneCtrl.text.trim(),
         role: _role,
         canEditWorkOrders: _canEditWorkOrders,
         contractStartDate: _contractStartDate,
