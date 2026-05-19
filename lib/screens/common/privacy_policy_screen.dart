@@ -360,7 +360,7 @@ class _WorkerPrivacyContent extends StatelessWidget {
             _SummaryData(
               title: 'Que tratamos',
               body:
-                  'Identidad, acceso, jornada, partes, adjuntos, firmas y trazabilidad tecnica.',
+                  'Identidad, acceso, jornada, partes, adjuntos, firmas, WhatsApp operativo y trazabilidad tecnica.',
               icon: Icons.inventory_2_outlined,
             ),
             _SummaryData(
@@ -372,7 +372,7 @@ class _WorkerPrivacyContent extends StatelessWidget {
             _SummaryData(
               title: 'Ubicacion',
               body:
-                  'Solo se usa de forma puntual para fichajes o evidencias concretas, nunca de forma continua.',
+                  'Solo se usa de forma puntual para fichajes o evidencias concretas, incluso cuando el trabajador comparte ubicacion por WhatsApp.',
               icon: Icons.place_outlined,
             ),
             _SummaryData(
@@ -416,6 +416,9 @@ class _WorkerPrivacyContent extends StatelessWidget {
               'Geolocalizacion puntual asociada a fichaje o evidencia concreta.',
             ),
             _PolicyBullet(
+              'Mensajes operativos de WhatsApp asociados al fichaje, solicitudes de ajuste y respuestas del trabajador.',
+            ),
+            _PolicyBullet(
               'Partes de trabajo, materiales, checklists, revisiones, firmas y archivos adjuntos.',
             ),
           ],
@@ -434,11 +437,71 @@ class _WorkerPrivacyContent extends StatelessWidget {
         ),
         SizedBox(height: 12),
         _SectionCard(
-          title: '4. Destinatarios y derechos',
+          title: '4. Uso de WhatsApp para fines internos',
+          children: [
+            _PolicyParagraph(
+              'Naval-GO puede utilizar WhatsApp como canal operativo interno exclusivamente para trabajadores registrados por la empresa. Este uso no esta abierto al publico general ni se ofrece como servicio publico de mensajeria.',
+            ),
+            _PolicyParagraph(
+              'Se utiliza porque, en ciertos contextos de trabajo, el empleado puede no tener acceso inmediato a la app o puede estar actuando con prisa, desplazandose o embarcado. WhatsApp permite reducir olvidos de fichaje sin convertir el canal en una via publica de soporte o captacion.',
+            ),
+            _PolicyBullet(
+              'Se utiliza para recordatorios de fichaje, registro de hora de entrada, solicitud de ubicacion compartida y solicitudes de ajuste de fichaje por olvido.',
+            ),
+            _PolicyBullet(
+              'Solo se tratan los datos necesarios para esa finalidad: numero de telefono profesional o facilitado por la empresa, contenido del mensaje relacionado con el fichaje, hora registrada y ubicacion compartida si el trabajador la envia.',
+            ),
+            _PolicyBullet(
+              'La ubicacion compartida por WhatsApp no se usa para seguimiento continuo ni monitorizacion permanente.',
+            ),
+            _PolicyBullet(
+              'No se utiliza WhatsApp con fines publicitarios, comerciales masivos ni para comunicaciones ajenas a la gestion interna de la jornada y el trabajo.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '5. Baja del canal de WhatsApp',
+          children: [
+            _PolicyParagraph(
+              'El canal de WhatsApp de Naval-GO no funciona como una suscripcion publica ni como una newsletter. Su activacion o desactivacion se gestiona como parte de la organizacion interna de la empresa usuaria.',
+            ),
+            _PolicyBullet(
+              'El trabajador puede pedir la desactivacion del canal a la persona administradora de su empresa o escribiendo a soporte@naval-go.com.',
+            ),
+            _PolicyBullet(
+              'La empresa puede retirar el numero del flujo operativo, desactivar la cuenta o eliminar la asociacion del telefono con ese usuario para detener nuevos mensajes.',
+            ),
+            _PolicyBullet(
+              'La baja de WhatsApp no elimina por si sola los registros de jornada ya creados ni otras obligaciones legales de conservacion.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '6. Permisos de Meta y destinatarios',
           children: [
             _PolicyParagraph(
               'Los datos pueden tratarse por proveedores necesarios para hosting, correo, almacenamiento o soporte tecnico, siempre bajo instrucciones del responsable y con medidas de seguridad razonables.',
             ),
+            _PolicyBullet(
+              'Cuando se usa WhatsApp, intervienen los servicios de la plataforma WhatsApp Business de Meta como proveedor tecnologico del canal de mensajeria.',
+            ),
+            _PolicyBullet(
+              'whatsapp_business_messaging se usa para enviar y recibir mensajes operativos de fichaje, ubicacion puntual y ajuste de jornada.',
+            ),
+            _PolicyBullet(
+              'whatsapp_business_management se usa para gestionar los recursos del numero de empresa, plantillas y configuracion del canal de WhatsApp Business.',
+            ),
+            _PolicyBullet(
+              'business_management solo se mantiene si resulta necesario para administrar activos empresariales vinculados a la cuenta de WhatsApp Business dentro del portfolio de negocio.',
+            ),
+          ],
+        ),
+        SizedBox(height: 12),
+        _SectionCard(
+          title: '7. Derechos',
+          children: [
             _PolicyBullet(
               'Puedes solicitar acceso, rectificacion o supresion de tus datos.',
             ),
@@ -465,7 +528,7 @@ class _WorkerTermsContent extends StatelessWidget {
             _SummaryData(
               title: 'Uso autorizado',
               body:
-                  'La cuenta es profesional y solo debe usarse dentro del marco de trabajo autorizado.',
+                  'La cuenta es profesional y solo debe usarse dentro del marco de trabajo autorizado, incluidos los flujos internos por WhatsApp.',
               icon: Icons.lock_outline,
             ),
             _SummaryData(
@@ -520,6 +583,9 @@ class _WorkerTermsContent extends StatelessWidget {
             ),
             _PolicyBullet(
               'No esta permitido extraer informacion de clientes, empresa o companeros fuera del uso autorizado.',
+            ),
+            _PolicyBullet(
+              'Si la empresa habilita WhatsApp para fichajes o ajustes, su uso queda limitado a fines operativos internos y no debe utilizarse para consultas ajenas al trabajo.',
             ),
           ],
         ),
