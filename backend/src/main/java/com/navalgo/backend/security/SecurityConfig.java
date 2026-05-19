@@ -55,7 +55,9 @@ public class SecurityConfig {
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> {
                     auth.requestMatchers("/api/auth/**", "/actuator/health").permitAll()
-                            .requestMatchers(HttpMethod.GET, "/api/health").permitAll();
+                            .requestMatchers(HttpMethod.GET, "/api/health").permitAll()
+                            .requestMatchers(HttpMethod.GET, "/api/webhooks/whatsapp").permitAll()
+                            .requestMatchers(HttpMethod.POST, "/api/webhooks/whatsapp").permitAll();
                     if (exposeSwagger) {
                         auth.requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll();
                     } else {
