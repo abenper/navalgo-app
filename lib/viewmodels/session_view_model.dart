@@ -9,7 +9,8 @@ class SessionViewModel extends ChangeNotifier {
   static const _rememberedEmailKey = 'remembered_email';
   static const _legacyUserSessionKey = 'user_session';
   static const _sessionStartedAtKey = 'session_started_at';
-  static const _maxSessionAge = Duration(days: 30);
+  static const _refreshCookieStorageKey = 'auth_refresh_cookie';
+  static const _maxSessionAge = Duration(days: 90);
 
   SessionViewModel({AuthService? authService}) : _authService = authService;
 
@@ -148,6 +149,7 @@ class SessionViewModel extends ChangeNotifier {
   }) async {
     await _clearLegacyUserSnapshot(prefs);
     await prefs.remove(_sessionStartedAtKey);
+    await prefs.remove(_refreshCookieStorageKey);
     if (clearRememberedEmail) {
       await prefs.setBool(_rememberMeKey, false);
       await prefs.remove(_rememberedEmailKey);

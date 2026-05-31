@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../firebase_options.dart';
 import '../utils/browser_notification.dart';
@@ -13,6 +14,14 @@ import 'notification_service.dart';
 // > Web Push certificates. Required for getToken() on web.
 const String _firebaseWebVapidKey =
     'BDi2-Q05VzIhbIm73QBGbteqMoYDeVNEoLnmiQWqvjdLiiI6XyvK8i8SXHv9krSJbgcpVTcwnbvKc5bf0AvkCuM';
+
+const AndroidNotificationChannel _androidNotificationChannel =
+    AndroidNotificationChannel(
+      'navalgo_notifications',
+      'Navalgo Notifications',
+      description: 'Avisos operativos, recordatorios y revisiones pendientes.',
+      importance: Importance.max,
+    );
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -52,6 +61,7 @@ class PushNotificationService {
   String? _registeredPushToken;
   bool _setupAttempted = false;
   bool _firebaseAvailable = false;
+  bool _listenersAttached = false;
 
   Future<void> dispose() async {
     await _foregroundSubscription?.cancel();
@@ -87,7 +97,7 @@ class PushNotificationService {
   }
 
   Future<void> _ensureInitialized() async {
-    if (_setupAttempted) {
+    if (_setupAttempted && _firebaseAvailable) {
       return;
     }
     _setupAttempted = true;
@@ -109,6 +119,11 @@ class PushNotificationService {
             iOS: DarwinInitializationSettings(),
           ),
         );
+        await _localNotifications
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >()
+            ?.createNotificationChannel(_androidNotificationChannel);
 
         FirebaseMessaging.onBackgroundMessage(
           firebaseMessagingBackgroundHandler,
@@ -116,6 +131,9 @@ class PushNotificationService {
       }
 
       await _messaging.requestPermission(alert: true, badge: true, sound: true);
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        await Permission.notification.request();
+      }
       final settings = await _messaging.getNotificationSettings();
       debugPrint(
         'Push permission status: ${settings.authorizationStatus.name}',
@@ -134,24 +152,35 @@ class PushNotificationService {
         );
       }
 
-      _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
-        unawaited(_handleForegroundMessage(message));
-      });
-      _messageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
-        message,
-      ) {
-        debugPrint(
-          'Push messageOpenedApp notificationId=${message.messageId} data=${message.data}',
-        );
+      if (!_listenersAttached) {
+        _foregroundSubscription = FirebaseMessaging.onMessage.listen((message) {
+          unawaited(_handleForegroundMessage(message));
+        });
+        _messageOpenedSubscription = FirebaseMessaging.onMessageOpenedApp.listen((
+          message,
+        ) {
+          debugPrint(
+            'Push messageOpenedApp notificationId=${message.messageId} data=${message.data}',
+          );
+          final refreshNotifications = _refreshNotifications;
+          if (refreshNotifications != null) {
+            unawaited(refreshNotifications());
+          }
+        });
+        _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((token) {
+          debugPrint('Push token refreshed: ${_maskToken(token)}');
+          unawaited(_registerCurrentToken(explicitToken: token, force: true));
+        });
+        _listenersAttached = true;
+      }
+
+      final initialMessage = await _messaging.getInitialMessage();
+      if (initialMessage != null) {
         final refreshNotifications = _refreshNotifications;
         if (refreshNotifications != null) {
           unawaited(refreshNotifications());
         }
-      });
-      _tokenRefreshSubscription = _messaging.onTokenRefresh.listen((token) {
-        debugPrint('Push token refreshed: ${_maskToken(token)}');
-        unawaited(_registerCurrentToken(explicitToken: token, force: true));
-      });
+      }
 
       _firebaseAvailable = true;
       debugPrint('Push Firebase inicializado correctamente en cliente.');

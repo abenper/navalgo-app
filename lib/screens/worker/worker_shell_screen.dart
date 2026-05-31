@@ -851,55 +851,6 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
               children: _buildLoadedScreens(),
             ),
           ),
-          bottomNavigationBar: SafeArea(
-            top: false,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-                border: const Border(
-                  top: BorderSide(color: NavalgoColors.border),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: NavalgoColors.deepSea.withValues(alpha: 0.08),
-                    blurRadius: 20,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: NavigationBar(
-                height: 72,
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: _onDestinationSelected,
-                labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.dashboard_outlined),
-                    selectedIcon: Icon(Icons.dashboard),
-                    label: 'Inicio',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.assignment_outlined),
-                    selectedIcon: Icon(Icons.assignment),
-                    label: 'Partes',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.access_time_outlined),
-                    selectedIcon: Icon(Icons.access_time_filled),
-                    label: 'Fichaje',
-                  ),
-                  NavigationDestination(
-                    icon: Icon(Icons.event_note_outlined),
-                    selectedIcon: Icon(Icons.event_note),
-                    label: 'Ausencias',
-                  ),
-                ],
-              ),
-            ),
-          ),
         );
       },
     );

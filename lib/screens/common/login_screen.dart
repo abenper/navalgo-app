@@ -27,14 +27,14 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _rememberMe = false;
+  bool _rememberMe = true;
   bool _obscurePassword = true;
 
   @override
   void initState() {
     super.initState();
     final session = context.read<SessionViewModel>();
-    _rememberMe = session.rememberMeEnabled;
+    _rememberMe = true;
     if (session.rememberedEmail.isNotEmpty) {
       _emailController.text = session.rememberedEmail;
     }

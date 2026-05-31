@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api_exception.dart';
 import 'http_client_factory.dart';
@@ -14,6 +15,10 @@ class ApiClient {
   static Future<void> Function(String message)? _sessionExpiredHandler;
   static Future<String?> Function()? _accessTokenRefreshHandler;
   static Future<String?>? _refreshInFlight;
+  static const _refreshCookieName = 'navalgo_refresh_token';
+  static const _refreshCookieStorageKey = 'auth_refresh_cookie';
+  static String? _cachedRefreshCookie;
+  static bool _refreshCookieLoaded = false;
 
   static void configureSessionExpiredHandler(
     Future<void> Function(String message)? handler,
@@ -45,13 +50,15 @@ class ApiClient {
 
     late final http.Response response;
     try {
+      await _ensureRefreshCookieLoaded();
       response = await _httpClient
-          .get(uri, headers: _buildHeaders(headers))
+          .get(uri, headers: _buildHeaders(headers, uri: uri))
           .timeout(const Duration(seconds: 12));
     } on Exception catch (e) {
       throw ApiException('No se pudo conectar con el servidor', details: '$e');
     }
 
+    await _storeRefreshCookieFromHeaders(response.headers);
     return _decodeResponse(response);
   }
 
@@ -87,13 +94,15 @@ class ApiClient {
   ) async {
     late final http.Response response;
     try {
+      await _ensureRefreshCookieLoaded();
       response = await _httpClient
-          .get(uri, headers: _buildHeaders(headers))
+          .get(uri, headers: _buildHeaders(headers, uri: uri))
           .timeout(const Duration(seconds: 30));
     } on Exception catch (e) {
       throw ApiException('No se pudo conectar con el servidor', details: '$e');
     }
 
+    await _storeRefreshCookieFromHeaders(response.headers);
     final token = extractBearerToken(response.request?.headers);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 401 && token != null) {
@@ -124,10 +133,11 @@ class ApiClient {
 
     late final http.Response response;
     try {
+      await _ensureRefreshCookieLoaded();
       response = await _httpClient
           .post(
             uri,
-            headers: _buildHeaders(headers),
+            headers: _buildHeaders(headers, uri: uri),
             body: jsonEncode(body ?? <String, dynamic>{}),
           )
           .timeout(const Duration(seconds: 12));
@@ -135,6 +145,7 @@ class ApiClient {
       throw ApiException('No se pudo conectar con el servidor', details: '$e');
     }
 
+    await _storeRefreshCookieFromHeaders(response.headers);
     return _decodeResponse(response);
   }
 
@@ -149,10 +160,11 @@ class ApiClient {
 
     late final http.Response response;
     try {
+      await _ensureRefreshCookieLoaded();
       response = await _httpClient
           .patch(
             uri,
-            headers: _buildHeaders(headers),
+            headers: _buildHeaders(headers, uri: uri),
             body: jsonEncode(body ?? <String, dynamic>{}),
           )
           .timeout(const Duration(seconds: 12));
@@ -160,6 +172,7 @@ class ApiClient {
       throw ApiException('No se pudo conectar con el servidor', details: '$e');
     }
 
+    await _storeRefreshCookieFromHeaders(response.headers);
     return _decodeResponse(response);
   }
 
@@ -174,10 +187,11 @@ class ApiClient {
 
     late final http.Response response;
     try {
+      await _ensureRefreshCookieLoaded();
       response = await _httpClient
           .put(
             uri,
-            headers: _buildHeaders(headers),
+            headers: _buildHeaders(headers, uri: uri),
             body: jsonEncode(body ?? <String, dynamic>{}),
           )
           .timeout(const Duration(seconds: 12));
@@ -185,6 +199,7 @@ class ApiClient {
       throw ApiException('No se pudo conectar con el servidor', details: '$e');
     }
 
+    await _storeRefreshCookieFromHeaders(response.headers);
     return _decodeResponse(response);
   }
 
@@ -199,10 +214,11 @@ class ApiClient {
 
     late final http.Response response;
     try {
+      await _ensureRefreshCookieLoaded();
       response = await _httpClient
           .delete(
             uri,
-            headers: _buildHeaders(headers),
+            headers: _buildHeaders(headers, uri: uri),
             body: body == null ? null : jsonEncode(body),
           )
           .timeout(const Duration(seconds: 12));
@@ -210,11 +226,20 @@ class ApiClient {
       throw ApiException('No se pudo conectar con el servidor', details: '$e');
     }
 
+    await _storeRefreshCookieFromHeaders(response.headers);
     return _decodeResponse(response);
   }
 
-  Map<String, String> _buildHeaders(Map<String, String>? headers) {
-    return {'Content-Type': 'application/json', ...?headers};
+  Map<String, String> _buildHeaders(Map<String, String>? headers, {Uri? uri}) {
+    final builtHeaders = {'Content-Type': 'application/json', ...?headers};
+    final refreshCookie = _cachedRefreshCookie;
+    if (refreshCookie != null &&
+        refreshCookie.isNotEmpty &&
+        _shouldSendRefreshCookie(uri) &&
+        !builtHeaders.keys.any((key) => key.toLowerCase() == 'cookie')) {
+      builtHeaders['Cookie'] = '$_refreshCookieName=$refreshCookie';
+    }
+    return builtHeaders;
   }
 
   dynamic _decodeResponse(http.Response response) {
@@ -367,5 +392,56 @@ class ApiClient {
       return;
     }
     await handler('Tu sesión ha expirado. Inicia sesión de nuevo.');
+  }
+
+  static bool _shouldSendRefreshCookie(Uri? uri) {
+    if (uri == null) {
+      return true;
+    }
+    return uri.path.startsWith('/api/');
+  }
+
+  static Future<void> _ensureRefreshCookieLoaded() async {
+    if (_refreshCookieLoaded) {
+      return;
+    }
+    final prefs = await SharedPreferences.getInstance();
+    _cachedRefreshCookie = prefs.getString(_refreshCookieStorageKey);
+    _refreshCookieLoaded = true;
+  }
+
+  static Future<void> _storeRefreshCookieFromHeaders(
+    Map<String, String> headers,
+  ) async {
+    final rawSetCookie = headers.entries
+        .firstWhere(
+          (entry) => entry.key.toLowerCase() == 'set-cookie',
+          orElse: () => const MapEntry('', ''),
+        )
+        .value;
+    if (rawSetCookie.isEmpty || !rawSetCookie.contains(_refreshCookieName)) {
+      return;
+    }
+
+    final match = RegExp(
+      '$_refreshCookieName=([^;]*)',
+      caseSensitive: false,
+    ).firstMatch(rawSetCookie);
+    if (match == null) {
+      return;
+    }
+
+    final value = match.group(1)?.trim() ?? '';
+    final shouldClear =
+        value.isEmpty || rawSetCookie.toLowerCase().contains('max-age=0');
+    final prefs = await SharedPreferences.getInstance();
+    if (shouldClear) {
+      _cachedRefreshCookie = null;
+      await prefs.remove(_refreshCookieStorageKey);
+      return;
+    }
+
+    _cachedRefreshCookie = value;
+    await prefs.setString(_refreshCookieStorageKey, value);
   }
 }

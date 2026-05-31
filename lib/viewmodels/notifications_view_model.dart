@@ -1,25 +1,28 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 import '../models/app_notification.dart';
 import '../services/notification_service.dart';
 import '../utils/browser_notification.dart';
 import 'session_view_model.dart';
 
-class NotificationsViewModel extends ChangeNotifier {
+class NotificationsViewModel extends ChangeNotifier
+    with WidgetsBindingObserver {
   NotificationsViewModel({
     required NotificationService notificationService,
     required SessionViewModel session,
   }) : _notificationService = notificationService,
        _session = session {
+    WidgetsBinding.instance.addObserver(this);
     _session.addListener(_handleSessionChanged);
     _syncAutoRefreshWithSession();
   }
 
   final NotificationService _notificationService;
   final SessionViewModel _session;
-  static const Duration _pollInterval = Duration(seconds: 15);
+  static const Duration _pollInterval = Duration(seconds: 8);
 
   bool _isLoading = false;
   bool _isRefreshing = false;
@@ -155,6 +158,13 @@ class NotificationsViewModel extends ChangeNotifier {
     });
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_refresh(showLoading: false));
+    }
+  }
+
   void _showWebNotificationFallback({
     required List<AppNotification> previous,
     required List<AppNotification> next,
@@ -217,6 +227,7 @@ class NotificationsViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     _session.removeListener(_handleSessionChanged);
     super.dispose();
   }

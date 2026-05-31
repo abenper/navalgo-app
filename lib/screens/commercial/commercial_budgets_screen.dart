@@ -563,27 +563,46 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Presupuestos',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    NavalgoGradientButton(
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stackHeader = constraints.maxWidth < 430;
+                    final title = Text(
+                      'Presupuestos',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    );
+                    final action = NavalgoGradientButton(
                       label: _isCreating ? 'Creando...' : 'Nuevo presupuesto',
                       icon: _isCreating ? null : Icons.add_circle_outline,
+                      expand: stackHeader,
                       onPressed: _isCreating ? null : _createBudget,
-                    ),
-                  ],
+                    );
+
+                    if (stackHeader) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          title,
+                          const SizedBox(height: 12),
+                          action,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: title),
+                        const SizedBox(width: 12),
+                        Flexible(child: action),
+                      ],
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 LayoutBuilder(
                   builder: (context, constraints) {
                     final crossAxisCount = constraints.maxWidth >= 900 ? 3 : 1;
-                    final childAspectRatio = crossAxisCount == 3 ? 1.75 : 2.6;
+                    final childAspectRatio = crossAxisCount == 3 ? 1.75 : 2.05;
                     return GridView(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),

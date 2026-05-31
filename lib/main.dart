@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:navalgo/app/app_globals.dart';
 import 'package:navalgo/firebase_options.dart';
 import 'package:navalgo/services/network/api_client.dart';
@@ -221,7 +222,72 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('es')],
-      home: const _RootScreen(),
+      home: const _StartupPermissionsGate(child: _RootScreen()),
+    );
+  }
+}
+
+class _StartupPermissionsGate extends StatefulWidget {
+  const _StartupPermissionsGate({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_StartupPermissionsGate> createState() =>
+      _StartupPermissionsGateState();
+}
+
+class _StartupPermissionsGateState extends State<_StartupPermissionsGate> {
+  Future<void>? _startupRequest;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _startupRequest = _requestStartupPermissions();
+      });
+    });
+  }
+
+  Future<void> _requestStartupPermissions() async {
+    if (kIsWeb) {
+      return;
+    }
+
+    if (defaultTargetPlatform != TargetPlatform.android &&
+        defaultTargetPlatform != TargetPlatform.iOS) {
+      return;
+    }
+
+    await Permission.notification.request();
+    await Permission.camera.request();
+    await Permission.microphone.request();
+    await Permission.location.request();
+    await Permission.locationWhenInUse.request();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final request = _startupRequest;
+    if (request == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    return FutureBuilder<void>(
+      future: request,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        return widget.child;
+      },
     );
   }
 }
@@ -253,7 +319,9 @@ class _RootScreen extends StatelessWidget {
     }
 
     if (isResetPasswordEntryUri(Uri.base)) {
-      return ResetPasswordScreen(token: Uri.base.queryParameters['token'] ?? '');
+      return ResetPasswordScreen(
+        token: Uri.base.queryParameters['token'] ?? '',
+      );
     }
 
     final session = context.watch<SessionViewModel>();

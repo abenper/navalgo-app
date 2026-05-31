@@ -67,7 +67,7 @@ psql -h localhost -U postgres -d navalgo -f navalgo_backend_postgres_migration.s
 ```bash
 APP_JWT_SECRET=un_secreto_de_al_menos_32_bytes
 APP_JWT_EXPIRATION_MS=3600000
-APP_JWT_REFRESH_EXPIRATION_MS=604800000
+APP_JWT_REFRESH_EXPIRATION_MS=7776000000
 SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/navalgo
 SPRING_DATASOURCE_USERNAME=navalgo
 SPRING_DATASOURCE_PASSWORD=cambia_esto

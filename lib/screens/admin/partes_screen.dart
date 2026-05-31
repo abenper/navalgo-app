@@ -1,13 +1,14 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:camera/camera.dart' as camera;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:signature/signature.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/owner.dart';
@@ -1544,7 +1545,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
               ),
               const SizedBox(height: 4),
               Text(
-                'Los adjuntos de avance se capturan desde la app y se guardan con ubicaci?n y marca de agua.',
+                'Los adjuntos de avance se capturan desde la app y se guardan con ubicación y marca de agua.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 12),
@@ -1552,7 +1553,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  if (_canCaptureMedia && _canCaptureWorkProgressMedia(context))
+                  if (_canCaptureMedia && _canCaptureWorkProgressMedia)
                     OutlinedButton.icon(
                       onPressed: _busy || _signing
                           ? null
@@ -1560,13 +1561,13 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                       icon: const Icon(Icons.photo_camera_outlined, size: 18),
                       label: const Text('Foto'),
                     ),
-                  if (_canCaptureMedia && _canCaptureWorkProgressMedia(context))
+                  if (_canCaptureMedia && _canCaptureWorkProgressMedia)
                     OutlinedButton.icon(
                       onPressed: _busy || _signing
                           ? null
                           : _captureWorkProgressVideo,
                       icon: const Icon(Icons.videocam_outlined, size: 18),
-                      label: const Text('V?deo'),
+                      label: const Text('Vídeo'),
                     ),
                   if (_canDownloadEvidenceActa)
                     OutlinedButton.icon(
@@ -1579,11 +1580,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             ],
           ),
           const SizedBox(height: 12),
-          if (kIsWeb && !_isMobileWebDevice(context))
+          if (kIsWeb)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                'Los adjuntos de avance solo pueden capturarse desde la app m?vil para evitar archivos externos.',
+                'Los adjuntos de avance solo pueden capturarse desde la app móvil para abrir la cámara y evitar archivos externos.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: NavalgoColors.storm),
@@ -1591,7 +1592,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
             ),
           if (_attachments.isEmpty)
             Text(
-              'Todav?a no hay avances adjuntos en este parte.',
+              'Todavía no hay avances adjuntos en este parte.',
               style: Theme.of(context).textTheme.bodyMedium,
             )
           else
@@ -2221,10 +2222,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }
 
   Future<void> _captureWorkProgressPhoto() async {
-    if (kIsWeb && !_isMobileWebDevice(context)) {
+    if (kIsWeb) {
       AppToast.warning(
         context,
-        'Los adjuntos de avance solo se pueden capturar desde la app móvil o desde la web abierta en un móvil.',
+        'Los adjuntos de avance solo se pueden capturar desde la app móvil para abrir la cámara.',
       );
       return;
     }
@@ -2235,32 +2236,32 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       return;
     }
 
-    final position = await _getRequiredAttachmentPosition();
-    if (position == null) {
+    if (!await _ensureCameraPermissions()) {
       return;
     }
 
     try {
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.rear,
-        imageQuality: 92,
+      final captured = await _openWorkProgressCamera(
+        mode: _WorkProgressCameraMode.photo,
       );
-      if (picked == null) {
+      if (captured == null) {
         return;
       }
 
-      final bytes = await picked.readAsBytes();
-      final mime = picked.mimeType ?? _guessMimeType(picked.name);
+      final bytes = await captured.readAsBytes();
+      final mime = captured.mimeType ?? _guessMimeType(captured.name);
       final capturedAt = DateTime.now().toUtc();
+      final position = await _getRequiredAttachmentPosition();
+      if (position == null) {
+        return;
+      }
 
       setState(() => _busy = true);
       final updated = await mediaService.attachToWorkOrder(
         token,
         workOrderId: _workOrder.id,
         fileName: _normalizeCapturedMediaFileName(
-          picked.name,
+          captured.name,
           fallback:
               'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.jpg',
         ),
@@ -2276,7 +2277,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       setState(() {
         _updateWorkOrder(updated, syncInputs: false);
       });
-      AppToast.success(context, 'Foto de avance guardada.');
+      AppToast.success(context, 'Foto de avance guardada con GPS.');
     } catch (e) {
       if (!mounted) {
         return;
@@ -2300,10 +2301,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }
 
   Future<void> _captureWorkProgressVideo() async {
-    if (kIsWeb && !_isMobileWebDevice(context)) {
+    if (kIsWeb) {
       AppToast.warning(
         context,
-        'Los vídeos de avance solo se pueden capturar desde la app móvil o desde la web abierta en un móvil.',
+        'Los vídeos de avance solo se pueden capturar desde la app móvil para abrir la cámara.',
       );
       return;
     }
@@ -2314,32 +2315,32 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       return;
     }
 
-    final position = await _getRequiredAttachmentPosition();
-    if (position == null) {
+    if (!await _ensureCameraPermissions(includeAudio: true)) {
       return;
     }
 
     try {
-      final picker = ImagePicker();
-      final picked = await picker.pickVideo(
-        source: ImageSource.camera,
-        preferredCameraDevice: CameraDevice.rear,
-        maxDuration: const Duration(minutes: 3),
+      final captured = await _openWorkProgressCamera(
+        mode: _WorkProgressCameraMode.video,
       );
-      if (picked == null) {
+      if (captured == null) {
         return;
       }
 
-      final bytes = await picked.readAsBytes();
-      final mime = picked.mimeType ?? _guessMimeType(picked.name);
+      final bytes = await captured.readAsBytes();
+      final mime = captured.mimeType ?? _guessMimeType(captured.name);
       final capturedAt = DateTime.now().toUtc();
+      final position = await _getRequiredAttachmentPosition();
+      if (position == null) {
+        return;
+      }
 
       setState(() => _busy = true);
       final updated = await mediaService.attachToWorkOrder(
         token,
         workOrderId: _workOrder.id,
         fileName: _normalizeCapturedMediaFileName(
-          picked.name,
+          captured.name,
           fallback:
               'avance_${_workOrder.id}_${capturedAt.millisecondsSinceEpoch}.mp4',
         ),
@@ -2355,7 +2356,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       setState(() {
         _updateWorkOrder(updated, syncInputs: false);
       });
-      AppToast.success(context, 'Vídeo de avance guardado.');
+      AppToast.success(context, 'Vídeo de avance guardado con GPS.');
     } catch (e) {
       if (!mounted) {
         return;
@@ -2378,21 +2379,70 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     }
   }
 
+  Future<camera.XFile?> _openWorkProgressCamera({
+    required _WorkProgressCameraMode mode,
+  }) async {
+    if (!mounted) {
+      return null;
+    }
+
+    return Navigator.of(context).push<camera.XFile>(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (_) => _WorkProgressCameraScreen(mode: mode),
+      ),
+    );
+  }
+
+  Future<bool> _ensureCameraPermissions({bool includeAudio = false}) async {
+    if (kIsWeb) {
+      return false;
+    }
+
+    final cameraStatus = await Permission.camera.status;
+    final audioStatus = includeAudio
+        ? await Permission.microphone.status
+        : PermissionStatus.granted;
+
+    if (cameraStatus.isGranted && audioStatus.isGranted) {
+      return true;
+    }
+
+    if (!mounted) {
+      return false;
+    }
+
+    final needsSettings =
+        cameraStatus.isPermanentlyDenied || audioStatus.isPermanentlyDenied;
+    AppToast.error(
+      context,
+      needsSettings
+          ? 'Activa los permisos de cámara${includeAudio ? ' y micrófono' : ''} en ajustes para capturar avances.'
+          : 'Necesitamos permiso de cámara${includeAudio ? ' y micrófono' : ''} para capturar el avance.',
+    );
+
+    if (needsSettings) {
+      await openAppSettings();
+    }
+    return false;
+  }
+
   Future<Position?> _getRequiredAttachmentPosition() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         if (mounted) {
-          AppToast.warning(
+          AppToast.error(
             context,
-            'Activa la ubicación del dispositivo para adjuntar multimedia de avance.',
+            'Activa la ubicación del dispositivo. No se guardará el avance sin GPS.',
           );
         }
         return null;
       }
 
       var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.unableToDetermine) {
         permission = await Geolocator.requestPermission();
       }
 
@@ -2400,34 +2450,100 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
           permission == LocationPermission.deniedForever ||
           permission == LocationPermission.unableToDetermine) {
         if (mounted) {
-          AppToast.warning(
+          AppToast.error(
             context,
-            'La ubicación es obligatoria para guardar multimedia de avance con metadatos y marca de agua.',
+            'Debes permitir la ubicación. No se guardará el avance sin GPS.',
           );
+          if (permission == LocationPermission.deniedForever) {
+            await openAppSettings();
+          }
         }
         return null;
       }
 
-      return await Geolocator.getCurrentPosition();
-    } catch (_) {
+      final position = await _getCurrentPositionForWorkOrder(
+        timeout: const Duration(seconds: 35),
+      );
+      debugPrint(
+        'GPS avance OK lat=${position.latitude} lon=${position.longitude} accuracy=${position.accuracy}',
+      );
+      return position;
+    } catch (error) {
+      debugPrint('No se pudo obtener GPS para avance: $error');
       if (mounted) {
-        AppToast.warning(
+        AppToast.error(
           context,
-          'No se pudo obtener la ubicación actual para adjuntar la foto.',
+          'No se pudo obtener GPS. No se ha guardado el adjunto; prueba en una zona con señal o revisa la precisión de ubicación.',
         );
       }
       return null;
     }
   }
 
-  Future<Position?> _getOptionalSignaturePosition() async {
+  Future<Position?> _getRequiredSignaturePosition() async {
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
+        if (mounted) {
+          AppToast.error(
+            context,
+            'Activa la ubicación del dispositivo para firmar.',
+          );
+        }
         return null;
       }
-      return await Geolocator.getCurrentPosition();
-    } catch (_) {
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.unableToDetermine) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.unableToDetermine) {
+        if (permission == LocationPermission.deniedForever) {
+          await openAppSettings();
+        }
+        if (mounted) {
+          AppToast.error(context, 'Debes permitir la ubicación para firmar.');
+        }
+        return null;
+      }
+
+      final position = await _getCurrentPositionForWorkOrder(
+        timeout: const Duration(seconds: 35),
+      );
+      debugPrint(
+        'GPS firma OK lat=${position.latitude} lon=${position.longitude} accuracy=${position.accuracy}',
+      );
+      return position;
+    } catch (error) {
+      debugPrint('No se pudo obtener GPS para firma: $error');
+      if (mounted) {
+        AppToast.error(
+          context,
+          'No se pudo obtener GPS. No se ha guardado la firma.',
+        );
+      }
       return null;
+    }
+  }
+
+  Future<Position> _getCurrentPositionForWorkOrder({
+    required Duration timeout,
+  }) async {
+    try {
+      return await Geolocator.getCurrentPosition(
+        locationSettings: _androidAwareLocationSettings(timeout: timeout),
+      );
+    } on TimeoutException {
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        debugPrint(
+          'GPS fallback lastKnown lat=${lastKnown.latitude} lon=${lastKnown.longitude} accuracy=${lastKnown.accuracy}',
+        );
+        return lastKnown;
+      }
+      rethrow;
     }
   }
 
@@ -2473,7 +2589,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         controller: _clientSigController,
         signaturePadKey: _clientSignaturePadKey,
       );
-      final position = await _getOptionalSignaturePosition();
+      final position = await _getRequiredSignaturePosition();
+      if (position == null) {
+        return;
+      }
 
       final updated = await mediaService.uploadClientSignature(
         token,
@@ -2481,8 +2600,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         signatureFileName: 'firma_cliente_parte_${_workOrder.id}.png',
         signatureBytes: signatureBytes,
         signatureMimeType: 'image/png',
-        latitude: position?.latitude,
-        longitude: position?.longitude,
+        latitude: position.latitude,
+        longitude: position.longitude,
       );
 
       if (!mounted) {
@@ -2603,7 +2722,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         controller: _sigController,
         signaturePadKey: _signaturePadKey,
       );
-      final position = await _getOptionalSignaturePosition();
+      final position = await _getRequiredSignaturePosition();
+      if (position == null) {
+        return;
+      }
 
       await mediaService.signWorkOrder(
         token,
@@ -2611,8 +2733,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         signatureFileName: 'firma_parte_${_workOrder.id}.png',
         signatureBytes: signatureBytes,
         signatureMimeType: 'image/png',
-        latitude: position?.latitude,
-        longitude: position?.longitude,
+        latitude: position.latitude,
+        longitude: position.longitude,
       );
 
       if (!mounted) {
@@ -3012,22 +3134,272 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }
 }
 
-bool _isMobileWebDevice(BuildContext context) {
-  if (!kIsWeb) {
-    return false;
+bool get _canCaptureWorkProgressMedia => !kIsWeb;
+
+LocationSettings _androidAwareLocationSettings({
+  Duration timeout = const Duration(seconds: 18),
+}) {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    return AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 0,
+      timeLimit: timeout,
+    );
   }
-  final platform = defaultTargetPlatform;
-  if (platform == TargetPlatform.android || platform == TargetPlatform.iOS) {
-    return true;
-  }
-  return MediaQuery.of(context).size.shortestSide < 700;
+
+  return LocationSettings(accuracy: LocationAccuracy.high, timeLimit: timeout);
 }
 
-bool _canCaptureWorkProgressMedia(BuildContext context) {
-  if (!kIsWeb) {
-    return true;
+enum _WorkProgressCameraMode { photo, video }
+
+class _WorkProgressCameraScreen extends StatefulWidget {
+  const _WorkProgressCameraScreen({required this.mode});
+
+  final _WorkProgressCameraMode mode;
+
+  @override
+  State<_WorkProgressCameraScreen> createState() =>
+      _WorkProgressCameraScreenState();
+}
+
+class _WorkProgressCameraScreenState extends State<_WorkProgressCameraScreen> {
+  static const Duration _maxVideoDuration = Duration(minutes: 3);
+
+  camera.CameraController? _controller;
+  Future<void>? _initializeFuture;
+  Timer? _maxVideoTimer;
+  bool _isCapturing = false;
+  bool _isRecording = false;
+  String? _error;
+
+  bool get _isVideo => widget.mode == _WorkProgressCameraMode.video;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeFuture = _initializeCamera();
   }
-  return _isMobileWebDevice(context);
+
+  @override
+  void dispose() {
+    _maxVideoTimer?.cancel();
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initializeCamera() async {
+    try {
+      final cameras = await camera.availableCameras();
+      if (cameras.isEmpty) {
+        throw camera.CameraException(
+          'no_camera',
+          'No se encontró una cámara disponible.',
+        );
+      }
+
+      final selectedCamera = cameras.firstWhere(
+        (item) => item.lensDirection == camera.CameraLensDirection.back,
+        orElse: () => cameras.first,
+      );
+
+      final controller = camera.CameraController(
+        selectedCamera,
+        camera.ResolutionPreset.high,
+        enableAudio: _isVideo,
+      );
+      _controller = controller;
+      await controller.initialize();
+    } catch (error) {
+      _error = 'No se pudo abrir la cámara. Revisa permisos y vuelve a probar.';
+      rethrow;
+    }
+  }
+
+  Future<void> _capturePhoto() async {
+    final controller = _controller;
+    if (controller == null || _isCapturing || !controller.value.isInitialized) {
+      return;
+    }
+
+    setState(() => _isCapturing = true);
+    try {
+      final file = await controller.takePicture();
+      if (mounted) {
+        Navigator.of(context).pop(file);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'No se pudo capturar la foto.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCapturing = false);
+      }
+    }
+  }
+
+  Future<void> _toggleVideoRecording() async {
+    final controller = _controller;
+    if (controller == null || _isCapturing || !controller.value.isInitialized) {
+      return;
+    }
+
+    if (_isRecording) {
+      await _stopVideoRecording();
+      return;
+    }
+
+    setState(() {
+      _isCapturing = true;
+      _error = null;
+    });
+    try {
+      await controller.startVideoRecording();
+      _maxVideoTimer?.cancel();
+      _maxVideoTimer = Timer(_maxVideoDuration, () {
+        if (mounted && _isRecording) {
+          unawaited(_stopVideoRecording());
+        }
+      });
+      if (mounted) {
+        setState(() {
+          _isRecording = true;
+          _isCapturing = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _error = 'No se pudo iniciar la grabación.';
+          _isCapturing = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _stopVideoRecording() async {
+    final controller = _controller;
+    if (controller == null || _isCapturing || !_isRecording) {
+      return;
+    }
+
+    _maxVideoTimer?.cancel();
+    setState(() => _isCapturing = true);
+    try {
+      final file = await controller.stopVideoRecording();
+      if (mounted) {
+        Navigator.of(context).pop(file);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'No se pudo guardar el vídeo.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCapturing = false;
+          _isRecording = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text(_isVideo ? 'Grabar vídeo' : 'Hacer foto'),
+      ),
+      body: FutureBuilder<void>(
+        future: _initializeFuture,
+        builder: (context, snapshot) {
+          final controller = _controller;
+          if (snapshot.connectionState != ConnectionState.done) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (snapshot.hasError ||
+              controller == null ||
+              !controller.value.isInitialized) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  _error ?? 'No se pudo abrir la cámara.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyLarge?.copyWith(color: Colors.white),
+                ),
+              ),
+            );
+          }
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(child: camera.CameraPreview(controller)),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 28,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_error != null) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Text(
+                            _error!,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.white),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      FilledButton.icon(
+                        onPressed: _isCapturing
+                            ? null
+                            : _isVideo
+                            ? _toggleVideoRecording
+                            : _capturePhoto,
+                        icon: Icon(
+                          _isVideo && _isRecording
+                              ? Icons.stop_circle_outlined
+                              : _isVideo
+                              ? Icons.fiber_manual_record
+                              : Icons.photo_camera_outlined,
+                        ),
+                        label: Text(
+                          _isVideo
+                              ? _isRecording
+                                    ? 'Detener y adjuntar'
+                                    : 'Grabar vídeo'
+                              : 'Capturar y adjuntar',
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _isVideo && _isRecording
+                              ? NavalgoColors.coral
+                              : NavalgoColors.harbor,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(220, 54),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
 }
 
 class _DetailRow extends StatelessWidget {

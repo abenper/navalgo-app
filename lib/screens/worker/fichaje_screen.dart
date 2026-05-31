@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
@@ -499,16 +500,21 @@ class _FichajeScreenState extends State<FichajeScreen> {
     }
 
     var permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.unableToDetermine) {
       permission = await Geolocator.requestPermission();
     }
 
     if (permission == LocationPermission.denied ||
-        permission == LocationPermission.deniedForever) {
+        permission == LocationPermission.deniedForever ||
+        permission == LocationPermission.unableToDetermine) {
+      if (permission == LocationPermission.deniedForever) {
+        await Geolocator.openAppSettings();
+      }
       if (mounted) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Debes permitir la ubicación para fichar.'),
+            content: Text('Debes permitir la ubicacion para fichar.'),
           ),
         );
       }
@@ -517,12 +523,24 @@ class _FichajeScreenState extends State<FichajeScreen> {
 
     try {
       return await Geolocator.getCurrentPosition(
-        locationSettings: const LocationSettings(
-          accuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 12),
-        ),
+        locationSettings: _androidAwareClockLocationSettings(),
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('No se pudo obtener ubicación de fichaje: $error');
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        if (mounted) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text(
+                'No hubo posición nueva; se usará la última ubicación disponible.',
+              ),
+            ),
+          );
+        }
+        return lastKnown;
+      }
+
       if (mounted) {
         messenger.showSnackBar(
           const SnackBar(
@@ -1438,6 +1456,21 @@ class _ClockWorkSiteOption {
   final String subtitle;
   final IconData icon;
   final Color accent;
+}
+
+LocationSettings _androidAwareClockLocationSettings() {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    return AndroidSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 0,
+      timeLimit: const Duration(seconds: 20),
+    );
+  }
+
+  return const LocationSettings(
+    accuracy: LocationAccuracy.high,
+    timeLimit: Duration(seconds: 20),
+  );
 }
 
 class _ClockInfoPill extends StatelessWidget {

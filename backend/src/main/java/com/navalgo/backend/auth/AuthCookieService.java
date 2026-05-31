@@ -24,7 +24,7 @@ public class AuthCookieService {
             @Value("${app.security.cookies.same-site:Lax}") String sameSite,
             @Value("${app.security.cookies.secure:false}") boolean secure,
             @Value("${app.security.cookies.path:/api/auth}") String cookiePath,
-            @Value("${app.jwt.refresh-expiration-ms:604800000}") long refreshExpirationMs
+            @Value("${app.jwt.refresh-expiration-ms:7776000000}") long refreshExpirationMs
     ) {
         this.refreshCookieName = refreshCookieName;
         this.sameSite = sameSite;
