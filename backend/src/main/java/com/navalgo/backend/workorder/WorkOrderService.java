@@ -301,9 +301,6 @@ public class WorkOrderService {
         }
 
         if (request.workerIds() != null) {
-            if (!admin) {
-                throw new AccessDeniedException("Solo un administrador puede reasignar trabajadores");
-            }
             Set<Worker> workers = resolveAssignableWorkers(request.workerIds());
             workOrder.setAssignedWorkers(workers);
         }

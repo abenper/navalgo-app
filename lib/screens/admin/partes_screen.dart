@@ -106,7 +106,7 @@ class _PartesScreenState extends State<PartesScreen> {
         await fleetViewModel.loadFleet();
       } catch (_) {}
 
-      if (user.role == 'ADMIN' || user.canEditWorkOrders) {
+      if (user.role == 'ADMIN' || user.role == 'WORKER') {
         try {
           await workersViewModel.loadWorkers();
         } catch (_) {}
@@ -2791,7 +2791,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         owners: fleetVm.owners,
         vessels: fleetVm.vessels,
         workers: _assignableWorkers(workersVm.workers),
-        canAssignWorkers: _isAdmin,
+        canAssignWorkers: _canEditPart,
       ),
     );
 
