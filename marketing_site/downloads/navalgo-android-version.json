@@ -1,7 +1,7 @@
 {
-  "versionName": "1.0.1",
-  "buildNumber": 2,
+  "versionName": "1.0.2",
+  "buildNumber": 3,
   "apkUrl": "https://naval-go.com/downloads/navalgo-android.apk",
   "fileName": "navalgo-android.apk",
-  "releaseNotes": "Nueva version de NavalGO disponible para Android."
+  "releaseNotes": "Mejora del icono de notificaciones Android."
 }
