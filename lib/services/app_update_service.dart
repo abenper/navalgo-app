@@ -88,7 +88,7 @@ class AppUpdateService {
       return;
     }
 
-    await _channel.invokeMethod<void>('downloadApk', <String, Object?>{
+    await _channel.invokeMethod<Object?>('downloadApk', <String, Object?>{
       'url': update.apkUrl,
       'fileName': update.fileName,
       'title': 'NavalGO ${update.versionName}',

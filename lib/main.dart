@@ -368,6 +368,14 @@ class _AndroidUpdateGateState extends State<_AndroidUpdateGate> {
       );
     } catch (error) {
       debugPrint('Android update check failed: $error');
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No se pudo descargar la actualizacion: $error'),
+        ),
+      );
     }
   }
 

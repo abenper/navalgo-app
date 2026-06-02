@@ -1,12 +1,19 @@
 package com.example.navalgo
 
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.widget.Toast
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -28,6 +35,24 @@ class MainActivity : FlutterActivity() {
                     }
 
                     try {
+                        val safeFileName = fileName
+                            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+                            .ifBlank { "navalgo-android.apk" }
+                        val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                        if (downloadsDir == null) {
+                            result.error(
+                                "download_failed",
+                                "No se pudo acceder a la carpeta de descargas",
+                                null
+                            )
+                            return@setMethodCallHandler
+                        }
+
+                        val apkFile = File(downloadsDir, safeFileName)
+                        if (apkFile.exists()) {
+                            apkFile.delete()
+                        }
+
                         val request = DownloadManager.Request(Uri.parse(url))
                             .setTitle(title)
                             .setDescription("Descargando actualizacion de NavalGO")
@@ -37,16 +62,19 @@ class MainActivity : FlutterActivity() {
                             )
                             .setAllowedOverMetered(true)
                             .setAllowedOverRoaming(true)
-                            .setDestinationInExternalPublicDir(
-                                Environment.DIRECTORY_DOWNLOADS,
-                                fileName
-                            )
+                            .setDestinationUri(Uri.fromFile(apkFile))
 
                         val downloadManager = getSystemService(
                             Context.DOWNLOAD_SERVICE
                         ) as DownloadManager
                         val downloadId = downloadManager.enqueue(request)
-                        result.success(downloadId)
+                        registerApkDownloadReceiver(downloadManager, downloadId, apkFile)
+                        Toast.makeText(
+                            this,
+                            "Descargando actualizacion de NavalGO",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        result.success(mapOf("downloadId" to downloadId))
                     } catch (error: Exception) {
                         result.error(
                             "download_failed",
@@ -57,6 +85,83 @@ class MainActivity : FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun registerApkDownloadReceiver(
+        downloadManager: DownloadManager,
+        downloadId: Long,
+        apkFile: File
+    ) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context, intent: Intent) {
+                val completedId = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+                if (completedId != downloadId) {
+                    return
+                }
+
+                try {
+                    context.unregisterReceiver(this)
+                } catch (_: Exception) {
+                }
+
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                downloadManager.query(query).use { cursor ->
+                    if (cursor == null || !cursor.moveToFirst()) {
+                        Toast.makeText(
+                            context,
+                            "No se pudo comprobar la descarga de NavalGO",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return
+                    }
+
+                    val status = cursor.getInt(
+                        cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)
+                    )
+                    if (status == DownloadManager.STATUS_SUCCESSFUL && apkFile.exists()) {
+                        openApkInstaller(context, apkFile)
+                    } else {
+                        val reason = cursor.getInt(
+                            cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)
+                        )
+                        Toast.makeText(
+                            context,
+                            "La descarga de NavalGO fallo ($reason)",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+        }
+
+        val filter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(receiver, filter)
+        }
+    }
+
+    private fun openApkInstaller(context: Context, apkFile: File) {
+        try {
+            val apkUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                apkFile
+            )
+            val installIntent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(installIntent)
+        } catch (error: Exception) {
+            Toast.makeText(
+                context,
+                error.message ?: "No se pudo abrir el instalador de NavalGO",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }
