@@ -23,6 +23,7 @@ import java.util.*;
 @Service
 @Transactional(readOnly = true)
 public class WorkOrderService {
+    private static final String SUPERADMIN_EMAIL = "admin@naval-go.com";
 
     private final WorkOrderRepository workOrderRepository;
     private final OwnerRepository ownerRepository;
@@ -553,11 +554,12 @@ public class WorkOrderService {
         if (!isAdmin(current)) {
             throw new AccessDeniedException("Solo un administrador puede borrar partes");
         }
-        if (isSealed(workOrder)) {
+        if (isSealed(workOrder) && !isSuperAdmin(current)) {
             throw new AccessDeniedException("No se puede borrar un parte sellado");
         }
 
-        List<String> mediaUrls = new ArrayList<>();
+        Set<String> mediaUrls = new LinkedHashSet<>();
+        Set<String> storageObjectKeys = new LinkedHashSet<>();
         if (workOrder.getSignatureUrl() != null && !workOrder.getSignatureUrl().isBlank()) {
             mediaUrls.add(workOrder.getSignatureUrl());
         }
@@ -565,12 +567,19 @@ public class WorkOrderService {
             mediaUrls.add(workOrder.getClientSignatureUrl());
         }
         for (WorkOrderAttachment att : workOrder.getAttachments()) {
-            mediaUrls.add(att.getFileUrl());
+            if (att.getStorageObjectKey() != null && !att.getStorageObjectKey().isBlank()) {
+                storageObjectKeys.add(att.getStorageObjectKey());
+            } else {
+                mediaUrls.add(att.getFileUrl());
+            }
         }
 
         workOrder.getAssignedWorkers().clear();
         workOrderRepository.delete(workOrder);
 
+        for (String storageObjectKey : storageObjectKeys) {
+            workOrderMediaService.deleteByObjectKey(storageObjectKey);
+        }
         for (String mediaUrl : mediaUrls) {
             workOrderMediaService.deleteByPublicUrl(mediaUrl);
         }
@@ -583,6 +592,12 @@ public class WorkOrderService {
 
     private boolean isAdmin(Worker worker) {
         return worker.getRole() == com.navalgo.backend.common.Role.ADMIN;
+    }
+
+    private boolean isSuperAdmin(Worker worker) {
+        return worker != null
+                && worker.getEmail() != null
+                && SUPERADMIN_EMAIL.equalsIgnoreCase(worker.getEmail().trim());
     }
 
     private Set<Worker> resolveAssignableWorkers(List<Long> workerIds) {

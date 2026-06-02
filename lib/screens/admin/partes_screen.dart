@@ -30,6 +30,8 @@ import '../../widgets/work_order_attachment_preview_dialog.dart';
 import '../../widgets/navalgo_ui.dart';
 import 'material_templates_screen.dart';
 
+const String _superAdminEmail = 'admin@naval-go.com';
+
 class PartesScreen extends StatefulWidget {
   const PartesScreen({super.key});
 
@@ -53,6 +55,30 @@ List<WorkerProfile> _assignableWorkers(List<WorkerProfile> workers) {
   return workers
       .where((worker) => worker.active && worker.role == 'WORKER')
       .toList();
+}
+
+bool _isSuperAdminEmail(String? email) {
+  return (email ?? '').trim().toLowerCase() == _superAdminEmail;
+}
+
+bool _isWorkOrderSealedForDelete(WorkOrder workOrder) {
+  return workOrder.status == 'DONE' ||
+      workOrder.status == 'CANCELLED' ||
+      (workOrder.signatureUrl?.isNotEmpty ?? false) ||
+      (workOrder.clientSignatureUrl?.isNotEmpty ?? false) ||
+      workOrder.signedAt != null ||
+      workOrder.clientSignedAt != null;
+}
+
+bool _canDeleteWorkOrderForUser(
+  WorkOrder workOrder, {
+  required String? role,
+  required String? email,
+}) {
+  if (role != 'ADMIN') {
+    return false;
+  }
+  return !_isWorkOrderSealedForDelete(workOrder) || _isSuperAdminEmail(email);
 }
 
 class _PartesScreenState extends State<PartesScreen> {
@@ -232,9 +258,11 @@ class _PartesScreenState extends State<PartesScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<WorkOrdersViewModel>();
-    final isAdmin = context.select<SessionViewModel, bool>(
-      (session) => session.user?.role == 'ADMIN',
-    );
+    final sessionUser = context
+        .select<SessionViewModel, ({String? role, String? email})>(
+          (session) => (role: session.user?.role, email: session.user?.email),
+        );
+    final isAdmin = sessionUser.role == 'ADMIN';
     final workOrders = vm.workOrders;
     var signedCount = 0;
     var pendingSignatureCount = 0;
@@ -483,7 +511,11 @@ class _PartesScreenState extends State<PartesScreen> {
                                                   ],
                                                 ),
                                               ),
-                                              if (isAdmin)
+                                              if (_canDeleteWorkOrderForUser(
+                                                parte,
+                                                role: sessionUser.role,
+                                                email: sessionUser.email,
+                                              ))
                                                 IconButton(
                                                   tooltip: 'Borrar parte',
                                                   onPressed: () =>
@@ -839,6 +871,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   }
 
   bool get _isAdmin => context.read<SessionViewModel>().user?.role == 'ADMIN';
+  bool get _isSuperAdmin =>
+      _isSuperAdminEmail(context.read<SessionViewModel>().user?.email);
   bool get _isWorker => context.read<SessionViewModel>().user?.role == 'WORKER';
   bool get _hasEditPermission =>
       context.read<SessionViewModel>().user?.canEditWorkOrders ?? false;
@@ -857,6 +891,8 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   bool get _canSign => (_isWorker || _isAdmin) && !_isSigned;
   bool get _canManageClientSignature => _isWorker || _isAdmin;
   bool get _canCaptureMedia => !_isClosedWorkOrder && !_isSigned;
+  bool get _canDeleteWorkOrder =>
+      _isAdmin && (!_isWorkOrderSealedForDelete(_workOrder) || _isSuperAdmin);
 
   bool get _canDeleteMedia {
     if (_isClosedWorkOrder || _isSigned) {
@@ -921,7 +957,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       appBar: AppBar(
         title: Text('Parte', style: textTheme.titleLarge),
         actions: [
-          if (_canEditPart || _isAdmin)
+          if (_canEditPart || _canDeleteWorkOrder)
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert_rounded),
               tooltip: 'Acciones',
@@ -942,7 +978,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                       title: Text('Editar parte'),
                     ),
                   ),
-                if (_isAdmin)
+                if (_canDeleteWorkOrder)
                   PopupMenuItem<String>(
                     value: 'delete',
                     child: ListTile(

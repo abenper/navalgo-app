@@ -4,6 +4,7 @@ import com.navalgo.backend.worker.Worker;
 import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,6 +18,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/push-debug")
 public class PushDebugController {
+    private static final String SUPERADMIN_EMAIL = "admin@naval-go.com";
 
     private final PushNotificationService pushNotificationService;
     private final NotificationService notificationService;
@@ -32,19 +34,22 @@ public class PushDebugController {
 
     @GetMapping("/status")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<PushDebugStatusDto> status() {
+    public ResponseEntity<PushDebugStatusDto> status(Authentication authentication) {
+        ensureSuperAdmin(authentication);
         return ResponseEntity.ok(pushNotificationService.getDebugStatus());
     }
 
     @GetMapping("/tokens")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<PushDebugTokenDto>> tokens() {
+    public ResponseEntity<List<PushDebugTokenDto>> tokens(Authentication authentication) {
+        ensureSuperAdmin(authentication);
         return ResponseEntity.ok(pushNotificationService.listDebugTokens());
     }
 
     @PostMapping("/send-self-test")
-    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> sendSelfTest(Authentication authentication) {
+        ensureSuperAdmin(authentication);
         Worker worker = workerRepository.findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
 
@@ -57,5 +62,12 @@ public class PushDebugController {
         );
 
         return ResponseEntity.noContent().build();
+    }
+
+    private void ensureSuperAdmin(Authentication authentication) {
+        String email = authentication == null ? "" : authentication.getName();
+        if (!SUPERADMIN_EMAIL.equalsIgnoreCase(email == null ? "" : email.trim())) {
+            throw new AccessDeniedException("Solo el superadmin puede acceder al diagnostico push");
+        }
     }
 }

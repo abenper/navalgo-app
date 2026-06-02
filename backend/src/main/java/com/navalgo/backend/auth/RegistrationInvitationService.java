@@ -1,6 +1,7 @@
 package com.navalgo.backend.auth;
 
 import com.navalgo.backend.common.InputSanitizer;
+import com.navalgo.backend.common.Role;
 import com.navalgo.backend.fleet.Owner;
 import com.navalgo.backend.fleet.Vessel;
 import com.navalgo.backend.fleet.VesselRepository;
@@ -84,6 +85,7 @@ public class RegistrationInvitationService {
         return new RegistrationInvitationStatusResponse(
                 worker.getFullName(),
                 worker.getEmail(),
+                worker.getRole().name(),
                 invitation.getExpiresAt()
         );
     }
@@ -102,12 +104,14 @@ public class RegistrationInvitationService {
         worker.setEmailVerified(true);
         workerRepository.save(worker);
 
-        maybeCreateVessel(
-                worker.getOwner(),
-                request.vesselName(),
-                request.vesselRegistrationNumber(),
-                request.vesselModel()
-        );
+        if (worker.getRole() == Role.CLIENT) {
+            maybeCreateVessel(
+                    worker.getOwner(),
+                    request.vesselName(),
+                    request.vesselRegistrationNumber(),
+                    request.vesselModel()
+            );
+        }
 
         invitation.setConsumedAt(Instant.now());
         invitationRepository.save(invitation);

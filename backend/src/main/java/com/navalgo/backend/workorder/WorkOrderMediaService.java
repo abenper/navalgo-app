@@ -675,14 +675,22 @@ public class WorkOrderMediaService {
             return;
         }
 
+        deleteByObjectKey(key);
+    }
+
+    public void deleteByObjectKey(String objectKey) {
+        if (objectKey == null || objectKey.isBlank()) {
+            return;
+        }
+
         DeleteObjectRequest request = DeleteObjectRequest.builder()
                 .bucket(mediaProperties.spacesBucket())
-                .key(key)
+                .key(objectKey)
                 .build();
         try {
             s3Client.deleteObject(request);
         } catch (Exception exception) {
-            log.warn("No se pudo borrar el objeto {} del almacenamiento: {}", key, exception.getMessage());
+            log.warn("No se pudo borrar el objeto {} del almacenamiento: {}", objectKey, exception.getMessage());
         }
     }
 

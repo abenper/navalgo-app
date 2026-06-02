@@ -91,6 +91,7 @@ public class FirebasePushGateway {
         try {
             BatchResponse response = messaging.sendEachForMulticast(pushMessage);
             Set<String> invalidTokens = collectInvalidTokens(tokens, response.getResponses());
+            logSendFailures(tokens, response.getResponses());
             lastInvalidTokenCount = invalidTokens.size();
             lastSendSuccessAt = Instant.now();
             lastSendError = null;
@@ -149,6 +150,24 @@ public class FirebasePushGateway {
             }
         }
         return invalidTokens;
+    }
+
+    private void logSendFailures(List<String> tokens, List<SendResponse> responses) {
+        for (int index = 0; index < responses.size() && index < tokens.size(); index += 1) {
+            SendResponse response = responses.get(index);
+            if (response.isSuccessful()) {
+                continue;
+            }
+
+            FirebaseMessagingException exception = response.getException();
+            MessagingErrorCode errorCode = exception == null ? null : exception.getMessagingErrorCode();
+            log.warn(
+                    "Push Firebase fallo. token={}, errorCode={}, message={}",
+                    maskToken(tokens.get(index)),
+                    errorCode,
+                    exception == null ? "Sin detalle" : exception.getMessage()
+            );
+        }
     }
 
     private FirebaseMessaging resolveMessaging() {
@@ -302,5 +321,15 @@ public class FirebasePushGateway {
         CredentialSource(boolean readable) {
             this.readable = readable;
         }
+    }
+
+    private String maskToken(String token) {
+        if (token == null || token.isBlank()) {
+            return "";
+        }
+        if (token.length() <= 12) {
+            return token;
+        }
+        return token.substring(0, 6) + "..." + token.substring(token.length() - 6);
     }
 }

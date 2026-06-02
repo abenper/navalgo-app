@@ -25,6 +25,7 @@ class AuthService {
     return RegistrationInvitationInfo(
       fullName: (map['fullName'] as String?) ?? '',
       email: (map['email'] as String?) ?? '',
+      role: (map['role'] as String?) ?? 'WORKER',
       expiresAt: DateTime.parse(map['expiresAt'] as String),
     );
   }
@@ -298,11 +299,13 @@ class RegistrationInvitationInfo {
   const RegistrationInvitationInfo({
     required this.fullName,
     required this.email,
+    required this.role,
     required this.expiresAt,
   });
 
   final String fullName;
   final String email;
+  final String role;
   final DateTime expiresAt;
 }
 

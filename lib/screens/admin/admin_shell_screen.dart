@@ -23,6 +23,9 @@ import 'equipo_screen.dart';
 import 'flota_screen.dart';
 import 'material_templates_screen.dart';
 import 'partes_screen.dart';
+import 'push_debug_screen.dart';
+
+const String _superAdminEmail = 'admin@naval-go.com';
 
 class AdminShellScreen extends StatefulWidget {
   const AdminShellScreen({super.key});
@@ -45,6 +48,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     const EquipoScreen(),
     const AdminTimeTrackingOverviewScreen(),
     const AusenciasScreen(),
+    const PushDebugScreen(),
   ];
 
   final List<String> _titles = const [
@@ -56,6 +60,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     'Equipo',
     'Fichaje',
     'Ausencias',
+    'Push',
   ];
 
   final List<IconData> _sectionIcons = const [
@@ -67,7 +72,42 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     Icons.people_outline,
     Icons.access_time_outlined,
     Icons.event_note_outlined,
+    Icons.notifications_active_outlined,
   ];
+
+  bool _isSuperAdminEmail(String? email) {
+    return (email ?? '').trim().toLowerCase() == _superAdminEmail;
+  }
+
+  bool _canUsePushDebug(BuildContext context) {
+    final email = context.watch<SessionViewModel>().user?.email;
+    return _isSuperAdminEmail(email);
+  }
+
+  List<Widget> _visibleScreens(bool canUsePushDebug) {
+    return canUsePushDebug
+        ? _screens
+        : _screens.take(_screens.length - 1).toList(growable: false);
+  }
+
+  List<String> _visibleTitles(bool canUsePushDebug) {
+    return canUsePushDebug
+        ? _titles
+        : _titles.take(_titles.length - 1).toList(growable: false);
+  }
+
+  List<IconData> _visibleIcons(bool canUsePushDebug) {
+    return canUsePushDebug
+        ? _sectionIcons
+        : _sectionIcons.take(_sectionIcons.length - 1).toList(growable: false);
+  }
+
+  int _safeSelectedIndex(int itemCount) {
+    if (_selectedIndex >= 0 && _selectedIndex < itemCount) {
+      return _selectedIndex;
+    }
+    return 0;
+  }
 
   @override
   void initState() {
@@ -170,6 +210,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
         return 6;
       case 'AUSENCIAS':
         return 7;
+      case 'PUSH':
+        return 8;
       default:
         return 0;
     }
@@ -298,6 +340,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   }
 
   AppBar _buildAppBar(BuildContext context) {
+    final canUsePushDebug = _canUsePushDebug(context);
+    final titles = _visibleTitles(canUsePushDebug);
+    final icons = _visibleIcons(canUsePushDebug);
+    final selectedIndex = _safeSelectedIndex(titles.length);
     final unreadCount = context.select<NotificationsViewModel, int>(
       (vm) => vm.unreadCount,
     );
@@ -327,7 +373,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
-                _sectionIcons[_selectedIndex],
+                icons[selectedIndex],
                 color: NavalgoColors.tide,
                 size: compact ? 20 : 24,
               ),
@@ -336,7 +382,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
           ],
           Expanded(
             child: Text(
-              _titles[_selectedIndex],
+              titles[selectedIndex],
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textTheme.titleLarge,
@@ -672,6 +718,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
   }
 
   Widget _buildMobileDrawer() {
+    final canUsePushDebug = _canUsePushDebug(context);
+    final titles = _visibleTitles(canUsePushDebug);
+    final icons = _visibleIcons(canUsePushDebug);
+    final selectedIndex = _safeSelectedIndex(titles.length);
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -712,17 +762,17 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                   horizontal: 8,
                   vertical: 12,
                 ),
-                itemCount: _titles.length,
+                itemCount: titles.length,
                 itemBuilder: (context, index) {
-                  final selected = index == _selectedIndex;
+                  final selected = index == selectedIndex;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: ListTile(
                       leading: Icon(
-                        _sectionIcons[index],
+                        icons[index],
                         color: selected ? NavalgoColors.tide : null,
                       ),
-                      title: Text(_titles[index]),
+                      title: Text(titles[index]),
                       selected: selected,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -743,10 +793,10 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     );
   }
 
-  List<Widget> _buildLoadedScreens() {
-    return List<Widget>.generate(_screens.length, (index) {
+  List<Widget> _buildLoadedScreens(List<Widget> screens) {
+    return List<Widget>.generate(screens.length, (index) {
       if (_loadedIndices.contains(index)) {
-        return _screens[index];
+        return screens[index];
       }
       return const SizedBox.shrink();
     });
@@ -767,6 +817,12 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+
+    final canUsePushDebug = _canUsePushDebug(context);
+    final screens = _visibleScreens(canUsePushDebug);
+    final titles = _visibleTitles(canUsePushDebug);
+    final icons = _visibleIcons(canUsePushDebug);
+    final selectedIndex = _safeSelectedIndex(screens.length);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -790,7 +846,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                       child: SizedBox(
                         width: 128,
                         child: NavigationRail(
-                          selectedIndex: _selectedIndex,
+                          selectedIndex: selectedIndex,
                           onDestinationSelected: _onDestinationSelected,
                           labelType: NavigationRailLabelType.all,
                           minWidth: 128,
@@ -822,48 +878,15 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                               ),
                             ),
                           ),
-                          destinations: const [
-                            NavigationRailDestination(
-                              icon: Icon(Icons.dashboard_outlined),
-                              selectedIcon: Icon(Icons.dashboard),
-                              label: Text('Panel'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.assignment_outlined),
-                              selectedIcon: Icon(Icons.assignment),
-                              label: Text('Partes'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.inventory_2_outlined),
-                              selectedIcon: Icon(Icons.inventory_2),
-                              label: Text('Plantillas'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.request_quote_outlined),
-                              selectedIcon: Icon(Icons.request_quote),
-                              label: Text('Presupuestos'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.directions_boat_outlined),
-                              selectedIcon: Icon(Icons.directions_boat),
-                              label: Text('Flota'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.people_outline),
-                              selectedIcon: Icon(Icons.people),
-                              label: Text('Equipo'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.access_time_outlined),
-                              selectedIcon: Icon(Icons.access_time_filled),
-                              label: Text('Fichaje'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.event_note_outlined),
-                              selectedIcon: Icon(Icons.event_note),
-                              label: Text('Ausencias'),
-                            ),
-                          ],
+                          destinations:
+                              List<NavigationRailDestination>.generate(
+                                titles.length,
+                                (index) => NavigationRailDestination(
+                                  icon: Icon(icons[index]),
+                                  selectedIcon: Icon(icons[index]),
+                                  label: Text(titles[index]),
+                                ),
+                              ),
                         ),
                       ),
                     ),
@@ -872,8 +895,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
                       child: IndexedStack(
-                        index: _selectedIndex,
-                        children: _buildLoadedScreens(),
+                        index: selectedIndex,
+                        children: _buildLoadedScreens(screens),
                       ),
                     ),
                   ),
@@ -891,8 +914,8 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
               gradient: NavalgoColors.pageGradient,
             ),
             child: IndexedStack(
-              index: _selectedIndex,
-              children: _buildLoadedScreens(),
+              index: selectedIndex,
+              children: _buildLoadedScreens(screens),
             ),
           ),
         );

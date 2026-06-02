@@ -100,13 +100,15 @@ class _CompleteRegistrationScreenState
     });
 
     try {
-      final vesselPrompt = await showClientVesselPromptDialog(
-        context,
-        title: 'Registra tu embarcación',
-        message:
-            'Puedes registrar tu embarcación ahora para que presupuestos, trabajos y documentación queden asociados desde el principio. Si prefieres, puedes hacerlo más tarde.',
-        actionLabel: 'Continuar',
-      );
+      final vesselPrompt = _invitationInfo?.role == 'CLIENT'
+          ? await showClientVesselPromptDialog(
+              context,
+              title: 'Registra tu embarcación',
+              message:
+                  'Puedes registrar tu embarcación ahora para que presupuestos, trabajos y documentación queden asociados desde el principio. Si prefieres, puedes hacerlo más tarde.',
+              actionLabel: 'Continuar',
+            )
+          : null;
       if (!mounted) {
         return;
       }
