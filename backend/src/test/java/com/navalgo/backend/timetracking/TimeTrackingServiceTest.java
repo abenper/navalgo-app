@@ -1,5 +1,6 @@
 package com.navalgo.backend.timetracking;
 
+import com.navalgo.backend.common.Role;
 import com.navalgo.backend.budget.BudgetRepository;
 import com.navalgo.backend.leave.LeaveRequestRepository;
 import com.navalgo.backend.workorder.WorkOrderRepository;
@@ -10,13 +11,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -107,6 +112,61 @@ class TimeTrackingServiceTest {
         assertThatThrownBy(() -> service.createManualEntry(request))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("hora de salida");
+    }
+
+    @Test
+    void clockingDisciplineDoesNotRewardWorkersWithoutEvaluableDays() {
+        TimeTrackingService service = new TimeTrackingService(
+                leaveRequestRepository,
+                timeEntryRepository,
+                workOrderRepository,
+                workerRepository,
+                budgetRepository
+        );
+        Worker worker = worker(11L, "Manuel Diego");
+        worker.setRole(Role.COMERCIAL);
+        worker.setContractStartDate(LocalDate.of(2026, 6, 2));
+
+        double score = (double) ReflectionTestUtils.invokeMethod(
+                service,
+                "calculateClockingDisciplineScore",
+                worker,
+                LocalDate.of(2026, 6, 2)
+        );
+
+        assertThat(score).isZero();
+    }
+
+    @Test
+    void clockingDisciplineRewardsManualClockOuts() {
+        TimeTrackingService service = new TimeTrackingService(
+                leaveRequestRepository,
+                timeEntryRepository,
+                workOrderRepository,
+                workerRepository,
+                budgetRepository
+        );
+        Worker worker = worker(12L, "Comercial Activo");
+        worker.setRole(Role.COMERCIAL);
+        worker.setContractStartDate(LocalDate.of(2026, 5, 1));
+        TimeEntry entry = new TimeEntry();
+        entry.setWorker(worker);
+        entry.setClockIn(Instant.parse("2026-06-01T07:00:00Z"));
+        entry.setClockOut(Instant.parse("2026-06-01T15:00:00Z"));
+        when(timeEntryRepository.findByWorkerIdAndClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(
+                anyLong(),
+                any(Instant.class),
+                any(Instant.class)
+        )).thenReturn(List.of(entry));
+
+        double score = (double) ReflectionTestUtils.invokeMethod(
+                service,
+                "calculateClockingDisciplineScore",
+                worker,
+                LocalDate.of(2026, 6, 2)
+        );
+
+        assertThat(score).isEqualTo(100.0);
     }
 
     private Worker worker(Long id, String fullName) {

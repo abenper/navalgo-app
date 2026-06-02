@@ -598,7 +598,7 @@ public class TimeTrackingService {
             start = worker.getContractStartDate();
         }
         if (!start.isBefore(endExclusive)) {
-            return 75.0;
+            return 0.0;
         }
 
         ZoneId zoneId = ZoneId.systemDefault();
@@ -630,7 +630,7 @@ public class TimeTrackingService {
         }
 
         if (evaluatedDays == 0) {
-            return 75.0;
+            return 0.0;
         }
         return clampScore(totalScore / evaluatedDays);
     }

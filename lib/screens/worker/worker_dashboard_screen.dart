@@ -142,7 +142,9 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         return;
       }
 
-      final topWorkers = workerStats.toList()
+      final topWorkers = workerStats
+          .where((worker) => worker.qualityScore > 0)
+          .toList()
         ..sort((a, b) {
           final scoreCompare = b.qualityScore.compareTo(a.qualityScore);
           if (scoreCompare != 0) {

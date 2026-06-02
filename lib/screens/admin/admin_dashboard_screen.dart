@@ -67,7 +67,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       final leaves = await leavesFuture;
       final todaySummary = await todaySummaryFuture;
       final workerStats = await workerStatsFuture;
-      final topWorkers = workerStats.toList()
+      final topWorkers = workerStats
+          .where((worker) => worker.qualityScore > 0)
+          .toList()
         ..sort((a, b) {
           final scoreCompare = b.qualityScore.compareTo(a.qualityScore);
           if (scoreCompare != 0) {
