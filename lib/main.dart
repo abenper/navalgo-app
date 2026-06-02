@@ -9,6 +9,7 @@ import 'package:navalgo/app/app_globals.dart';
 import 'package:navalgo/firebase_options.dart';
 import 'package:navalgo/services/network/api_client.dart';
 import 'package:navalgo/services/auth_service.dart';
+import 'package:navalgo/services/app_update_service.dart';
 import 'package:navalgo/services/budget_service.dart';
 import 'package:navalgo/services/fleet_service.dart';
 import 'package:navalgo/services/leave_service.dart';
@@ -80,6 +81,7 @@ Future<void> main() async {
       providers: [
         ChangeNotifierProvider<SessionViewModel>.value(value: sessionViewModel),
         Provider<AuthService>.value(value: authService),
+        Provider<AppUpdateService>(create: (_) => AppUpdateService()),
         Provider<BudgetService>(create: (_) => BudgetService()),
         Provider<WorkerService>(create: (_) => WorkerService()),
         Provider<FleetService>(create: (_) => FleetService()),
@@ -222,7 +224,9 @@ class MyApp extends StatelessWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       supportedLocales: const [Locale('es')],
-      home: const _StartupPermissionsGate(child: _RootScreen()),
+      home: const _StartupPermissionsGate(
+        child: _AndroidUpdateGate(child: _RootScreen()),
+      ),
     );
   }
 }
@@ -289,6 +293,87 @@ class _StartupPermissionsGateState extends State<_StartupPermissionsGate> {
         return widget.child;
       },
     );
+  }
+}
+
+class _AndroidUpdateGate extends StatefulWidget {
+  const _AndroidUpdateGate({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_AndroidUpdateGate> createState() => _AndroidUpdateGateState();
+}
+
+class _AndroidUpdateGateState extends State<_AndroidUpdateGate> {
+  bool _checked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _checked) {
+        return;
+      }
+      _checked = true;
+      unawaited(_checkForAndroidUpdate());
+    });
+  }
+
+  Future<void> _checkForAndroidUpdate() async {
+    try {
+      final service = context.read<AppUpdateService>();
+      final update = await service.checkAndroidUpdate();
+      if (!mounted || update == null) {
+        return;
+      }
+
+      final shouldDownload = await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (dialogContext) {
+          return AlertDialog(
+            title: const Text('Nueva version disponible'),
+            content: Text(
+              update.releaseNotes == null || update.releaseNotes!.isEmpty
+                  ? 'Hay una nueva version de NavalGO disponible. Deseas descargarla?'
+                  : 'Hay una nueva version de NavalGO disponible.\n\n${update.releaseNotes}\n\nDeseas descargarla?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Ahora no'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Descargar'),
+              ),
+            ],
+          );
+        },
+      );
+
+      if (!mounted || shouldDownload != true) {
+        return;
+      }
+
+      await service.downloadAndroidApk(update);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Descargando APK en la carpeta Descargas.'),
+        ),
+      );
+    } catch (error) {
+      debugPrint('Android update check failed: $error');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
 
