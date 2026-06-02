@@ -10,9 +10,9 @@ class TeamLeaderboardPanel extends StatelessWidget {
     super.key,
     required this.entries,
     required this.token,
-    this.title = 'Top 3 del equipo',
+    this.title = 'Top 3 de fichaje',
     this.subtitle =
-        'Ranking conjunto entre comerciales y taller según la puntuación global de rendimiento.',
+        'Ranking mensual segun cierre manual de jornada, ausencias registradas y dias sin fichaje.',
   });
 
   final List<WorkerTimeTrackingStats> entries;
@@ -22,6 +22,8 @@ class TeamLeaderboardPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showMonthlyWinner = DateTime.now().day == 1 && entries.isNotEmpty;
+
     return NavalgoPanel(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -31,7 +33,7 @@ class TeamLeaderboardPanel extends StatelessWidget {
           const SizedBox(height: 16),
           if (entries.isEmpty)
             const Text(
-              'Todavía no hay datos suficientes para mostrar el ranking.',
+              'Todavia no hay datos suficientes para mostrar el ranking.',
             )
           else
             ...entries.asMap().entries.map((entry) {
@@ -43,6 +45,7 @@ class TeamLeaderboardPanel extends StatelessWidget {
                   position: entry.key + 1,
                   entry: entry.value,
                   token: token,
+                  isMonthlyWinner: showMonthlyWinner && entry.key == 0,
                 ),
               );
             }),
@@ -57,11 +60,13 @@ class _LeaderboardTile extends StatelessWidget {
     required this.position,
     required this.entry,
     required this.token,
+    required this.isMonthlyWinner,
   });
 
   final int position;
   final WorkerTimeTrackingStats entry;
   final String? token;
+  final bool isMonthlyWinner;
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +77,33 @@ class _LeaderboardTile extends StatelessWidget {
     };
     final resolvedPhotoUrl = resolveMediaUrl(entry.photoUrl);
     final photoHeaders = buildMediaHeaders(token);
+    final tileDecoration = BoxDecoration(
+      color: accent.withValues(alpha: isMonthlyWinner ? 0.12 : 0.08),
+      gradient: isMonthlyWinner
+          ? LinearGradient(
+              colors: [
+                NavalgoColors.sand.withValues(alpha: 0.24),
+                Colors.white.withValues(alpha: 0.86),
+                accent.withValues(alpha: 0.1),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            )
+          : null,
+      borderRadius: BorderRadius.circular(22),
+      border: Border.all(
+        color: accent.withValues(alpha: isMonthlyWinner ? 0.32 : 0.16),
+      ),
+      boxShadow: isMonthlyWinner
+          ? [
+              BoxShadow(
+                color: NavalgoColors.sand.withValues(alpha: 0.18),
+                blurRadius: 24,
+                offset: const Offset(0, 10),
+              ),
+            ]
+          : null,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -79,11 +111,7 @@ class _LeaderboardTile extends StatelessWidget {
 
         return Container(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: accent.withValues(alpha: 0.16)),
-          ),
+          decoration: tileDecoration,
           child: stacked
               ? Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -96,6 +124,7 @@ class _LeaderboardTile extends StatelessWidget {
                       photoHeaders: photoHeaders,
                       workerName: entry.workerName,
                       workerRole: entry.workerRole,
+                      isMonthlyWinner: isMonthlyWinner,
                     ),
                     const SizedBox(height: 12),
                     _LeaderboardScore(
@@ -115,6 +144,7 @@ class _LeaderboardTile extends StatelessWidget {
                       photoHeaders: photoHeaders,
                       workerName: entry.workerName,
                       workerRole: entry.workerRole,
+                      isMonthlyWinner: isMonthlyWinner,
                     ),
                     const SizedBox(width: 12),
                     _LeaderboardScore(
@@ -139,6 +169,7 @@ class _LeaderboardIdentity extends StatelessWidget {
     required this.photoHeaders,
     required this.workerName,
     required this.workerRole,
+    required this.isMonthlyWinner,
   });
 
   final bool expandContent;
@@ -148,6 +179,7 @@ class _LeaderboardIdentity extends StatelessWidget {
   final Map<String, String>? photoHeaders;
   final String workerName;
   final String workerRole;
+  final bool isMonthlyWinner;
 
   @override
   Widget build(BuildContext context) {
@@ -171,13 +203,40 @@ class _LeaderboardIdentity extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 14),
-        CircleAvatar(
-          radius: 24,
-          backgroundColor: NavalgoColors.mist,
-          foregroundImage: resolvedPhotoUrl.isEmpty
-              ? null
-              : NetworkImage(resolvedPhotoUrl, headers: photoHeaders),
-          child: const Icon(Icons.person_outline, color: NavalgoColors.tide),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: NavalgoColors.mist,
+              foregroundImage: resolvedPhotoUrl.isEmpty
+                  ? null
+                  : NetworkImage(resolvedPhotoUrl, headers: photoHeaders),
+              child: const Icon(
+                Icons.person_outline,
+                color: NavalgoColors.tide,
+              ),
+            ),
+            if (isMonthlyWinner)
+              Positioned(
+                top: -13,
+                right: -9,
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: NavalgoColors.sand,
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: Colors.white, width: 2),
+                  ),
+                  child: const Icon(
+                    Icons.workspace_premium_rounded,
+                    color: Colors.white,
+                    size: 16,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: 14),
         Expanded(
@@ -198,6 +257,10 @@ class _LeaderboardIdentity extends StatelessWidget {
                 workerRole == 'COMERCIAL' ? 'Comercial' : 'Taller',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              if (isMonthlyWinner) ...[
+                const SizedBox(height: 6),
+                _MonthlyWinnerBadge(workerName: workerName),
+              ],
             ],
           ),
         ),
@@ -208,6 +271,47 @@ class _LeaderboardIdentity extends StatelessWidget {
       return Expanded(child: content);
     }
     return content;
+  }
+}
+
+class _MonthlyWinnerBadge extends StatelessWidget {
+  const _MonthlyWinnerBadge({required this.workerName});
+
+  final String workerName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 260),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: NavalgoColors.sand.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: NavalgoColors.sand.withValues(alpha: 0.34)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            Icons.emoji_events_outlined,
+            size: 15,
+            color: NavalgoColors.sand,
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              'Ganador/a de este mes: $workerName',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: NavalgoColors.deepSea,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -236,7 +340,7 @@ class _LeaderboardScore extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'puntos',
+          'fichaje',
           style: Theme.of(
             context,
           ).textTheme.labelMedium?.copyWith(color: NavalgoColors.storm),

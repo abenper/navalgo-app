@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.text.Normalizer;
 import java.time.Instant;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.YearMonth;
@@ -162,18 +163,18 @@ public class TimeTrackingService {
         Map<Long, Long> absenceDaysByWorker = new HashMap<>();
         Map<Long, Double> productivityByWorker = new HashMap<>();
         Map<Long, Double> completionByWorker = new HashMap<>();
-        Map<Long, Double> closeDisciplineByWorker = new HashMap<>();
+        Map<Long, Double> clockingDisciplineByWorker = new HashMap<>();
         for (Worker worker : workers) {
             absenceDaysByWorker.put(worker.getId(), calculateApprovedNonVacationAbsenceDaysThisYear(worker.getId(), today));
             productivityByWorker.put(worker.getId(), calculateProductivityBasis(worker, now));
             completionByWorker.put(worker.getId(), calculateCompletionBasis(worker));
-            closeDisciplineByWorker.put(worker.getId(), calculateCloseDisciplineBasis(worker.getId()));
+            clockingDisciplineByWorker.put(worker.getId(), calculateClockingDisciplineScore(worker, today));
         }
 
         Map<Role, Double> averageAbsenceDaysByRole = averageLongByRole(workers, absenceDaysByWorker);
         Map<Role, Double> averageProductivityByRole = averageDoubleByRole(workers, productivityByWorker);
         Map<Role, Double> averageCompletionByRole = averageDoubleByRole(workers, completionByWorker);
-        Map<Role, Double> averageCloseDisciplineByRole = averageDoubleByRole(workers, closeDisciplineByWorker);
+        Map<Role, Double> averageCloseDisciplineByRole = averageDoubleByRole(workers, clockingDisciplineByWorker);
 
         return workers.stream()
                 .map(worker -> buildStats(
@@ -188,7 +189,7 @@ public class TimeTrackingService {
                         absenceDaysByWorker,
                         productivityByWorker,
                         completionByWorker,
-                        closeDisciplineByWorker
+                        clockingDisciplineByWorker
                 ))
                 .toList();
     }
@@ -208,19 +209,19 @@ public class TimeTrackingService {
         Map<Long, Long> absenceDaysByWorker = new HashMap<>();
         Map<Long, Double> productivityByWorker = new HashMap<>();
         Map<Long, Double> completionByWorker = new HashMap<>();
-        Map<Long, Double> closeDisciplineByWorker = new HashMap<>();
+        Map<Long, Double> clockingDisciplineByWorker = new HashMap<>();
 
         for (Worker item : activeWorkers) {
             absenceDaysByWorker.put(item.getId(), calculateApprovedNonVacationAbsenceDaysThisYear(item.getId(), today));
             productivityByWorker.put(item.getId(), calculateProductivityBasis(item, now));
             completionByWorker.put(item.getId(), calculateCompletionBasis(item));
-            closeDisciplineByWorker.put(item.getId(), calculateCloseDisciplineBasis(item.getId()));
+            clockingDisciplineByWorker.put(item.getId(), calculateClockingDisciplineScore(item, today));
         }
 
         Map<Role, Double> averageAbsenceDaysByRole = averageLongByRole(activeWorkers, absenceDaysByWorker);
         Map<Role, Double> averageProductivityByRole = averageDoubleByRole(activeWorkers, productivityByWorker);
         Map<Role, Double> averageCompletionByRole = averageDoubleByRole(activeWorkers, completionByWorker);
-        Map<Role, Double> averageCloseDisciplineByRole = averageDoubleByRole(activeWorkers, closeDisciplineByWorker);
+        Map<Role, Double> averageCloseDisciplineByRole = averageDoubleByRole(activeWorkers, clockingDisciplineByWorker);
 
         WorkerTimeTrackingStatsDto summary = buildStats(
                 worker,
@@ -234,7 +235,7 @@ public class TimeTrackingService {
                 absenceDaysByWorker,
                 productivityByWorker,
                 completionByWorker,
-                closeDisciplineByWorker
+                clockingDisciplineByWorker
         );
 
         Role role = worker.getRole();
@@ -251,10 +252,7 @@ public class TimeTrackingService {
                 completionByWorker.getOrDefault(workerId, 0.0),
                 averageCompletionByRole.getOrDefault(role, 0.0)
         );
-        double disciplineFactor = scoreRelativeToAverage(
-                closeDisciplineByWorker.getOrDefault(workerId, 0.0),
-                averageCloseDisciplineByRole.getOrDefault(role, 0.0)
-        );
+        double disciplineFactor = clockingDisciplineByWorker.getOrDefault(workerId, 0.0);
 
         List<WorkerPerformanceFactorDto> factors = List.of(
                 new WorkerPerformanceFactorDto(
@@ -270,10 +268,10 @@ public class TimeTrackingService {
                         buildProductivityDetail(role, productivityByWorker.getOrDefault(workerId, 0.0))
                 ),
                 new WorkerPerformanceFactorDto(
-                        "Cierres sin incidencia",
+                        "Disciplina de fichaje",
                         disciplineFactor,
-                        formatOneDecimal(closeDisciplineByWorker.getOrDefault(workerId, 0.0))
-                                + "% de jornadas sin cierre forzado"
+                        formatOneDecimal(clockingDisciplineByWorker.getOrDefault(workerId, 0.0))
+                                + "% mensual. Cierre manual diario como mejor señal; ausencia aprobada como dia justificado"
                 ),
                 new WorkerPerformanceFactorDto(
                         role == Role.COMERCIAL ? "Seguimiento comercial" : "Firmas completas",
@@ -464,11 +462,7 @@ public class TimeTrackingService {
                 completionByWorker.getOrDefault(worker.getId(), 0.0),
                 averageCompletionByRole.getOrDefault(role, 0.0)
         );
-        double disciplineFactor = scoreRelativeToAverage(
-                closeDisciplineByWorker.getOrDefault(worker.getId(), 0.0),
-                averageCloseDisciplineByRole.getOrDefault(role, 0.0)
-        );
-        double qualityScore = (absenceFactor + throughputFactor + signatureFactor + disciplineFactor) / 4.0;
+        double qualityScore = closeDisciplineByWorker.getOrDefault(worker.getId(), 0.0);
 
         return new WorkerTimeTrackingStatsDto(
                 worker.getId(),
@@ -591,18 +585,82 @@ public class TimeTrackingService {
         return (progressedBudgets * 100.0) / budgets.size();
     }
 
-    private double calculateCloseDisciplineBasis(Long workerId) {
-        List<TimeEntry> entries = timeEntryRepository.findByWorkerIdOrderByClockInDesc(workerId);
-        List<TimeEntry> closedEntries = entries.stream()
-                .filter(entry -> entry.getClockOut() != null)
-                .toList();
-        if (closedEntries.isEmpty()) {
+    private double calculateClockingDisciplineScore(Worker worker, LocalDate today) {
+        YearMonth rankingMonth = today.getDayOfMonth() == 1
+                ? YearMonth.from(today.minusMonths(1))
+                : YearMonth.from(today);
+        LocalDate start = rankingMonth.atDay(1);
+        LocalDate endExclusive = today.getDayOfMonth() == 1
+                ? rankingMonth.atEndOfMonth().plusDays(1)
+                : today;
+
+        if (worker.getContractStartDate() != null && worker.getContractStartDate().isAfter(start)) {
+            start = worker.getContractStartDate();
+        }
+        if (!start.isBefore(endExclusive)) {
+            return 75.0;
+        }
+
+        ZoneId zoneId = ZoneId.systemDefault();
+        double totalScore = 0.0;
+        long evaluatedDays = 0;
+        for (LocalDate date = start; date.isBefore(endExclusive); date = date.plusDays(1)) {
+            if (isWeekend(date)) {
+                continue;
+            }
+            evaluatedDays += 1;
+
+            Instant dayStart = date.atStartOfDay(zoneId).toInstant();
+            Instant dayEnd = date.plusDays(1).atStartOfDay(zoneId).toInstant();
+            List<TimeEntry> entries = timeEntryRepository
+                    .findByWorkerIdAndClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(
+                            worker.getId(),
+                            dayStart,
+                            dayEnd
+                    );
+
+            if (!entries.isEmpty()) {
+                totalScore += scoreClockingDay(entries);
+                continue;
+            }
+
+            if (isWorkerOnApprovedLeave(worker.getId(), date)) {
+                totalScore += 70.0;
+            }
+        }
+
+        if (evaluatedDays == 0) {
+            return 75.0;
+        }
+        return clampScore(totalScore / evaluatedDays);
+    }
+
+    private double scoreClockingDay(List<TimeEntry> entries) {
+        boolean allClosed = entries.stream().allMatch(entry -> entry.getClockOut() != null);
+        boolean hasManualClose = entries.stream()
+                .anyMatch(entry -> entry.getClockOut() != null && entry.getAutoCloseReason() == null);
+        boolean hasPlannedAutoClose = entries.stream()
+                .anyMatch(entry -> entry.getClockOut() != null
+                        && entry.getAutoCloseReason() == TimeEntryAutoCloseReason.PLANNED_END_TIME);
+        boolean hasForcedOrOpen = entries.stream()
+                .anyMatch(entry -> entry.getClockOut() == null
+                        || entry.getAutoCloseReason() == TimeEntryAutoCloseReason.END_OF_DAY_FORCE_CLOSE);
+
+        if (allClosed && hasManualClose && !hasForcedOrOpen) {
             return 100.0;
         }
-        long healthyClosures = closedEntries.stream()
-                .filter(entry -> entry.getAutoCloseReason() != TimeEntryAutoCloseReason.END_OF_DAY_FORCE_CLOSE)
-                .count();
-        return (healthyClosures * 100.0) / closedEntries.size();
+        if (hasPlannedAutoClose && !hasForcedOrOpen) {
+            return 75.0;
+        }
+        if (allClosed) {
+            return 60.0;
+        }
+        return 35.0;
+    }
+
+    private boolean isWeekend(LocalDate date) {
+        DayOfWeek dayOfWeek = date.getDayOfWeek();
+        return dayOfWeek == DayOfWeek.SATURDAY || dayOfWeek == DayOfWeek.SUNDAY;
     }
 
     private long calculateApprovedNonVacationAbsenceDaysThisYear(Long workerId, LocalDate today) {
