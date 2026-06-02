@@ -13,10 +13,8 @@ import 'admin_time_tracking_screen.dart';
 
 enum _AuditFilter {
   all,
-  incidents,
   openShifts,
   pendingAdjustments,
-  forcedClosures,
 }
 
 class AdminTimeTrackingOverviewScreen extends StatefulWidget {
@@ -124,9 +122,6 @@ class _AdminTimeTrackingOverviewScreenState
         final pendingRequests = workerRequests
             .where((item) => item.isPending)
             .toList();
-        final forcedClosures = entries
-            .where((entry) => entry.autoCloseReason == 'END_OF_DAY_FORCE_CLOSE')
-            .toList();
         final latestEntry = entries.isEmpty ? null : entries.first;
         final openEntry = _firstWhereOrNull(
           entries,
@@ -156,18 +151,8 @@ class _AdminTimeTrackingOverviewScreenState
             openEntry: openEntry,
             pendingAdjustmentCount: pendingRequests.length,
             adjustmentHistoryCount: workerRequests.length,
-            forcedClosureCount: forcedClosures.length,
             latestPendingRequestAt: pendingRequests
                 .map((item) => item.createdAt ?? item.workDate)
-                .fold<DateTime?>(null, (current, value) {
-                  if (current == null || value.isAfter(current)) {
-                    return value;
-                  }
-                  return current;
-                }),
-            latestForcedClosureAt: forcedClosures
-                .map((entry) => entry.autoClosedAt ?? entry.clockOut)
-                .whereType<DateTime>()
                 .fold<DateTime?>(null, (current, value) {
                   if (current == null || value.isAfter(current)) {
                     return value;
@@ -341,12 +326,6 @@ class _AdminTimeTrackingOverviewScreenState
               accent: NavalgoColors.sand,
             ),
             NavalgoMetricCard(
-              label: 'Cierres forzados',
-              value: '${overview.forcedClosures}',
-              icon: const Icon(Icons.warning_amber_rounded),
-              accent: NavalgoColors.coral,
-            ),
-            NavalgoMetricCard(
               label: 'Trabajadores con incidencias',
               value: '${overview.workersWithIncidents}',
               icon: const Icon(Icons.fact_check_outlined),
@@ -448,7 +427,7 @@ class _AdminTimeTrackingOverviewScreenState
         NavalgoSectionHeader(
           title: 'Plantilla completa',
           subtitle:
-              'Resumen por trabajador para revisar horas, ausencias, ajustes y cierres forzados sin entrar uno por uno.',
+              'Resumen por trabajador para revisar horas, ausencias y ajustes sin entrar uno por uno.',
         ),
         const SizedBox(height: 12),
         if (snapshots.isEmpty)
@@ -474,7 +453,6 @@ class _AdminTimeTrackingOverviewScreenState
   _OverviewData _buildOverview(List<_WorkerAuditSnapshot> snapshots) {
     var openShiftWorkers = 0;
     var pendingAdjustments = 0;
-    var forcedClosures = 0;
     var workersWithIncidents = 0;
 
     for (final snapshot in snapshots) {
@@ -482,7 +460,6 @@ class _AdminTimeTrackingOverviewScreenState
         openShiftWorkers++;
       }
       pendingAdjustments += snapshot.pendingAdjustmentCount;
-      forcedClosures += snapshot.forcedClosureCount;
       if (snapshot.hasIncidents) {
         workersWithIncidents++;
       }
@@ -492,7 +469,6 @@ class _AdminTimeTrackingOverviewScreenState
       totalWorkers: snapshots.length,
       openShiftWorkers: openShiftWorkers,
       pendingAdjustments: pendingAdjustments,
-      forcedClosures: forcedClosures,
       workersWithIncidents: workersWithIncidents,
     );
   }
@@ -512,14 +488,10 @@ class _AdminTimeTrackingOverviewScreenState
       switch (_filter) {
         case _AuditFilter.all:
           return true;
-        case _AuditFilter.incidents:
-          return snapshot.hasIncidents;
         case _AuditFilter.openShifts:
           return snapshot.isCurrentlyClockedIn;
         case _AuditFilter.pendingAdjustments:
           return snapshot.pendingAdjustmentCount > 0;
-        case _AuditFilter.forcedClosures:
-          return snapshot.forcedClosureCount > 0;
       }
     }).toList();
   }
@@ -550,19 +522,6 @@ class _AdminTimeTrackingOverviewScreenState
         );
       }
 
-      if (snapshot.latestForcedClosureAt != null) {
-        events.add(
-          _AuditEvent(
-            snapshot: snapshot,
-            type: _AuditEventType.forcedClosure,
-            when: snapshot.latestForcedClosureAt!,
-            title: 'Cierre forzado',
-            detail:
-                '${snapshot.worker.fullName} acumula ${snapshot.forcedClosureCount} cierre(s) forzado(s). El más reciente quedó registrado el ${_formatDate(snapshot.latestForcedClosureAt!)}.',
-          ),
-        );
-      }
-
       if (snapshot.pendingAdjustmentCount > 0) {
         events.add(
           _AuditEvent(
@@ -587,14 +546,12 @@ class _OverviewData {
     required this.totalWorkers,
     required this.openShiftWorkers,
     required this.pendingAdjustments,
-    required this.forcedClosures,
     required this.workersWithIncidents,
   });
 
   final int totalWorkers;
   final int openShiftWorkers;
   final int pendingAdjustments;
-  final int forcedClosures;
   final int workersWithIncidents;
 }
 
@@ -607,9 +564,7 @@ class _WorkerAuditSnapshot {
     required this.openEntry,
     required this.pendingAdjustmentCount,
     required this.adjustmentHistoryCount,
-    required this.forcedClosureCount,
     required this.latestPendingRequestAt,
-    required this.latestForcedClosureAt,
   });
 
   final WorkerProfile worker;
@@ -619,19 +574,14 @@ class _WorkerAuditSnapshot {
   final TimeEntry? openEntry;
   final int pendingAdjustmentCount;
   final int adjustmentHistoryCount;
-  final int forcedClosureCount;
   final DateTime? latestPendingRequestAt;
-  final DateTime? latestForcedClosureAt;
 
   bool get hasIncidents =>
-      isCurrentlyClockedIn ||
-      pendingAdjustmentCount > 0 ||
-      forcedClosureCount > 0;
+      isCurrentlyClockedIn || pendingAdjustmentCount > 0;
 
   int get incidentScore =>
       (isCurrentlyClockedIn ? 4 : 0) +
-      (pendingAdjustmentCount > 0 ? 2 : 0) +
-      (forcedClosureCount > 0 ? 1 : 0);
+      (pendingAdjustmentCount > 0 ? 2 : 0);
 
   bool get isCurrentlyClockedIn =>
       openEntry != null || stats.currentlyClockedIn;
@@ -664,7 +614,7 @@ class _WorkerAuditSnapshot {
       latestPendingRequestAt ?? DateTime.now();
 }
 
-enum _AuditEventType { openShift, pendingAdjustment, forcedClosure }
+enum _AuditEventType { openShift, pendingAdjustment }
 
 class _AuditEvent {
   const _AuditEvent({
@@ -693,12 +643,10 @@ class _AuditEventCard extends StatelessWidget {
     final color = switch (event.type) {
       _AuditEventType.openShift => NavalgoColors.kelp,
       _AuditEventType.pendingAdjustment => NavalgoColors.sand,
-      _AuditEventType.forcedClosure => NavalgoColors.coral,
     };
     final icon = switch (event.type) {
       _AuditEventType.openShift => Icons.lock_open_outlined,
       _AuditEventType.pendingAdjustment => Icons.pending_actions_outlined,
-      _AuditEventType.forcedClosure => Icons.warning_amber_rounded,
     };
 
     return NavalgoPanel(
@@ -817,12 +765,6 @@ class _WorkerAuditCard extends StatelessWidget {
                             label:
                                 '${snapshot.pendingAdjustmentCount} ajuste(s) pendiente(s)',
                             color: NavalgoColors.sand,
-                          ),
-                        if (snapshot.forcedClosureCount > 0)
-                          NavalgoStatusChip(
-                            label:
-                                '${snapshot.forcedClosureCount} cierre(s) forzado(s)',
-                            color: NavalgoColors.coral,
                           ),
                         if (!snapshot.hasIncidents)
                           const NavalgoStatusChip(
@@ -955,20 +897,16 @@ class _MiniMetricChip extends StatelessWidget {
 String _filterLabel(_AuditFilter filter) {
   return switch (filter) {
     _AuditFilter.all => 'Todos',
-    _AuditFilter.incidents => 'Con incidencias',
     _AuditFilter.openShifts => 'Jornadas abiertas',
     _AuditFilter.pendingAdjustments => 'Ajustes pendientes',
-    _AuditFilter.forcedClosures => 'Cierres forzados',
   };
 }
 
 Color _filterColor(_AuditFilter filter) {
   return switch (filter) {
     _AuditFilter.all => NavalgoColors.tide,
-    _AuditFilter.incidents => NavalgoColors.harbor,
     _AuditFilter.openShifts => NavalgoColors.kelp,
     _AuditFilter.pendingAdjustments => NavalgoColors.sand,
-    _AuditFilter.forcedClosures => NavalgoColors.coral,
   };
 }
 
