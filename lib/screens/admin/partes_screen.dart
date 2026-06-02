@@ -874,22 +874,24 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
   bool get _isSuperAdmin =>
       _isSuperAdminEmail(context.read<SessionViewModel>().user?.email);
   bool get _isWorker => context.read<SessionViewModel>().user?.role == 'WORKER';
-  bool get _hasEditPermission =>
-      context.read<SessionViewModel>().user?.canEditWorkOrders ?? false;
-  bool get _canEditPart => _isAdmin || (_isWorker && _hasEditPermission);
-  bool get _canUpdateWorkLog => _isAdmin || _isWorker;
-  bool get _canReviewMaterial => _isAdmin || _isWorker;
   bool get _isClosedWorkOrder =>
       _workOrder.status == 'DONE' || _workOrder.status == 'CANCELLED';
   bool get _isSigned =>
-      _workOrder.signatureUrl != null && _workOrder.signatureUrl!.isNotEmpty;
+      (_workOrder.signatureUrl != null &&
+          _workOrder.signatureUrl!.isNotEmpty) ||
+      _workOrder.signedAt != null;
   bool get _hasClientSignature =>
       _workOrder.clientSignatureUrl != null &&
       _workOrder.clientSignatureUrl!.isNotEmpty;
+  bool get _canEditPart =>
+      (_isAdmin || _isWorker) && !_isClosedWorkOrder && !_isSigned;
+  bool get _canUpdateWorkLog => _canEditPart;
+  bool get _canReviewMaterial => _canEditPart;
   bool get _canDownloadEvidenceActa =>
       _isAdmin && _attachments.isNotEmpty && _isSigned;
-  bool get _canSign => (_isWorker || _isAdmin) && !_isSigned;
-  bool get _canManageClientSignature => _isWorker || _isAdmin;
+  bool get _canSign =>
+      (_isWorker || _isAdmin) && !_isClosedWorkOrder && !_isSigned;
+  bool get _canManageClientSignature => _canEditPart;
   bool get _canCaptureMedia => !_isClosedWorkOrder && !_isSigned;
   bool get _canDeleteWorkOrder =>
       _isAdmin && (!_isWorkOrderSealedForDelete(_workOrder) || _isSuperAdmin);
@@ -898,10 +900,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
     if (_isClosedWorkOrder || _isSigned) {
       return false;
     }
-    if (_isAdmin || _canEditPart) {
-      return true;
-    }
-    return !_isSigned;
+    return _isAdmin || _canEditPart;
   }
 
   void _startWorkOrderRealtimeSync() {
@@ -1392,17 +1391,10 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
                     }).toList(),
                   ),
           ),
-          if (_workOrder.laborHours != null) ...[
-            const SizedBox(height: 8),
-            _DetailRow(
-              label: 'Últimas horas guardadas',
-              value: _formatLaborHoursLabel(_workOrder.laborHours),
-            ),
-          ],
           if (_workOrder.engineHours.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
-              'Último registro guardado',
+              'Último registro guardado de horas de motor',
               style: Theme.of(
                 context,
               ).textTheme.labelLarge?.copyWith(color: NavalgoColors.storm),
@@ -2799,6 +2791,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         owners: fleetVm.owners,
         vessels: fleetVm.vessels,
         workers: _assignableWorkers(workersVm.workers),
+        canAssignWorkers: _isAdmin,
       ),
     );
 
@@ -3892,7 +3885,7 @@ class _EditPartInput {
 
   final int ownerId;
   final int? vesselId;
-  final List<int> workerIds;
+  final List<int>? workerIds;
   final bool highPriority;
   final DateTime closeDueDate;
   final int? materialTemplateId;
@@ -3905,12 +3898,14 @@ class _EditPartDialog extends StatefulWidget {
     required this.owners,
     required this.vessels,
     required this.workers,
+    required this.canAssignWorkers,
   });
 
   final WorkOrder workOrder;
   final List<Owner> owners;
   final List<Vessel> vessels;
   final List<WorkerProfile> workers;
+  final bool canAssignWorkers;
 
   @override
   State<_EditPartDialog> createState() => _EditPartDialogState();
@@ -3978,7 +3973,9 @@ class _EditPartDialogState extends State<_EditPartDialog> {
               _EditPartInput(
                 ownerId: _ownerId,
                 vesselId: _vesselId,
-                workerIds: _selectedWorkers.toList(),
+                workerIds: widget.canAssignWorkers
+                    ? _selectedWorkers.toList()
+                    : null,
                 highPriority: _highPriority,
                 closeDueDate: _closeDueDate!,
                 materialTemplateId: _selectedMaterialTemplateId,
@@ -4131,27 +4128,30 @@ class _EditPartDialogState extends State<_EditPartDialog> {
                 ),
               ),
             ),
-            const SizedBox(height: 14),
-            NavalgoFormFieldBlock(
-              label: 'Mecánicos asignados',
-              caption: 'Selecciona el equipo que trabajará sobre este parte.',
-              child: NavalgoPanel(
-                tint: Colors.white.withValues(alpha: 0.96),
-                child: _WorkerAssignmentList(
-                  workers: widget.workers,
-                  selectedWorkers: _selectedWorkers,
-                  onToggle: (workerId, selected) {
-                    setState(() {
-                      if (selected) {
-                        _selectedWorkers.add(workerId);
-                      } else {
-                        _selectedWorkers.remove(workerId);
-                      }
-                    });
-                  },
+            if (widget.canAssignWorkers) ...[
+              const SizedBox(height: 14),
+              NavalgoFormFieldBlock(
+                label: 'Mecánicos asignados',
+                caption:
+                    'Selecciona el equipo que trabajará sobre este parte.',
+                child: NavalgoPanel(
+                  tint: Colors.white.withValues(alpha: 0.96),
+                  child: _WorkerAssignmentList(
+                    workers: widget.workers,
+                    selectedWorkers: _selectedWorkers,
+                    onToggle: (workerId, selected) {
+                      setState(() {
+                        if (selected) {
+                          _selectedWorkers.add(workerId);
+                        } else {
+                          _selectedWorkers.remove(workerId);
+                        }
+                      });
+                    },
+                  ),
                 ),
               ),
-            ),
+            ],
             const SizedBox(height: 14),
             _MaterialTemplateAssignmentField(
               selectedTemplateId: _selectedMaterialTemplateId,
@@ -6386,13 +6386,6 @@ String _formatLaborHoursInput(double? value) {
   return text
       .replaceFirst(RegExp(r'\.0+$'), '')
       .replaceFirst(RegExp(r'(\.[0-9]*?)0+$'), r'$1');
-}
-
-String _formatLaborHoursLabel(double? value) {
-  if (value == null) {
-    return 'Sin registrar';
-  }
-  return '${_formatLaborHoursInput(value)} h';
 }
 
 double? _parseLaborHours(String raw) {

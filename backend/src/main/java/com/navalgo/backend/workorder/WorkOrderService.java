@@ -229,13 +229,7 @@ public class WorkOrderService {
         }
         ensureNotSealed(workOrder);
 
-        boolean canAdvancedEdit = hasAdvancedEditPermission(current, workOrder);
-
-        if (!canAdvancedEdit && requestHasAdvancedChanges(request)) {
-            throw new AccessDeniedException(
-                    "Solo administradores o mecanicos con permiso de edicion pueden editar esos campos"
-            );
-        }
+        boolean canEditUnsignedWorkOrder = canEditWorkOrder(current, workOrder);
 
         if (request.title() != null && !request.title().isBlank()) {
             workOrder.setTitle(inputSanitizer.requiredText(request.title(), "El titulo", 255));
@@ -260,7 +254,7 @@ public class WorkOrderService {
         }
 
         if (Boolean.TRUE.equals(request.clearSignature())) {
-            if (!canAdvancedEdit) {
+            if (!canEditUnsignedWorkOrder) {
                 throw new AccessDeniedException("No tienes permiso para borrar la firma de este parte");
             }
             if (workOrder.getSignatureUrl() != null && !workOrder.getSignatureUrl().isBlank()) {
@@ -272,7 +266,7 @@ public class WorkOrderService {
         }
 
         if (Boolean.TRUE.equals(request.clearClientSignature())) {
-            if (!canAdvancedEdit) {
+            if (!canEditUnsignedWorkOrder) {
                 throw new AccessDeniedException("No tienes permiso para borrar la firma de cliente de este parte");
             }
             if (workOrder.getClientSignatureUrl() != null && !workOrder.getClientSignatureUrl().isBlank()) {
@@ -283,9 +277,6 @@ public class WorkOrderService {
         }
 
         if (request.materialTemplateId() != null) {
-            if (!admin) {
-                throw new AccessDeniedException("Solo un administrador puede asignar plantillas de material");
-            }
             MaterialChecklistTemplate template = materialChecklistTemplateRepository.findById(request.materialTemplateId())
                     .orElseThrow(() -> new EntityNotFoundException("Plantilla de material no encontrada"));
             applyMaterialChecklistTemplate(workOrder, template);
@@ -293,9 +284,6 @@ public class WorkOrderService {
         }
 
         if (Boolean.TRUE.equals(request.clearMaterialChecklist())) {
-            if (!admin) {
-                throw new AccessDeniedException("Solo un administrador puede desasignar plantillas de material");
-            }
             workOrder.setMaterialChecklist(null);
             workOrder.setDescription(mergeAutoMaterialObservations(workOrder.getDescription(), null));
         }
@@ -313,6 +301,9 @@ public class WorkOrderService {
         }
 
         if (request.workerIds() != null) {
+            if (!admin) {
+                throw new AccessDeniedException("Solo un administrador puede reasignar trabajadores");
+            }
             Set<Worker> workers = resolveAssignableWorkers(request.workerIds());
             workOrder.setAssignedWorkers(workers);
         }
@@ -621,25 +612,7 @@ public class WorkOrderService {
     }
 
     private boolean canEditWorkOrder(Worker worker, WorkOrder workOrder) {
-        return isAdmin(worker) || (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders());
-    }
-
-    private boolean hasAdvancedEditPermission(Worker worker, WorkOrder workOrder) {
-        return isAdmin(worker) || (isAssignedToWorkOrder(worker, workOrder) && worker.isCanEditWorkOrders());
-    }
-
-    private boolean requestHasAdvancedChanges(UpdateWorkOrderRequest request) {
-        return (request.title() != null && !request.title().isBlank())
-                || request.priority() != null
-                || request.status() != null
-            || request.closeDueDate() != null
-                || request.ownerId() != null
-                || request.vesselId() != null
-                || request.workerIds() != null
-                || Boolean.TRUE.equals(request.clearSignature())
-                || Boolean.TRUE.equals(request.clearClientSignature())
-                || request.materialTemplateId() != null
-                || Boolean.TRUE.equals(request.clearMaterialChecklist());
+        return !isSealed(workOrder) && (isAdmin(worker) || isAssignedToWorkOrder(worker, workOrder));
     }
 
     private boolean canModifyMultimedia(Worker worker, WorkOrder workOrder) {
