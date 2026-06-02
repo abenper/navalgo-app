@@ -1,6 +1,7 @@
 package com.navalgo.backend.fleet;
 
 import com.navalgo.backend.common.InputSanitizer;
+import com.navalgo.backend.common.Role;
 import com.navalgo.backend.company.Company;
 import com.navalgo.backend.company.CompanyRepository;
 import com.navalgo.backend.budget.BudgetRepository;
@@ -13,7 +14,9 @@ import com.navalgo.backend.worker.WorkerRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -57,15 +60,18 @@ public class FleetController {
     }
 
     @GetMapping("/owners")
-    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
-    public ResponseEntity<List<OwnerDto>> listOwners() {
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
+    public ResponseEntity<List<OwnerDto>> listOwners(Authentication authentication) {
+        ensureCanManageFleetCreation(authentication);
         return ResponseEntity.ok(ownerRepository.findAllByArchivedFalseOrderByDisplayNameAsc().stream().map(OwnerDto::from).toList());
     }
 
     @PostMapping("/owners")
-    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     @Transactional
-    public ResponseEntity<OwnerDto> createOwner(@RequestBody @Valid CreateOwnerRequest request) {
+    public ResponseEntity<OwnerDto> createOwner(@RequestBody @Valid CreateOwnerRequest request,
+                                                Authentication authentication) {
+        ensureCanManageFleetCreation(authentication);
         return ResponseEntity.ok(OwnerDto.from(ownerRepository.save(buildOwnerFromRequest(new Owner(), request))));
     }
 
@@ -149,9 +155,11 @@ public class FleetController {
     }
 
     @PostMapping("/vessels")
-    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     @Transactional
-    public ResponseEntity<VesselDto> createVessel(@RequestBody @Valid CreateVesselRequest request) {
+    public ResponseEntity<VesselDto> createVessel(@RequestBody @Valid CreateVesselRequest request,
+                                                  Authentication authentication) {
+        ensureCanManageFleetCreation(authentication);
         return ResponseEntity.ok(VesselDto.from(vesselRepository.save(buildVesselFromCreateRequest(new Vessel(), request))));
     }
 
@@ -374,6 +382,18 @@ public class FleetController {
         }
 
         return normalized;
+    }
+
+    private void ensureCanManageFleetCreation(Authentication authentication) {
+        Worker current = workerRepository.findByEmailIgnoreCase(authentication.getName())
+                .orElseThrow(() -> new EntityNotFoundException("Usuario no encontrado"));
+        if (current.getRole() == Role.ADMIN || current.getRole() == Role.COMERCIAL) {
+            return;
+        }
+        if (current.getRole() == Role.WORKER && current.isCanEditWorkOrders()) {
+            return;
+        }
+        throw new AccessDeniedException("No tienes permiso para crear clientes o embarcaciones");
     }
 
     private List<String> normalizeEngineSerialNumbers(List<String> engineSerialNumbers,

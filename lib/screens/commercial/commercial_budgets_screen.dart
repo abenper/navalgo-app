@@ -534,6 +534,7 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final compactHeader = MediaQuery.of(context).size.width < 430;
     final visibleBudgets = _filterBudgets(_budgets).toList(growable: false);
     final sentCount = visibleBudgets
         .where((budget) => budget.status == 'SENT')
@@ -563,40 +564,26 @@ class _CommercialBudgetsScreenState extends State<CommercialBudgetsScreen> {
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final stackHeader = constraints.maxWidth < 430;
-                    final title = Text(
-                      'Presupuestos',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    );
-                    final action = NavalgoGradientButton(
-                      label: _isCreating ? 'Creando...' : 'Nuevo presupuesto',
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Presupuestos',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    NavalgoGradientButton(
+                      label: _isCreating
+                          ? 'Creando...'
+                          : compactHeader
+                          ? 'Nuevo'
+                          : 'Nuevo presupuesto',
                       icon: _isCreating ? null : Icons.add_circle_outline,
-                      expand: stackHeader,
                       onPressed: _isCreating ? null : _createBudget,
-                    );
-
-                    if (stackHeader) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          title,
-                          const SizedBox(height: 12),
-                          action,
-                        ],
-                      );
-                    }
-
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: title),
-                        const SizedBox(width: 12),
-                        Flexible(child: action),
-                      ],
-                    );
-                  },
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 LayoutBuilder(
@@ -1285,75 +1272,75 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                   ),
                   const SizedBox(height: 12),
                   if (!_walkInClient) ...[
-                  TextFormField(
-                    controller: _searchCtrl,
-                    decoration: const InputDecoration(
-                      labelText: 'Buscar cliente',
-                      hintText: 'Nombre, correo, tel\u00e9fono o documento',
-                      prefixIcon: Icon(Icons.search_rounded),
-                    ),
-                  ),
-                  if (_ownerId != null) ...[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: TextButton.icon(
-                        onPressed: () {
-                          setState(() {
-                            _ownerId = null;
-                            _newClientNameCtrl.clear();
-                            _habitualPhoneCtrl.clear();
-                            _habitualDocumentCtrl.clear();
-                          });
-                        },
-                        icon: const Icon(Icons.person_add_alt_1_outlined),
-                        label: const Text('Crear como cliente nuevo'),
+                    TextFormField(
+                      controller: _searchCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Buscar cliente',
+                        hintText: 'Nombre, correo, tel\u00e9fono o documento',
+                        prefixIcon: Icon(Icons.search_rounded),
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<int>(
-                    key: ValueKey(
-                      'owner-${selectedOwnerId ?? 'none'}-${filteredOwners.length}',
-                    ),
-                    initialValue: selectedOwnerId,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Cliente',
-                      hintText: 'Opcional: selecciona un cliente existente',
-                    ),
-                    items: filteredOwners
-                        .map(
-                          (owner) => DropdownMenuItem<int>(
-                            value: owner.id,
-                            child: Text(
-                              owner.email == null || owner.email!.isEmpty
-                                  ? owner.displayName
-                                  : '${owner.displayName} - ${owner.email}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                    if (_ownerId != null) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _ownerId = null;
+                              _newClientNameCtrl.clear();
+                              _habitualPhoneCtrl.clear();
+                              _habitualDocumentCtrl.clear();
+                            });
+                          },
+                          icon: const Icon(Icons.person_add_alt_1_outlined),
+                          label: const Text('Crear como cliente nuevo'),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<int>(
+                      key: ValueKey(
+                        'owner-${selectedOwnerId ?? 'none'}-${filteredOwners.length}',
+                      ),
+                      initialValue: selectedOwnerId,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Cliente',
+                        hintText: 'Opcional: selecciona un cliente existente',
+                      ),
+                      items: filteredOwners
+                          .map(
+                            (owner) => DropdownMenuItem<int>(
+                              value: owner.id,
+                              child: Text(
+                                owner.email == null || owner.email!.isEmpty
+                                    ? owner.displayName
+                                    : '${owner.displayName} - ${owner.email}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _ownerId = value;
-                        if (value == null) {
-                          return;
-                        }
-                        final selectedOwner = widget.owners.where(
-                          (owner) => owner.id == value,
-                        );
-                        final owner = selectedOwner.isEmpty
-                            ? null
-                            : selectedOwner.first;
-                        if (owner != null) {
-                          _applyOwner(owner);
-                        }
-                      });
-                    },
-                  ),
+                          )
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _ownerId = value;
+                          if (value == null) {
+                            return;
+                          }
+                          final selectedOwner = widget.owners.where(
+                            (owner) => owner.id == value,
+                          );
+                          final owner = selectedOwner.isEmpty
+                              ? null
+                              : selectedOwner.first;
+                          if (owner != null) {
+                            _applyOwner(owner);
+                          }
+                        });
+                      },
+                    ),
                   ],
                   if (_walkInClient) ...[
                     TextFormField(
@@ -1410,9 +1397,7 @@ class _CreateBudgetDialogState extends State<_CreateBudgetDialog> {
                     const SizedBox(height: 12),
                     TextFormField(
                       controller: _habitualPhoneCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Teléfono',
-                      ),
+                      decoration: const InputDecoration(labelText: 'Teléfono'),
                     ),
                   ],
                   const SizedBox(height: 12),

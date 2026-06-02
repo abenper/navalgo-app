@@ -18,7 +18,7 @@ public class MaterialChecklistTemplateController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
     public ResponseEntity<List<MaterialChecklistTemplateDto>> list() {
         return ResponseEntity.ok(service.findAll());
     }

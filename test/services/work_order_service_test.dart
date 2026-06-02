@@ -5,11 +5,16 @@ import 'package:http/http.dart' as http;
 import 'package:navalgo/models/work_order.dart';
 import 'package:navalgo/services/network/api_client.dart';
 import 'package:navalgo/services/work_order_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/fake_base_client.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('WorkOrderService.createWorkOrder serializes critical fields', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+
     final attachment = WorkOrderAttachmentItem(
       id: 3,
       fileUrl: 'https://cdn.example.com/evidence.jpg',

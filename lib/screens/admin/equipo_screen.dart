@@ -783,8 +783,8 @@ class _WorkerCard extends StatelessWidget {
                           label: worker.role == 'COMERCIAL'
                               ? 'Sin acceso a partes'
                               : worker.canEditWorkOrders
-                              ? 'Puede editar partes'
-                              : 'Sin edición de partes',
+                              ? 'Gestiona clientes y flota'
+                              : 'Sin gestion de flota',
                           color: worker.canEditWorkOrders
                               ? NavalgoColors.harbor
                               : NavalgoColors.storm,
@@ -1234,9 +1234,9 @@ class _CreateWorkerDialogState extends State<_CreateWorkerDialog> {
                 value: _canEditWorkOrders,
                 title: _role == 'COMERCIAL'
                     ? 'Sin acceso a partes'
-                    : 'Permitir editar partes',
+                    : 'Permitir gestionar clientes y flota',
                 subtitle:
-                    'Activa este permiso si podrá completar o modificar partes.',
+                    'Activa este permiso si podra crear clientes y embarcaciones.',
                 onChanged: _role == 'COMERCIAL'
                     ? null
                     : (value) {
@@ -1523,9 +1523,9 @@ class _EditWorkerDialogState extends State<_EditWorkerDialog> {
                 value: _canEditWorkOrders,
                 title: _role == 'COMERCIAL'
                     ? 'Sin acceso a partes'
-                    : 'Permitir editar partes',
+                    : 'Permitir gestionar clientes y flota',
                 subtitle:
-                    'Activa este permiso si podrá completar o modificar partes.',
+                    'Activa este permiso si podra crear clientes y embarcaciones.',
                 onChanged: _role == 'COMERCIAL'
                     ? null
                     : (value) {

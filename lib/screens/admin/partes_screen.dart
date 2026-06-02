@@ -9,7 +9,6 @@ import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:signature/signature.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../models/owner.dart';
 import '../../models/vessel.dart';
@@ -111,21 +110,23 @@ class _PartesScreenState extends State<PartesScreen> {
       return;
     }
 
-    if (fleetVm.owners.isEmpty) {
+    if (fleetVm.vessels.isEmpty) {
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Crea un propietario antes de crear partes'),
+          content: Text('Crea una embarcacion antes de crear partes'),
         ),
       );
       return;
     }
 
-    final input = await showDialog<_CreatePartInput>(
+    final input = await showDialog<_QuickCreatePartInput>(
       context: context,
-      builder: (_) => _CreatePartDialog(
-        owners: fleetVm.owners,
+      builder: (_) => _QuickCreatePartDialog(
         vessels: fleetVm.vessels,
-        workers: _assignableWorkers(workersVm.workers),
+        workers: session.user?.role == 'ADMIN'
+            ? _assignableWorkers(workersVm.workers)
+            : const <WorkerProfile>[],
+        canAssignWorkers: session.user?.role == 'ADMIN',
       ),
     );
 
@@ -134,27 +135,14 @@ class _PartesScreenState extends State<PartesScreen> {
     }
 
     try {
-      await workOrderService.createWorkOrder(
+      final created = await workOrderService.createWorkOrder(
         token,
         title: input.title,
         description: input.description,
         ownerId: input.ownerId,
         vesselId: input.vesselId,
         workerIds: input.workerIds,
-        closeDueDate: input.closeDueDate,
-        laborHours: input.laborHours,
         materialTemplateId: input.materialTemplateId,
-        engineHours: input.engineHours
-            .map(
-              (item) => <String, dynamic>{
-                'engineLabel': item.engineLabel,
-                'hours': item.hours,
-              },
-            )
-            .toList(),
-        attachmentUrls: input.attachments.map((item) => item.fileUrl).toList(),
-        attachments: input.attachments,
-        priority: input.priority,
       );
 
       await workOrdersViewModel.loadWorkOrders(
@@ -164,6 +152,13 @@ class _PartesScreenState extends State<PartesScreen> {
         return;
       }
       AppToast.success(context, 'Parte creado correctamente');
+      await openWorkOrderDetailsScreen(context, initialWorkOrder: created);
+      if (!mounted) {
+        return;
+      }
+      await workOrdersViewModel.loadWorkOrders(
+        workerId: session.user?.role == 'ADMIN' ? null : session.user?.id,
+      );
     } catch (e) {
       if (!mounted) {
         return;
@@ -321,12 +316,11 @@ class _PartesScreenState extends State<PartesScreen> {
                                     ).textTheme.headlineSmall,
                                   ),
                                 ),
-                                if (isAdmin)
-                                  NavalgoGradientButton(
-                                    label: 'Nuevo parte',
-                                    onPressed: _openCreateDialog,
-                                    icon: Icons.note_add_outlined,
-                                  ),
+                                NavalgoGradientButton(
+                                  label: 'Nuevo parte',
+                                  onPressed: _openCreateDialog,
+                                  icon: Icons.note_add_outlined,
+                                ),
                               ],
                             ),
                             const SizedBox(height: 14),
@@ -1439,11 +1433,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
               spacing: 10,
               runSpacing: 10,
               children: [
-                OutlinedButton.icon(
-                  onPressed: () => _openExternal(_workOrder.signatureUrl!),
-                  icon: const Icon(Icons.open_in_new),
-                  label: const Text('Abrir firma'),
-                ),
                 if (_canEditPart)
                   OutlinedButton.icon(
                     onPressed: _busy ? null : _clearSignature,
@@ -1785,21 +1774,6 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       if (mounted) {
         setState(() => _busy = false);
       }
-    }
-  }
-
-  Future<void> _openExternal(String url) async {
-    final rawUrl = url.trim();
-    final resolvedUrl = resolveMediaUrl(rawUrl);
-    final targetUrl = rawUrl.isNotEmpty ? rawUrl : resolvedUrl;
-    final opened = await launchUrl(
-      Uri.parse(targetUrl),
-      mode: kIsWeb
-          ? LaunchMode.platformDefault
-          : LaunchMode.externalApplication,
-    );
-    if (!opened && mounted) {
-      AppToast.error(context, 'No se pudo abrir el archivo.');
     }
   }
 
@@ -4166,6 +4140,235 @@ class _EditPartDialogState extends State<_EditPartDialog> {
         ),
       ),
     );
+  }
+}
+
+class _QuickCreatePartInput {
+  const _QuickCreatePartInput({
+    required this.title,
+    required this.description,
+    required this.ownerId,
+    required this.vesselId,
+    required this.workerIds,
+    required this.materialTemplateId,
+  });
+
+  final String title;
+  final String description;
+  final int ownerId;
+  final int vesselId;
+  final List<int> workerIds;
+  final int? materialTemplateId;
+}
+
+class _QuickCreatePartDialog extends StatefulWidget {
+  const _QuickCreatePartDialog({
+    required this.vessels,
+    required this.workers,
+    required this.canAssignWorkers,
+  });
+
+  final List<Vessel> vessels;
+  final List<WorkerProfile> workers;
+  final bool canAssignWorkers;
+
+  @override
+  State<_QuickCreatePartDialog> createState() => _QuickCreatePartDialogState();
+}
+
+class _QuickCreatePartDialogState extends State<_QuickCreatePartDialog> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _descriptionCtrl = TextEditingController();
+  final Set<int> _selectedWorkers = <int>{};
+  int? _vesselId;
+  int? _selectedMaterialTemplateId;
+  String? _validationError;
+
+  @override
+  void initState() {
+    super.initState();
+    final vessels = _sortedVessels();
+    if (vessels.isNotEmpty) {
+      _vesselId = vessels.first.id;
+    }
+  }
+
+  @override
+  void dispose() {
+    _descriptionCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vessels = _sortedVessels();
+
+    return NavalgoFormDialog(
+      title: 'Nuevo parte',
+      maxWidth: 720,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cancelar',
+          onPressed: () => Navigator.pop(context),
+        ),
+        NavalgoGradientButton(
+          label: 'Crear',
+          icon: Icons.note_add_outlined,
+          onPressed: _submit,
+        ),
+      ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            NavalgoFormFieldBlock(
+              label: 'Embarcacion',
+              child: DropdownButtonFormField<int>(
+                initialValue: _vesselId,
+                dropdownColor: NavalgoColors.shell,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Embarcacion',
+                  prefixIcon: const Icon(Icons.directions_boat_outlined),
+                ),
+                items: vessels
+                    .map(
+                      (vessel) => DropdownMenuItem<int>(
+                        value: vessel.id,
+                        child: Text('${vessel.name} - ${vessel.ownerName}'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) {
+                  setState(() {
+                    _vesselId = value;
+                    _validationError = null;
+                  });
+                },
+                validator: (value) =>
+                    value == null ? 'Selecciona una embarcacion.' : null,
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
+              label: 'Trabajo',
+              child: TextFormField(
+                controller: _descriptionCtrl,
+                minLines: 3,
+                maxLines: 5,
+                textInputAction: TextInputAction.newline,
+                decoration: NavalgoFormStyles.inputDecoration(
+                  context,
+                  label: 'Trabajo a realizar',
+                  hint: 'Ej. Revision de filtros y prueba de motor',
+                  prefixIcon: const Icon(Icons.notes_outlined),
+                ),
+                validator: (value) {
+                  if ((value?.trim() ?? '').isEmpty) {
+                    return 'Describe brevemente el trabajo.';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            _MaterialTemplateAssignmentField(
+              selectedTemplateId: _selectedMaterialTemplateId,
+              onChanged: (value) {
+                setState(() {
+                  _selectedMaterialTemplateId = value;
+                });
+              },
+            ),
+            if (widget.canAssignWorkers) ...[
+              const SizedBox(height: 14),
+              NavalgoFormFieldBlock(
+                label: 'Asignar trabajadores',
+                caption:
+                    'Opcional. Si no marcas a nadie, el parte se crea sin asignacion inicial.',
+                child: widget.workers.isEmpty
+                    ? NavalgoPanel(
+                        tint: Colors.white.withValues(alpha: 0.96),
+                        child: const Text('No hay trabajadores disponibles.'),
+                      )
+                    : NavalgoPanel(
+                        tint: Colors.white.withValues(alpha: 0.96),
+                        child: _WorkerAssignmentList(
+                          workers: widget.workers,
+                          selectedWorkers: _selectedWorkers,
+                          onToggle: (workerId, selected) {
+                            setState(() {
+                              if (selected) {
+                                _selectedWorkers.add(workerId);
+                              } else {
+                                _selectedWorkers.remove(workerId);
+                              }
+                            });
+                          },
+                        ),
+                      ),
+              ),
+            ],
+            if (_validationError != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _validationError!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _submit() {
+    final form = _formKey.currentState;
+    if (form == null || !form.validate()) {
+      setState(() {
+        _validationError = null;
+      });
+      return;
+    }
+
+    final vessel = widget.vessels
+        .where((item) => item.id == _vesselId)
+        .cast<Vessel?>()
+        .firstOrNull;
+    if (vessel == null) {
+      setState(() {
+        _validationError = 'Selecciona una embarcacion.';
+      });
+      return;
+    }
+
+    Navigator.pop(
+      context,
+      _QuickCreatePartInput(
+        title: 'Trabajo en ${vessel.name}',
+        description: _descriptionCtrl.text.trim(),
+        ownerId: vessel.ownerId,
+        vesselId: vessel.id,
+        workerIds: widget.canAssignWorkers
+            ? _selectedWorkers.toList()
+            : const <int>[],
+        materialTemplateId: _selectedMaterialTemplateId,
+      ),
+    );
+  }
+
+  List<Vessel> _sortedVessels() {
+    return List<Vessel>.of(widget.vessels)..sort((a, b) {
+      final ownerCompare = a.ownerName.toLowerCase().compareTo(
+        b.ownerName.toLowerCase(),
+      );
+      if (ownerCompare != 0) {
+        return ownerCompare;
+      }
+      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
   }
 }
 

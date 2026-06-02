@@ -12,6 +12,7 @@ import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../admin/partes_screen.dart';
 import '../admin/admin_shell_screen.dart';
+import '../admin/flota_screen.dart';
 import '../client/client_shell_screen.dart';
 import '../commercial/commercial_shell_screen.dart';
 import '../common/login_screen.dart';
@@ -31,27 +32,6 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
   int _selectedIndex = 0;
   bool _shownUnreadToast = false;
   final Set<int> _loadedIndices = <int>{0};
-
-  final List<Widget> _screens = const [
-    WorkerDashboardScreen(),
-    PartesScreen(),
-    FichajeScreen(),
-    AusenciasScreen(),
-  ];
-
-  final List<String> _titles = const [
-    'Inicio',
-    'Partes',
-    'Fichaje',
-    'Ausencias',
-  ];
-
-  final List<IconData> _sectionIcons = const [
-    Icons.dashboard_outlined,
-    Icons.assignment_outlined,
-    Icons.access_time_outlined,
-    Icons.event_note_outlined,
-  ];
 
   @override
   void initState() {
@@ -142,14 +122,90 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     });
   }
 
+  bool get _canManageFleet =>
+      context.read<SessionViewModel>().user?.canEditWorkOrders ?? false;
+
+  List<Widget> _screensForCurrentUser() {
+    return <Widget>[
+      const WorkerDashboardScreen(),
+      const PartesScreen(),
+      if (_canManageFleet) const FlotaScreen(),
+      const FichajeScreen(),
+      const AusenciasScreen(),
+    ];
+  }
+
+  List<String> _titlesForCurrentUser() {
+    return <String>[
+      'Inicio',
+      'Partes',
+      if (_canManageFleet) 'Flota',
+      'Fichaje',
+      'Ausencias',
+    ];
+  }
+
+  List<IconData> _sectionIconsForCurrentUser() {
+    return <IconData>[
+      Icons.dashboard_outlined,
+      Icons.assignment_outlined,
+      if (_canManageFleet) Icons.directions_boat_outlined,
+      Icons.access_time_outlined,
+      Icons.event_note_outlined,
+    ];
+  }
+
+  List<NavigationRailDestination> _railDestinationsForCurrentUser() {
+    return <NavigationRailDestination>[
+      const NavigationRailDestination(
+        icon: Icon(Icons.dashboard_outlined),
+        selectedIcon: Icon(Icons.dashboard),
+        label: Text('Inicio'),
+      ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.assignment_outlined),
+        selectedIcon: Icon(Icons.assignment),
+        label: Text('Partes'),
+      ),
+      if (_canManageFleet)
+        const NavigationRailDestination(
+          icon: Icon(Icons.directions_boat_outlined),
+          selectedIcon: Icon(Icons.directions_boat),
+          label: Text('Flota'),
+        ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.access_time_outlined),
+        selectedIcon: Icon(Icons.access_time_filled),
+        label: Text('Fichaje'),
+      ),
+      const NavigationRailDestination(
+        icon: Icon(Icons.event_note_outlined),
+        selectedIcon: Icon(Icons.event_note),
+        label: Text('Ausencias'),
+      ),
+    ];
+  }
+
+  int _safeSelectedIndex(int length) {
+    if (length <= 0) {
+      return 0;
+    }
+    if (_selectedIndex >= length) {
+      return length - 1;
+    }
+    return _selectedIndex;
+  }
+
   int _mapActionRouteToTab(String actionRoute) {
     switch (actionRoute) {
       case 'PARTES':
         return 1;
+      case 'FLOTA':
+        return _canManageFleet ? 2 : 1;
       case 'FICHAJES':
-        return 2;
+        return _canManageFleet ? 3 : 2;
       case 'AUSENCIAS':
-        return 3;
+        return _canManageFleet ? 4 : 3;
       default:
         return 0;
     }
@@ -292,6 +348,9 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
     final compact = width < 390;
     final showSectionBadge = width >= 360;
     final textTheme = Theme.of(context).textTheme;
+    final titles = _titlesForCurrentUser();
+    final icons = _sectionIconsForCurrentUser();
+    final selectedIndex = _safeSelectedIndex(titles.length);
 
     return AppBar(
       toolbarHeight: compact ? 64 : 72,
@@ -307,7 +366,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: Icon(
-                _sectionIcons[_selectedIndex],
+                icons[selectedIndex],
                 color: NavalgoColors.tide,
                 size: compact ? 20 : 24,
               ),
@@ -316,7 +375,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
           ],
           Expanded(
             child: Text(
-              _titles[_selectedIndex],
+              titles[selectedIndex],
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: textTheme.titleLarge,
@@ -649,6 +708,10 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
   }
 
   Widget _buildMobileDrawer() {
+    final titles = _titlesForCurrentUser();
+    final icons = _sectionIconsForCurrentUser();
+    final selectedIndex = _safeSelectedIndex(titles.length);
+
     return Drawer(
       child: SafeArea(
         child: Column(
@@ -689,17 +752,17 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                   horizontal: 8,
                   vertical: 12,
                 ),
-                itemCount: _titles.length,
+                itemCount: titles.length,
                 itemBuilder: (context, index) {
-                  final selected = index == _selectedIndex;
+                  final selected = index == selectedIndex;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: ListTile(
                       leading: Icon(
-                        _sectionIcons[index],
+                        icons[index],
                         color: selected ? NavalgoColors.tide : null,
                       ),
-                      title: Text(_titles[index]),
+                      title: Text(titles[index]),
                       selected: selected,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
@@ -721,9 +784,10 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
   }
 
   List<Widget> _buildLoadedScreens() {
-    return List<Widget>.generate(_screens.length, (index) {
+    final screens = _screensForCurrentUser();
+    return List<Widget>.generate(screens.length, (index) {
       if (_loadedIndices.contains(index)) {
-        return _screens[index];
+        return screens[index];
       }
       return const SizedBox.shrink();
     });
@@ -744,6 +808,8 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       });
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
+    final screenCount = _screensForCurrentUser().length;
+    final selectedIndex = _safeSelectedIndex(screenCount);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -767,7 +833,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                       child: SizedBox(
                         width: 128,
                         child: NavigationRail(
-                          selectedIndex: _selectedIndex,
+                          selectedIndex: selectedIndex,
                           onDestinationSelected: _onDestinationSelected,
                           labelType: NavigationRailLabelType.all,
                           minWidth: 128,
@@ -798,28 +864,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                               ),
                             ),
                           ),
-                          destinations: const [
-                            NavigationRailDestination(
-                              icon: Icon(Icons.dashboard_outlined),
-                              selectedIcon: Icon(Icons.dashboard),
-                              label: Text('Inicio'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.assignment_outlined),
-                              selectedIcon: Icon(Icons.assignment),
-                              label: Text('Partes'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.access_time_outlined),
-                              selectedIcon: Icon(Icons.access_time_filled),
-                              label: Text('Fichaje'),
-                            ),
-                            NavigationRailDestination(
-                              icon: Icon(Icons.event_note_outlined),
-                              selectedIcon: Icon(Icons.event_note),
-                              label: Text('Ausencias'),
-                            ),
-                          ],
+                          destinations: _railDestinationsForCurrentUser(),
                         ),
                       ),
                     ),
@@ -828,7 +873,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(0, 16, 16, 16),
                       child: IndexedStack(
-                        index: _selectedIndex,
+                        index: selectedIndex,
                         children: _buildLoadedScreens(),
                       ),
                     ),
@@ -847,7 +892,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
               gradient: NavalgoColors.pageGradient,
             ),
             child: IndexedStack(
-              index: _selectedIndex,
+              index: selectedIndex,
               children: _buildLoadedScreens(),
             ),
           ),

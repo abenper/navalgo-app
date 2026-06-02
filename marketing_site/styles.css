@@ -898,6 +898,45 @@ a {
   margin-top: auto;
 }
 
+.android-download-block {
+  display: grid;
+  gap: 22px;
+  align-items: center;
+  padding: 26px 18px;
+  background:
+    linear-gradient(135deg, rgba(29, 168, 159, 0.2), rgba(17, 23, 47, 0.94)),
+    var(--panel);
+}
+
+.android-download-copy h2 {
+  margin: 0;
+  font-family: "Sora", sans-serif;
+  font-size: clamp(1.9rem, 5.2vw, 3.1rem);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.android-download-copy p {
+  max-width: 760px;
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 1.04rem;
+  line-height: 1.7;
+}
+
+.android-download-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.download-meta {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .cta-band {
   display: grid;
   gap: 18px;
@@ -1020,6 +1059,7 @@ a {
   }
 
   .hero-actions,
+  .android-download-actions,
   .cta-actions {
     flex-direction: row;
     flex-wrap: wrap;
@@ -1061,6 +1101,16 @@ a {
   .cta-band {
     grid-template-columns: 1.2fr 0.9fr;
     align-items: center;
+  }
+
+  .android-download-block {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 34px;
+  }
+
+  .android-download-actions {
+    align-items: flex-end;
+    justify-content: center;
   }
 
   .workflow-flow {
@@ -1473,6 +1523,10 @@ a {
     min-height: 42px;
     padding: 0 14px;
     font-size: 0.9rem;
+  }
+
+  .topbar-apk {
+    display: none;
   }
 
   .hero-card {

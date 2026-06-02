@@ -122,25 +122,24 @@ public class WorkOrderService {
     @Transactional
     public WorkOrderDto create(CreateWorkOrderRequest request, String currentUserEmail) {
         Worker current = requireWorkerByEmail(currentUserEmail);
-        if (!isAdmin(current)) {
-            throw new AccessDeniedException("Solo un administrador puede crear partes");
-        }
-        Owner owner = ownerRepository.findByIdAndArchivedFalse(request.ownerId())
-                .orElseThrow(() -> new EntityNotFoundException("Propietario no encontrado"));
-
         Vessel vessel = null;
         if (request.vesselId() != null) {
             vessel = vesselRepository.findByIdAndArchivedFalse(request.vesselId())
                     .orElseThrow(() -> new EntityNotFoundException("Embarcacion no encontrada"));
         }
+        if (vessel == null) {
+            throw new IllegalArgumentException("Selecciona una embarcacion para crear el parte");
+        }
+
+        Owner owner = vessel.getOwner();
 
         WorkOrder workOrder = new WorkOrder();
-        workOrder.setTitle(inputSanitizer.requiredText(request.title(), "El titulo", 255));
+        workOrder.setTitle(resolveCreateTitle(request.title(), vessel, request.description()));
         workOrder.setDescription(inputSanitizer.optionalText(request.description(), 3000));
         workOrder.setOwner(owner);
         workOrder.setVessel(vessel);
         workOrder.setPriority(request.priority() == null ? WorkOrderPriority.NORMAL : request.priority());
-        workOrder.setCloseDueDate(request.closeDueDate());
+        workOrder.setCloseDueDate(request.closeDueDate() == null ? java.time.LocalDate.now().plusDays(1) : request.closeDueDate());
         workOrder.setLaborHours(request.laborHours());
 
         if (request.materialTemplateId() != null) {
@@ -151,8 +150,13 @@ public class WorkOrderService {
         }
 
         if (request.workerIds() != null && !request.workerIds().isEmpty()) {
+            if (!isAdmin(current)) {
+                throw new AccessDeniedException("Solo un administrador puede asignar trabajadores al crear partes");
+            }
             Set<Worker> workers = resolveAssignableWorkers(request.workerIds());
             workOrder.setAssignedWorkers(workers);
+        } else if (!isAdmin(current)) {
+            workOrder.setAssignedWorkers(new HashSet<>(Set.of(current)));
         }
 
         if (request.engineHours() != null) {
@@ -738,6 +742,26 @@ public class WorkOrderService {
         String day = String.format("%02d", closeDate.getDayOfMonth());
         String month = String.format("%02d", closeDate.getMonthValue());
         return day + "/" + month + "/" + closeDate.getYear();
+    }
+
+    private String resolveCreateTitle(String requestedTitle, Vessel vessel, String description) {
+        String sanitizedTitle = inputSanitizer.optionalText(requestedTitle, 255);
+        if (sanitizedTitle != null && !sanitizedTitle.isBlank()) {
+            return sanitizedTitle;
+        }
+
+        if (vessel != null && vessel.getName() != null && !vessel.getName().isBlank()) {
+            return inputSanitizer.requiredText("Trabajo en " + vessel.getName(), "El titulo", 255);
+        }
+
+        String sanitizedDescription = inputSanitizer.optionalText(description, 255);
+        if (sanitizedDescription != null && !sanitizedDescription.isBlank()) {
+            return sanitizedDescription.length() <= 80
+                    ? sanitizedDescription
+                    : sanitizedDescription.substring(0, 80).trim();
+        }
+
+        return "Parte de trabajo";
     }
 
     @Transactional

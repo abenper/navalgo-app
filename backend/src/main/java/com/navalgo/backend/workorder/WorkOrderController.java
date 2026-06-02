@@ -58,7 +58,7 @@ public class WorkOrderController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','WORKER')")
     public ResponseEntity<WorkOrderDto> create(@RequestBody @Valid CreateWorkOrderRequest request,
                                                Authentication authentication) {
         return ResponseEntity.ok(service.create(request, authentication.getName()));

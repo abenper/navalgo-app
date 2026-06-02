@@ -370,6 +370,13 @@ class _FlotaScreenState extends State<FlotaScreen> {
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<FleetViewModel>();
+    final sessionUser = context.watch<SessionViewModel>().user;
+    final canCreateFleet =
+        sessionUser?.role == 'ADMIN' ||
+        sessionUser?.role == 'COMERCIAL' ||
+        sessionUser?.canEditWorkOrders == true;
+    final canModifyFleet =
+        sessionUser?.role == 'ADMIN' || sessionUser?.role == 'COMERCIAL';
     final vesselCountByOwner = <int, int>{};
     for (final vessel in vm.vessels) {
       vesselCountByOwner[vessel.ownerId] =
@@ -394,25 +401,27 @@ class _FlotaScreenState extends State<FlotaScreen> {
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final compact = constraints.maxWidth < 920;
-                      final actions = Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        alignment: compact
-                            ? WrapAlignment.start
-                            : WrapAlignment.end,
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: _createOwner,
-                            icon: const Icon(Icons.person_add),
-                            label: const Text('Nuevo propietario'),
-                          ),
-                          NavalgoGradientButton(
-                            label: 'Nueva embarcación',
-                            icon: Icons.directions_boat,
-                            onPressed: () => _createVessel(vm.owners),
-                          ),
-                        ],
-                      );
+                      final actions = canCreateFleet
+                          ? Wrap(
+                              spacing: 12,
+                              runSpacing: 12,
+                              alignment: compact
+                                  ? WrapAlignment.start
+                                  : WrapAlignment.end,
+                              children: [
+                                OutlinedButton.icon(
+                                  onPressed: _createOwner,
+                                  icon: const Icon(Icons.person_add),
+                                  label: const Text('Nuevo propietario'),
+                                ),
+                                NavalgoGradientButton(
+                                  label: 'Nueva embarcación',
+                                  icon: Icons.directions_boat,
+                                  onPressed: () => _createVessel(vm.owners),
+                                ),
+                              ],
+                            )
+                          : const SizedBox.shrink();
 
                       if (compact) {
                         return Column(
@@ -524,26 +533,27 @@ class _FlotaScreenState extends State<FlotaScreen> {
                                               : Icons.expand_more_rounded,
                                           color: accent,
                                         ),
-                                      PopupMenuButton<String>(
-                                        onSelected: (value) {
-                                          if (value == 'edit') {
-                                            _editOwner(owner);
-                                          }
-                                          if (value == 'delete') {
-                                            _deleteOwner(owner);
-                                          }
-                                        },
-                                        itemBuilder: (context) => const [
-                                          PopupMenuItem<String>(
-                                            value: 'edit',
-                                            child: Text('Editar'),
-                                          ),
-                                          PopupMenuItem<String>(
-                                            value: 'delete',
-                                            child: Text('Eliminar'),
-                                          ),
-                                        ],
-                                      ),
+                                      if (canModifyFleet)
+                                        PopupMenuButton<String>(
+                                          onSelected: (value) {
+                                            if (value == 'edit') {
+                                              _editOwner(owner);
+                                            }
+                                            if (value == 'delete') {
+                                              _deleteOwner(owner);
+                                            }
+                                          },
+                                          itemBuilder: (context) => const [
+                                            PopupMenuItem<String>(
+                                              value: 'edit',
+                                              child: Text('Editar'),
+                                            ),
+                                            PopupMenuItem<String>(
+                                              value: 'delete',
+                                              child: Text('Eliminar'),
+                                            ),
+                                          ],
+                                        ),
                                     ],
                                   ),
                                 ),
@@ -794,26 +804,28 @@ class _FlotaScreenState extends State<FlotaScreen> {
                                     '${vessel.engineLabels.isEmpty ? 'Sin posiciones definidas' : vessel.engineLabels.join(', ')}',
                                   ),
                                   isThreeLine: true,
-                                  trailing: PopupMenuButton<String>(
-                                    onSelected: (value) {
-                                      if (value == 'edit') {
-                                        _editVessel(vessel, vm.owners);
-                                      }
-                                      if (value == 'delete') {
-                                        _deleteVessel(vessel);
-                                      }
-                                    },
-                                    itemBuilder: (context) => const [
-                                      PopupMenuItem<String>(
-                                        value: 'edit',
-                                        child: Text('Editar'),
-                                      ),
-                                      PopupMenuItem<String>(
-                                        value: 'delete',
-                                        child: Text('Eliminar'),
-                                      ),
-                                    ],
-                                  ),
+                                  trailing: canModifyFleet
+                                      ? PopupMenuButton<String>(
+                                          onSelected: (value) {
+                                            if (value == 'edit') {
+                                              _editVessel(vessel, vm.owners);
+                                            }
+                                            if (value == 'delete') {
+                                              _deleteVessel(vessel);
+                                            }
+                                          },
+                                          itemBuilder: (context) => const [
+                                            PopupMenuItem<String>(
+                                              value: 'edit',
+                                              child: Text('Editar'),
+                                            ),
+                                            PopupMenuItem<String>(
+                                              value: 'delete',
+                                              child: Text('Eliminar'),
+                                            ),
+                                          ],
+                                        )
+                                      : null,
                                 ),
                               ),
                             )

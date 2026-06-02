@@ -479,8 +479,8 @@ class _ProfileEditorDialogState extends State<_ProfileEditorDialog> {
           _profile.role == 'COMERCIAL'
               ? 'Sin acceso a partes de trabajo'
               : _profile.canEditWorkOrders
-              ? 'Con permiso de edición sobre partes'
-              : 'Sin permiso de edición sobre partes',
+              ? 'Con permiso para gestionar clientes y flota'
+              : 'Sin permiso para gestionar clientes y flota',
           maxLines: 3,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
