@@ -35,6 +35,7 @@ public class FirebasePushGateway {
     private static final Logger log = LoggerFactory.getLogger(FirebasePushGateway.class);
     private static final String APP_NAME = "navalgo-backend";
     private static final String ANDROID_NOTIFICATION_CHANNEL_ID = "navalgo_notifications";
+    private static final String FIREBASE_MESSAGING_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
     private static final String GOOGLE_APPLICATION_CREDENTIALS_ENV = "GOOGLE_APPLICATION_CREDENTIALS";
     private static final Path DEFAULT_DOCKER_SECRET_PATH = Path.of("/run/secrets/firebase-admin.json");
 
@@ -103,8 +104,12 @@ public class FirebasePushGateway {
             Set<String> invalidTokens = collectInvalidTokens(tokens, response.getResponses());
             logSendFailures(tokens, response.getResponses());
             lastInvalidTokenCount = invalidTokens.size();
-            lastSendSuccessAt = Instant.now();
-            lastSendError = null;
+            if (response.getSuccessCount() > 0) {
+                lastSendSuccessAt = Instant.now();
+                lastSendError = null;
+            } else if (response.getFailureCount() > 0) {
+                lastSendError = buildFailureSummary(response.getResponses());
+            }
             log.info(
                     "Push Firebase enviada. tokens={}, success={}, failure={}, invalidated={}",
                     tokens.size(),
@@ -117,7 +122,7 @@ public class FirebasePushGateway {
                     response.getSuccessCount(),
                     response.getFailureCount(),
                     invalidTokens,
-                    null
+                    response.getSuccessCount() > 0 ? null : lastSendError
             );
         } catch (FirebaseMessagingException ex) {
             lastSendError = ex.getMessage();
@@ -180,6 +185,25 @@ public class FirebasePushGateway {
         }
     }
 
+    private String buildFailureSummary(List<SendResponse> responses) {
+        for (SendResponse response : responses) {
+            if (response.isSuccessful()) {
+                continue;
+            }
+
+            FirebaseMessagingException exception = response.getException();
+            if (exception == null) {
+                return "Firebase rechazo el envio sin detalle";
+            }
+
+            MessagingErrorCode errorCode = exception.getMessagingErrorCode();
+            String message = exception.getMessage();
+            return (errorCode == null ? "Firebase" : errorCode.name())
+                    + (message == null || message.isBlank() ? "" : ": " + message);
+        }
+        return null;
+    }
+
     private FirebaseMessaging resolveMessaging() {
         FirebaseApp app = resolveApp();
         return app == null ? null : FirebaseMessaging.getInstance(app);
@@ -213,8 +237,11 @@ public class FirebasePushGateway {
                     return null;
                 }
 
+                GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
+                        .createScoped(List.of(FIREBASE_MESSAGING_SCOPE));
+
                 FirebaseOptions options = FirebaseOptions.builder()
-                        .setCredentials(GoogleCredentials.fromStream(credentialsStream))
+                        .setCredentials(credentials)
                         .build();
 
                 firebaseApp = FirebaseApp.getApps().stream()
