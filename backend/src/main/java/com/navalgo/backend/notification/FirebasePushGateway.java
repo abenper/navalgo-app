@@ -4,6 +4,7 @@ import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.AndroidConfig;
+import com.google.firebase.messaging.AndroidNotification;
 import com.google.firebase.messaging.ApnsConfig;
 import com.google.firebase.messaging.Aps;
 import com.google.firebase.messaging.BatchResponse;
@@ -33,6 +34,7 @@ public class FirebasePushGateway {
 
     private static final Logger log = LoggerFactory.getLogger(FirebasePushGateway.class);
     private static final String APP_NAME = "navalgo-backend";
+    private static final String ANDROID_NOTIFICATION_CHANNEL_ID = "navalgo_notifications";
     private static final String GOOGLE_APPLICATION_CREDENTIALS_ENV = "GOOGLE_APPLICATION_CREDENTIALS";
     private static final Path DEFAULT_DOCKER_SECRET_PATH = Path.of("/run/secrets/firebase-admin.json");
 
@@ -82,6 +84,14 @@ public class FirebasePushGateway {
                         .build())
                 .setAndroidConfig(AndroidConfig.builder()
                         .setPriority(AndroidConfig.Priority.HIGH)
+                        .setNotification(AndroidNotification.builder()
+                                .setTitle(title)
+                                .setBody(message)
+                                .setChannelId(ANDROID_NOTIFICATION_CHANNEL_ID)
+                                .setSound("default")
+                                .setDefaultSound(true)
+                                .setPriority(AndroidNotification.Priority.HIGH)
+                                .build())
                         .build())
                 .setApnsConfig(ApnsConfig.builder()
                         .setAps(Aps.builder().setSound("default").build())
