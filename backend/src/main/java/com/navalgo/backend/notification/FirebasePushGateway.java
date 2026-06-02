@@ -35,6 +35,8 @@ public class FirebasePushGateway {
     private static final Logger log = LoggerFactory.getLogger(FirebasePushGateway.class);
     private static final String APP_NAME = "navalgo-backend";
     private static final String ANDROID_NOTIFICATION_CHANNEL_ID = "navalgo_notifications";
+    private static final String ANDROID_NOTIFICATION_ICON = "ic_stat_navalgo";
+    private static final String ANDROID_NOTIFICATION_COLOR = "#0D7185";
     private static final String FIREBASE_MESSAGING_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
     private static final String GOOGLE_APPLICATION_CREDENTIALS_ENV = "GOOGLE_APPLICATION_CREDENTIALS";
     private static final Path DEFAULT_DOCKER_SECRET_PATH = Path.of("/run/secrets/firebase-admin.json");
@@ -89,6 +91,8 @@ public class FirebasePushGateway {
                                 .setTitle(title)
                                 .setBody(message)
                                 .setChannelId(ANDROID_NOTIFICATION_CHANNEL_ID)
+                                .setIcon(ANDROID_NOTIFICATION_ICON)
+                                .setColor(ANDROID_NOTIFICATION_COLOR)
                                 .setSound("default")
                                 .setDefaultSound(true)
                                 .setPriority(AndroidNotification.Priority.HIGH)

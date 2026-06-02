@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -14,6 +15,7 @@ import 'notification_service.dart';
 // > Web Push certificates. Required for getToken() on web.
 const String _firebaseWebVapidKey =
     'BDi2-Q05VzIhbIm73QBGbteqMoYDeVNEoLnmiQWqvjdLiiI6XyvK8i8SXHv9krSJbgcpVTcwnbvKc5bf0AvkCuM';
+const String _androidNotificationIcon = '@drawable/ic_stat_navalgo';
 
 const AndroidNotificationChannel _androidNotificationChannel =
     AndroidNotificationChannel(
@@ -115,7 +117,7 @@ class PushNotificationService {
       if (!kIsWeb) {
         await _localNotifications.initialize(
           const InitializationSettings(
-            android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+            android: AndroidInitializationSettings(_androidNotificationIcon),
             iOS: DarwinInitializationSettings(),
           ),
         );
@@ -231,6 +233,8 @@ class PushNotificationService {
               'Avisos operativos, recordatorios y revisiones pendientes.',
           importance: Importance.max,
           priority: Priority.high,
+          icon: _androidNotificationIcon,
+          color: Color(0xFF0D7185),
         ),
         iOS: DarwinNotificationDetails(
           presentAlert: true,
