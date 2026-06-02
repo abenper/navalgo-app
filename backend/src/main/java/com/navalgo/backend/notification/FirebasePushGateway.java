@@ -177,10 +177,11 @@ public class FirebasePushGateway {
             FirebaseMessagingException exception = response.getException();
             MessagingErrorCode errorCode = exception == null ? null : exception.getMessagingErrorCode();
             log.warn(
-                    "Push Firebase fallo. token={}, errorCode={}, message={}",
+                    "Push Firebase fallo. token={}, errorCode={}, message={}, cause={}",
                     maskToken(tokens.get(index)),
                     errorCode,
-                    exception == null ? "Sin detalle" : exception.getMessage()
+                    exception == null ? "Sin detalle" : exception.getMessage(),
+                    describeThrowable(exception == null ? null : exception.getCause())
             );
         }
     }
@@ -199,9 +200,32 @@ public class FirebasePushGateway {
             MessagingErrorCode errorCode = exception.getMessagingErrorCode();
             String message = exception.getMessage();
             return (errorCode == null ? "Firebase" : errorCode.name())
-                    + (message == null || message.isBlank() ? "" : ": " + message);
+                    + (message == null || message.isBlank() ? "" : ": " + message)
+                    + " | cause=" + describeThrowable(exception.getCause());
         }
         return null;
+    }
+
+    private String describeThrowable(Throwable throwable) {
+        if (throwable == null) {
+            return "Sin causa";
+        }
+
+        StringBuilder builder = new StringBuilder();
+        Throwable current = throwable;
+        int depth = 0;
+        while (current != null && depth < 6) {
+            if (!builder.isEmpty()) {
+                builder.append(" -> ");
+            }
+            builder.append(current.getClass().getName());
+            if (current.getMessage() != null && !current.getMessage().isBlank()) {
+                builder.append(": ").append(current.getMessage());
+            }
+            current = current.getCause();
+            depth += 1;
+        }
+        return builder.toString();
     }
 
     private FirebaseMessaging resolveMessaging() {
@@ -239,6 +263,7 @@ public class FirebasePushGateway {
 
                 GoogleCredentials credentials = GoogleCredentials.fromStream(credentialsStream)
                         .createScoped(List.of(FIREBASE_MESSAGING_SCOPE));
+                credentials.refreshAccessToken();
 
                 FirebaseOptions options = FirebaseOptions.builder()
                         .setCredentials(credentials)
@@ -253,8 +278,12 @@ public class FirebasePushGateway {
                 log.info("Firebase Admin SDK inicializado correctamente para push.");
                 return firebaseApp;
             } catch (IOException ex) {
-                lastInitializationError = ex.getMessage();
-                log.warn("No se pudo inicializar Firebase Admin SDK: {}", ex.getMessage());
+                lastInitializationError = ex.getMessage() + " | cause=" + describeThrowable(ex.getCause());
+                log.warn(
+                        "No se pudo inicializar Firebase Admin SDK: {} cause={}",
+                        ex.getMessage(),
+                        describeThrowable(ex.getCause())
+                );
                 return null;
             }
         }

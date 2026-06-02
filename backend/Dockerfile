@@ -13,7 +13,8 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends ffmpeg \
+	&& apt-get install -y --no-install-recommends ca-certificates curl ffmpeg \
+	&& update-ca-certificates \
 	&& rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /app/target/backend-0.0.1-SNAPSHOT.jar app.jar
