@@ -38,7 +38,12 @@ class FleetViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _owners = await _fleetService.getOwners(token);
+      final role = _session.user?.role;
+      if (role == 'ADMIN' || role == 'COMERCIAL') {
+        _owners = await _fleetService.getOwners(token);
+      } else {
+        _owners = <Owner>[];
+      }
       _vessels = await _fleetService.getVessels(token, ownerId: ownerId);
     } catch (e) {
       _error = e.toString();

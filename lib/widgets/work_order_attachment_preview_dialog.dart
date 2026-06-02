@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 
 import '../models/work_order.dart';
@@ -152,7 +151,7 @@ class _WorkOrderAttachmentPreviewDialogState
                           return _AttachmentErrorState(
                             message: 'No se pudo cargar el adjunto.',
                             onOpenSecondary: _secondaryAction,
-                            secondaryLabel: kIsWeb ? 'Descargar' : 'Abrir fuera',
+                            secondaryLabel: 'Descargar',
                           );
                         }
 
@@ -170,12 +169,8 @@ class _WorkOrderAttachmentPreviewDialogState
                 children: [
                   OutlinedButton.icon(
                     onPressed: _isDownloading ? null : _secondaryAction,
-                    icon: Icon(
-                      kIsWeb
-                          ? Icons.download_outlined
-                          : Icons.open_in_new_outlined,
-                    ),
-                    label: Text(kIsWeb ? 'Descargar' : 'Abrir fuera'),
+                    icon: const Icon(Icons.download_outlined),
+                    label: const Text('Descargar'),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
@@ -197,7 +192,7 @@ class _WorkOrderAttachmentPreviewDialogState
       return _AttachmentErrorState(
         message: 'No se pudo cargar la imagen.',
         onOpenSecondary: _secondaryAction,
-        secondaryLabel: kIsWeb ? 'Descargar' : 'Abrir fuera',
+        secondaryLabel: 'Descargar',
       );
     }
 
@@ -343,14 +338,10 @@ class _WorkOrderAttachmentPreviewDialogState
   }
 
   Future<void> _secondaryAction() async {
-    if (kIsWeb) {
-      await _downloadForWeb();
-      return;
-    }
-    await _openOutsideApp();
+    await _downloadAttachment();
   }
 
-  Future<void> _downloadForWeb() async {
+  Future<void> _downloadAttachment() async {
     setState(() => _isDownloading = true);
     try {
       final payload = _previewBytes != null
@@ -372,18 +363,6 @@ class _WorkOrderAttachmentPreviewDialogState
       if (mounted) {
         setState(() => _isDownloading = false);
       }
-    }
-  }
-
-  Future<void> _openOutsideApp() async {
-    final rawUrl = widget.attachment.fileUrl.trim();
-    final targetUrl = rawUrl.isNotEmpty ? rawUrl : _resolvedUrl;
-    final opened = await launchUrl(
-      Uri.parse(targetUrl),
-      mode: LaunchMode.externalApplication,
-    );
-    if (!opened && mounted) {
-      AppToast.error(context, 'No se pudo abrir el archivo.');
     }
   }
 
@@ -482,11 +461,7 @@ class _AttachmentErrorState extends StatelessWidget {
               const SizedBox(height: 18),
               OutlinedButton.icon(
                 onPressed: onOpenSecondary,
-                icon: Icon(
-                  kIsWeb
-                      ? Icons.download_outlined
-                      : Icons.open_in_new_outlined,
-                ),
+                icon: const Icon(Icons.download_outlined),
                 label: Text(secondaryLabel),
               ),
             ],

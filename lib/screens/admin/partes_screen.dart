@@ -2659,6 +2659,7 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
       return;
     }
 
+    final engineHours = <Map<String, dynamic>>[];
     for (final entry in _engineHoursControllers.entries) {
       final rawValue = entry.value.text.trim();
       if (rawValue.isEmpty) {
@@ -2675,7 +2676,11 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
         );
         return;
       }
+      engineHours.add({'engineLabel': entry.key, 'hours': int.parse(rawValue)});
     }
+    final engineHoursPayload = _engineHoursControllers.isEmpty
+        ? null
+        : engineHours;
 
     if (_attachments.isEmpty) {
       final continueWithoutMedia = await showDialog<bool>(
@@ -2718,6 +2723,20 @@ class _WorkOrderDetailsSheetState extends State<_WorkOrderDetailsSheet>
 
     final mediaService = context.read<WorkOrderMediaService>();
     try {
+      final persisted = await context.read<WorkOrderService>().updateWorkOrder(
+        token,
+        workOrderId: _workOrder.id,
+        description: _observationsCtrl.text.trim(),
+        laborHours: laborHours,
+        engineHours: engineHoursPayload,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _updateWorkOrder(persisted, syncInputs: false);
+      });
+
       final signatureBytes = await _exportSignatureBytes(
         controller: _sigController,
         signaturePadKey: _signaturePadKey,
