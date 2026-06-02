@@ -1,6 +1,8 @@
 package com.navalgo.backend.timetracking;
 
 import com.navalgo.backend.common.Role;
+import com.navalgo.backend.leave.LeaveRequestRepository;
+import com.navalgo.backend.leave.LeaveStatus;
 import com.navalgo.backend.notification.NotificationService;
 import com.navalgo.backend.notification.NotificationType;
 import com.navalgo.backend.notification.NotificationDeliveryOptions;
@@ -12,24 +14,35 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Set;
+import java.time.temporal.ChronoUnit;
 
 @Service
 @Transactional(readOnly = true)
 public class TimeAdjustmentRequestService {
 
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Madrid");
+    private static final LocalTime AUTO_APPROVE_CLOCK_IN = LocalTime.of(8, 0);
+    private static final LocalTime AUTO_APPROVE_CLOCK_OUT = LocalTime.of(15, 0);
+
     private final NotificationService notificationService;
+    private final LeaveRequestRepository leaveRequestRepository;
     private final TimeAdjustmentRequestRepository timeAdjustmentRequestRepository;
     private final TimeEntryRepository timeEntryRepository;
     private final WorkerRepository workerRepository;
 
     public TimeAdjustmentRequestService(NotificationService notificationService,
+                                        LeaveRequestRepository leaveRequestRepository,
                                         TimeAdjustmentRequestRepository timeAdjustmentRequestRepository,
                                         TimeEntryRepository timeEntryRepository,
                                         WorkerRepository workerRepository) {
         this.notificationService = notificationService;
+        this.leaveRequestRepository = leaveRequestRepository;
         this.timeAdjustmentRequestRepository = timeAdjustmentRequestRepository;
         this.timeEntryRepository = timeEntryRepository;
         this.workerRepository = workerRepository;
@@ -87,6 +100,23 @@ public class TimeAdjustmentRequestService {
         entity.setStatus(TimeAdjustmentRequestStatus.PENDING);
         entity.setCreatedAt(Instant.now());
 
+        if (canAutoApproveStandardWorkday(entity)) {
+            applyAdjustment(entity);
+            entity.setStatus(TimeAdjustmentRequestStatus.APPROVED);
+            entity.setAdminComment("Autoaprobado: jornada estándar 08:00-15:00 sin ausencias registradas.");
+            entity.setReviewedAt(Instant.now());
+            TimeAdjustmentRequest saved = timeAdjustmentRequestRepository.save(entity);
+            notificationService.notifyWorker(
+                    worker.getId(),
+                    "Ajuste de fichaje autoaprobado",
+                    "Tu solicitud de ajuste del " + formatDate(saved.getWorkDate()) + " se ha aplicado automáticamente.",
+                    "FICHAJES",
+                    NotificationType.SUCCESS,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
+            );
+            return TimeAdjustmentRequestDto.from(saved);
+        }
+
         TimeAdjustmentRequest saved = timeAdjustmentRequestRepository.save(entity);
         notificationService.notifyAdmins(
                 "Solicitud de ajuste de fichaje",
@@ -117,6 +147,23 @@ public class TimeAdjustmentRequestService {
         entity.setReviewedAt(null);
         entity.setReviewedByWorker(null);
 
+        if (canAutoApproveStandardWorkday(entity)) {
+            applyAdjustment(entity);
+            entity.setStatus(TimeAdjustmentRequestStatus.APPROVED);
+            entity.setAdminComment("Autoaprobado: jornada estándar 08:00-15:00 sin ausencias registradas.");
+            entity.setReviewedAt(Instant.now());
+            TimeAdjustmentRequest saved = timeAdjustmentRequestRepository.save(entity);
+            notificationService.notifyWorker(
+                    saved.getWorker().getId(),
+                    "Ajuste de fichaje autoaprobado",
+                    "Tu solicitud de ajuste del " + formatDate(saved.getWorkDate()) + " se ha aplicado automáticamente.",
+                    "FICHAJES",
+                    NotificationType.SUCCESS,
+                    NotificationDeliveryOptions.EMAIL_FALLBACK
+            );
+            return TimeAdjustmentRequestDto.from(saved);
+        }
+
         TimeAdjustmentRequest saved = timeAdjustmentRequestRepository.save(entity);
         notificationService.notifyAdmins(
                 "Solicitud de ajuste modificada",
@@ -125,6 +172,57 @@ public class TimeAdjustmentRequestService {
                 NotificationType.INFO
         );
         return TimeAdjustmentRequestDto.from(saved);
+    }
+
+    private boolean canAutoApproveStandardWorkday(TimeAdjustmentRequest request) {
+        if (request.getRequestedClockIn() == null || request.getRequestedClockOut() == null) {
+            return false;
+        }
+
+        LocalDate workDate = request.getWorkDate();
+        if (workDate == null || isWeekend(workDate)) {
+            return false;
+        }
+
+        LocalDate clockInDate = request.getRequestedClockIn().atZone(BUSINESS_ZONE).toLocalDate();
+        LocalDate clockOutDate = request.getRequestedClockOut().atZone(BUSINESS_ZONE).toLocalDate();
+        if (!workDate.equals(clockInDate) || !workDate.equals(clockOutDate)) {
+            return false;
+        }
+
+        LocalTime clockIn = request.getRequestedClockIn().atZone(BUSINESS_ZONE).toLocalTime().truncatedTo(ChronoUnit.MINUTES);
+        LocalTime clockOut = request.getRequestedClockOut().atZone(BUSINESS_ZONE).toLocalTime().truncatedTo(ChronoUnit.MINUTES);
+        if (!AUTO_APPROVE_CLOCK_IN.equals(clockIn) || !AUTO_APPROVE_CLOCK_OUT.equals(clockOut)) {
+            return false;
+        }
+
+        if (hasActiveLeaveOnDate(request.getWorker().getId(), workDate)) {
+            return false;
+        }
+
+        return request.getTimeEntry() != null || !hasExistingEntriesOnDate(request.getWorker().getId(), workDate);
+    }
+
+    private boolean isWeekend(LocalDate workDate) {
+        DayOfWeek day = workDate.getDayOfWeek();
+        return day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
+    }
+
+    private boolean hasActiveLeaveOnDate(Long workerId, LocalDate workDate) {
+        return leaveRequestRepository.existsByWorkerIdAndStatusInAndStartDateLessThanEqualAndEndDateGreaterThanEqual(
+                workerId,
+                Set.of(LeaveStatus.PENDING, LeaveStatus.APPROVED),
+                workDate,
+                workDate
+        );
+    }
+
+    private boolean hasExistingEntriesOnDate(Long workerId, LocalDate workDate) {
+        Instant start = workDate.atStartOfDay(BUSINESS_ZONE).toInstant();
+        Instant end = workDate.plusDays(1).atStartOfDay(BUSINESS_ZONE).toInstant();
+        return !timeEntryRepository
+                .findByWorkerIdAndClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(workerId, start, end)
+                .isEmpty();
     }
 
     @Transactional
@@ -220,6 +318,10 @@ public class TimeAdjustmentRequestService {
             entry.setClockIn(effectiveClockIn);
             entry.setClockOut(effectiveClockOut);
             entry.setWorkSite(request.getWorkSite());
+            if (request.getRequestedClockOut() != null) {
+                entry.setAutoClosedAt(null);
+                entry.setAutoCloseReason(null);
+            }
             request.setTimeEntry(timeEntryRepository.save(entry));
             return;
         }
