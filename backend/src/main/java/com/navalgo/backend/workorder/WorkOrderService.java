@@ -528,6 +528,7 @@ public class WorkOrderService {
 
         WorkOrderAttachment att = buildAttachmentEntity(workOrder, attachment, current, uploadIp, uploadUserAgent);
         workOrder.getAttachments().add(att);
+        workOrder.setStatus(WorkOrderStatus.IN_PROGRESS);
         WorkOrder saved = workOrderRepository.saveAndFlush(workOrder);
         signAttachmentEvidence(saved, att);
         return toDto(workOrderRepository.save(saved));
