@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class AndroidAppUpdate {
   const AndroidAppUpdate({
@@ -88,11 +89,28 @@ class AppUpdateService {
       return;
     }
 
-    await _channel.invokeMethod<Object?>('downloadApk', <String, Object?>{
-      'url': update.apkUrl,
-      'fileName': update.fileName,
-      'title': 'NavalGO ${update.versionName}',
-    });
+    try {
+      await _channel.invokeMethod<Object?>('downloadApk', <String, Object?>{
+        'url': update.apkUrl,
+        'fileName': update.fileName,
+        'title': 'NavalGO ${update.versionName}',
+      });
+    } on PlatformException {
+      await _openApkUrl(update.apkUrl);
+    } on MissingPluginException {
+      await _openApkUrl(update.apkUrl);
+    }
+  }
+
+  Future<void> _openApkUrl(String apkUrl) async {
+    final uri = Uri.parse(apkUrl);
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!opened) {
+      throw PlatformException(
+        code: 'download_failed',
+        message: 'No se pudo abrir la descarga de la APK',
+      );
+    }
   }
 
   bool _isRemoteNewer({
