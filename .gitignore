@@ -1,5 +1,6 @@
 # Miscellaneous
 *.class
+*.err
 *.log
 *.pyc
 *.swp
@@ -60,13 +61,4 @@ backend/src/main/resources/application-secrets.yml
 *.iml
 .vscode/settings.json
 backend/material_templates_seed_from_scanned_document_4.sql
-tmp_pdf_pages/page_2.png
-.gitignore
-tmp_pdf_pages/page_7.png
-tmp_pdf_pages/page_6.png
-.gitignore
-tmp_pdf_pages/page_4.png
-tmp_pdf_pages/page_3.png
-.gitignore
-tmp_pdf_pages/page_5.png
-tmp_pdf_pages/page_1.png
+tmp_pdf_pages/
