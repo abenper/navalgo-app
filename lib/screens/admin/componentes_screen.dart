@@ -382,6 +382,7 @@ class _ComponentEditorDialogState extends State<_ComponentEditorDialog> {
   late final TextEditingController _nameCtrl;
   late final TextEditingController _manufacturerCtrl;
   late final TextEditingController _modelCtrl;
+  late final TextEditingController _templateSearchCtrl;
   late final Set<int> _templateIds;
 
   @override
@@ -394,6 +395,12 @@ class _ComponentEditorDialogState extends State<_ComponentEditorDialog> {
       text: component?.manufacturer ?? '',
     );
     _modelCtrl = TextEditingController(text: component?.model ?? '');
+    _templateSearchCtrl = TextEditingController();
+    _templateSearchCtrl.addListener(() {
+      if (mounted) {
+        setState(() {});
+      }
+    });
     _templateIds = component?.templateIds.toSet() ?? <int>{};
   }
 
@@ -402,7 +409,26 @@ class _ComponentEditorDialogState extends State<_ComponentEditorDialog> {
     _nameCtrl.dispose();
     _manufacturerCtrl.dispose();
     _modelCtrl.dispose();
+    _templateSearchCtrl.dispose();
     super.dispose();
+  }
+
+  List<MaterialChecklistTemplate> get _filteredTemplates {
+    final query = _templateSearchCtrl.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return widget.templates;
+    }
+    return widget.templates.where((template) {
+      final haystack = [
+        template.name,
+        template.description ?? '',
+        template.baseTemplateName ?? '',
+        template.templateType,
+        ...template.items.map((item) => item.articleName),
+        ...template.items.map((item) => item.reference),
+      ].join(' ').toLowerCase();
+      return haystack.contains(query);
+    }).toList();
   }
 
   @override
@@ -488,26 +514,43 @@ class _ComponentEditorDialogState extends State<_ComponentEditorDialog> {
           ),
           if (widget.templates.isNotEmpty) ...[
             const SizedBox(height: 14),
-            ...widget.templates.map((template) {
-              final id = template.id;
-              if (id == null) {
-                return const SizedBox.shrink();
-              }
-              return CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                value: _templateIds.contains(id),
-                title: Text(template.name),
-                onChanged: (selected) {
-                  setState(() {
-                    if (selected == true) {
-                      _templateIds.add(id);
-                    } else {
-                      _templateIds.remove(id);
-                    }
-                  });
-                },
-              );
-            }),
+            NavalgoSearchField(
+              controller: _templateSearchCtrl,
+              label: 'Buscar plantilla',
+              hint: 'Nombre, artículo, referencia',
+            ),
+            const SizedBox(height: 8),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 320),
+              child: _filteredTemplates.isEmpty
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 12),
+                      child: Text('Sin resultados.'),
+                    )
+                  : ListView(
+                      shrinkWrap: true,
+                      children: _filteredTemplates.map((template) {
+                        final id = template.id;
+                        if (id == null) {
+                          return const SizedBox.shrink();
+                        }
+                        return CheckboxListTile(
+                          contentPadding: EdgeInsets.zero,
+                          value: _templateIds.contains(id),
+                          title: Text(template.name),
+                          onChanged: (selected) {
+                            setState(() {
+                              if (selected == true) {
+                                _templateIds.add(id);
+                              } else {
+                                _templateIds.remove(id);
+                              }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+            ),
           ],
         ],
       ),
