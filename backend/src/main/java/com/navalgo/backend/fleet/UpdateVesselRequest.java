@@ -8,7 +8,7 @@ import java.util.List;
 
 public record UpdateVesselRequest(
         @NotBlank @Size(max = 255) String name,
-        @NotBlank @Size(max = 255) String registrationNumber,
+        @Size(max = 255) String registrationNumber,
         @Size(max = 255) String model,
         Integer engineCount,
         List<String> engineLabels,

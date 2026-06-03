@@ -129,7 +129,8 @@ class VesselStats {
   final List<VesselEngineHourSeries> engineSeries;
   final List<VesselWorkOrderMilestone> workOrderMilestones;
 
-  bool get hasEngineData => engineSeries.any((series) => series.points.isNotEmpty);
+  bool get hasEngineData =>
+      engineSeries.any((series) => series.points.isNotEmpty);
 
   factory VesselStats.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic value) {
@@ -214,7 +215,7 @@ class Vessel {
     return Vessel(
       id: json['id'] as int,
       name: json['name'] as String,
-      registrationNumber: json['registrationNumber'] as String,
+      registrationNumber: json['registrationNumber']?.toString() ?? '',
       model: json['model'] as String?,
       engineCount: json['engineCount'] as int?,
       engineLabels:

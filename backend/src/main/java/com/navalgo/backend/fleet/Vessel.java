@@ -18,7 +18,7 @@ public class Vessel {
     @Column(nullable = false)
     private String name;
 
-    @Column(nullable = false, unique = true)
+    @Column
     private String registrationNumber;
 
     private String model;

@@ -37,6 +37,9 @@ ALTER TABLE vessels
 ALTER TABLE vessels
     DROP CONSTRAINT IF EXISTS vessels_registration_number_key;
 
+ALTER TABLE vessels
+    ALTER COLUMN registration_number DROP NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_owners_archived
     ON owners(archived);
 

@@ -254,7 +254,7 @@ public class ClientAccountService {
                                    String rawModel) {
         String vesselName = inputSanitizer.optionalText(rawVesselName, 255);
         String registrationNumber = inputSanitizer.optionalText(rawRegistrationNumber, 255);
-        if (vesselName == null || vesselName.isBlank() || registrationNumber == null || registrationNumber.isBlank()) {
+        if (vesselName == null || vesselName.isBlank()) {
             return;
         }
 

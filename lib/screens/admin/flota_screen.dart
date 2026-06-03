@@ -29,6 +29,46 @@ IconData _engineOptionIcon(String position) {
   }
 }
 
+String _displayRegistrationNumber(String? registrationNumber) {
+  final normalized = registrationNumber?.trim() ?? '';
+  return normalized.isEmpty ? 'Sin matrícula' : normalized;
+}
+
+String? _validateRequiredText(String? value, String message) {
+  if ((value?.trim() ?? '').isEmpty) {
+    return message;
+  }
+  return _validateOptionalText(value, 255);
+}
+
+String? _validateOptionalText(String? value, int maxLength) {
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.length > maxLength) {
+    return 'Máximo $maxLength caracteres.';
+  }
+  return null;
+}
+
+String? _validateOptionalDecimal(String? value) {
+  final trimmed = value?.trim() ?? '';
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  final parsed = double.tryParse(trimmed.replaceAll(',', '.'));
+  if (parsed == null || parsed < 0) {
+    return 'Introduce un número válido.';
+  }
+  return null;
+}
+
+double? _parseOptionalDecimal(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return null;
+  }
+  return double.tryParse(trimmed.replaceAll(',', '.'));
+}
+
 class FlotaScreen extends StatefulWidget {
   const FlotaScreen({super.key});
 
@@ -94,7 +134,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
 
     final input = await showDialog<_OwnerInput>(
       context: context,
-      builder: (_) => const _OwnerDialog(),
+      builder: (_) => _OwnerDialog(existingOwners: fleetViewModel.owners),
     );
     if (!mounted || input == null) {
       return;
@@ -133,7 +173,10 @@ class _FlotaScreenState extends State<FlotaScreen> {
 
     final input = await showDialog<_OwnerInput>(
       context: context,
-      builder: (_) => _OwnerDialog(initialOwner: owner),
+      builder: (_) => _OwnerDialog(
+        initialOwner: owner,
+        existingOwners: fleetViewModel.owners,
+      ),
     );
     if (!mounted || input == null) {
       return;
@@ -327,7 +370,8 @@ class _FlotaScreenState extends State<FlotaScreen> {
       context: context,
       builder: (_) => NavalgoConfirmDialog(
         title: 'Eliminar embarcación',
-        message: 'Se eliminará ${vessel.name} (${vessel.registrationNumber}).',
+        message:
+            'Se eliminará ${vessel.name} (${_displayRegistrationNumber(vessel.registrationNumber)}).',
         confirmLabel: 'Eliminar',
         destructive: true,
         icon: Icons.directions_boat_filled_outlined,
@@ -665,7 +709,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
                                                                 height: 4,
                                                               ),
                                                               Text(
-                                                                '${vessel.registrationNumber} • ${vessel.model ?? 'Modelo no indicado'}',
+                                                                '${_displayRegistrationNumber(vessel.registrationNumber)} • ${vessel.model ?? 'Modelo no indicado'}',
                                                                 style: Theme.of(
                                                                   context,
                                                                 ).textTheme.bodyMedium,
@@ -799,7 +843,7 @@ class _FlotaScreenState extends State<FlotaScreen> {
                                     ),
                                   ),
                                   subtitle: Text(
-                                    '${vessel.registrationNumber} • ${vessel.ownerName}\n'
+                                    '${_displayRegistrationNumber(vessel.registrationNumber)} • ${vessel.ownerName}\n'
                                     'Modelo: ${vessel.model ?? 'N/D'} • Motores: ${vessel.engineCount ?? 0}\n'
                                     '${vessel.engineLabels.isEmpty ? 'Sin posiciones definidas' : vessel.engineLabels.join(', ')}',
                                   ),
@@ -857,9 +901,13 @@ class _OwnerInput {
 }
 
 class _OwnerDialog extends StatefulWidget {
-  const _OwnerDialog({this.initialOwner});
+  const _OwnerDialog({
+    this.initialOwner,
+    this.existingOwners = const <Owner>[],
+  });
 
   final Owner? initialOwner;
+  final List<Owner> existingOwners;
 
   @override
   State<_OwnerDialog> createState() => _OwnerDialogState();
@@ -968,10 +1016,10 @@ class _OwnerDialogState extends State<_OwnerDialog> {
                   prefixIcon: const Icon(Icons.person_outline),
                 ),
                 validator: (value) {
-                  if ((value?.trim() ?? '').isEmpty) {
-                    return 'Indica el nombre del propietario.';
-                  }
-                  return null;
+                  return _validateRequiredText(
+                    value,
+                    'Indica el nombre del propietario.',
+                  );
                 },
               ),
             ),
@@ -996,7 +1044,7 @@ class _OwnerDialogState extends State<_OwnerDialog> {
                         ? 'Indica el CIF o NIF de la empresa.'
                         : 'Indica el DNI o NIF del cliente.';
                   }
-                  return null;
+                  return _validateOptionalText(value, 255);
                 },
               ),
             ),
@@ -1012,6 +1060,7 @@ class _OwnerDialogState extends State<_OwnerDialog> {
                   label: 'Teléfono',
                   prefixIcon: const Icon(Icons.phone_outlined),
                 ),
+                validator: (value) => _validateOptionalText(value, 255),
               ),
             ),
             const SizedBox(height: 14),
@@ -1034,8 +1083,25 @@ class _OwnerDialogState extends State<_OwnerDialog> {
                   if (trimmed.isEmpty) {
                     return null;
                   }
-                  if (!trimmed.contains('@') || !trimmed.contains('.')) {
+                  final lengthError = _validateOptionalText(value, 255);
+                  if (lengthError != null) {
+                    return lengthError;
+                  }
+                  if (!RegExp(
+                    r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
+                  ).hasMatch(trimmed)) {
                     return 'Introduce un correo válido.';
+                  }
+                  final normalized = trimmed.toLowerCase();
+                  final duplicate = widget.existingOwners.any((owner) {
+                    if (owner.id == widget.initialOwner?.id) {
+                      return false;
+                    }
+                    return (owner.email ?? '').trim().toLowerCase() ==
+                        normalized;
+                  });
+                  if (duplicate) {
+                    return 'Ya existe un cliente con ese correo.';
                   }
                   return null;
                 },
@@ -1065,7 +1131,7 @@ class _VesselInput {
   });
 
   final String name;
-  final String registrationNumber;
+  final String? registrationNumber;
   final String? model;
   final int? engineCount;
   final List<String> engineLabels;
@@ -1202,7 +1268,9 @@ class _VesselDialogState extends State<_VesselDialog> {
               context,
               _VesselInput(
                 name: _nameCtrl.text.trim(),
-                registrationNumber: _regCtrl.text.trim(),
+                registrationNumber: _regCtrl.text.trim().isEmpty
+                    ? null
+                    : _regCtrl.text.trim(),
                 model: _modelCtrl.text.trim().isEmpty
                     ? null
                     : _modelCtrl.text.trim(),
@@ -1219,7 +1287,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                 gearboxSerialNumbers: _gearboxSerialCtrls
                     .map((controller) => controller.text.trim())
                     .toList(),
-                lengthMeters: double.tryParse(_lengthCtrl.text.trim()),
+                lengthMeters: _parseOptionalDecimal(_lengthCtrl.text),
                 ownerId: _ownerId,
               ),
             );
@@ -1243,10 +1311,10 @@ class _VesselDialogState extends State<_VesselDialog> {
                   prefixIcon: const Icon(Icons.sailing_outlined),
                 ),
                 validator: (value) {
-                  if ((value?.trim() ?? '').isEmpty) {
-                    return 'Indica el nombre de la embarcación.';
-                  }
-                  return null;
+                  return _validateRequiredText(
+                    value,
+                    'Indica el nombre de la embarcación.',
+                  );
                 },
               ),
             ),
@@ -1261,6 +1329,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                   label: 'Matrícula',
                   prefixIcon: const Icon(Icons.badge_outlined),
                 ),
+                validator: (value) => _validateOptionalText(value, 255),
               ),
             ),
             const SizedBox(height: 14),
@@ -1274,6 +1343,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                   label: 'Modelo',
                   prefixIcon: const Icon(Icons.description),
                 ),
+                validator: (value) => _validateOptionalText(value, 255),
               ),
             ),
             const SizedBox(height: 14),
@@ -1384,6 +1454,8 @@ class _VesselDialogState extends State<_VesselDialog> {
                                       'Introduce el número de serie del motor',
                                   prefixIcon: const Icon(Icons.dialpad),
                                 ),
+                                validator: (value) =>
+                                    _validateOptionalText(value, 255),
                               ),
                             ],
                           ),
@@ -1406,8 +1478,10 @@ class _VesselDialogState extends State<_VesselDialog> {
                       });
                     },
               serialControllers: _jetSerialCtrls,
-              serialFieldLabel: (index) =>
-                  'Número de serie del jet ${_associatedComponentLabels[index]}',
+              serialFieldLabel: (index) => _associatedSerialFieldLabel(
+                componentName: 'jet',
+                engineLabel: _associatedComponentLabels[index],
+              ),
             ),
             const SizedBox(height: 14),
             _buildAssociatedComponentSection(
@@ -1421,8 +1495,10 @@ class _VesselDialogState extends State<_VesselDialog> {
                       });
                     },
               serialControllers: _gearboxSerialCtrls,
-              serialFieldLabel: (index) =>
-                  'Número de serie de la reductora ${_associatedComponentLabels[index]}',
+              serialFieldLabel: (index) => _associatedSerialFieldLabel(
+                componentName: 'reductora',
+                engineLabel: _associatedComponentLabels[index],
+              ),
             ),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
@@ -1438,6 +1514,7 @@ class _VesselDialogState extends State<_VesselDialog> {
                   label: 'Eslora (m)',
                   prefixIcon: const Icon(Icons.straighten_outlined),
                 ),
+                validator: _validateOptionalDecimal,
               ),
             ),
             const SizedBox(height: 14),
@@ -1620,6 +1697,14 @@ class _VesselDialogState extends State<_VesselDialog> {
         baseLabel == 'Estribor';
   }
 
+  String _associatedSerialFieldLabel({
+    required String componentName,
+    required String engineLabel,
+  }) {
+    final position = engineLabel.trim().toLowerCase();
+    return 'Número de serie de $componentName de $position';
+  }
+
   void _refreshAssociatedComponentControls() {
     final previousLabels = _associatedComponentLabels;
     final updatedLabels = _buildAssociatedComponentLabels();
@@ -1720,19 +1805,34 @@ class _VesselDialogState extends State<_VesselDialog> {
           if (value && serialControllers.isNotEmpty) ...[
             const SizedBox(height: 12),
             ...List<Widget>.generate(serialControllers.length, (index) {
+              final serialLabel = serialFieldLabel(index);
               return Padding(
                 padding: EdgeInsets.only(
                   bottom: index == serialControllers.length - 1 ? 0 : 12,
                 ),
-                child: TextFormField(
-                  controller: serialControllers[index],
-                  textInputAction: TextInputAction.next,
-                  decoration: NavalgoFormStyles.inputDecoration(
-                    context,
-                    label: serialFieldLabel(index),
-                    hint: 'Introduce el número de serie',
-                    prefixIcon: const Icon(Icons.confirmation_number_outlined),
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      serialLabel,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: NavalgoColors.deepSea,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextFormField(
+                      controller: serialControllers[index],
+                      textInputAction: TextInputAction.next,
+                      decoration: NavalgoFormStyles.inputDecoration(
+                        context,
+                        label: 'Número de serie',
+                        hint: 'Introduce el número de serie',
+                        prefixIcon: const Icon(Icons.dialpad),
+                      ),
+                      validator: (value) => _validateOptionalText(value, 255),
+                    ),
+                  ],
                 ),
               );
             }),
@@ -1813,7 +1913,7 @@ class _VesselDetailsDialogState extends State<_VesselDetailsDialog> {
             label: 'Matrícula',
             child: _VesselDetailValue(
               icon: Icons.badge_outlined,
-              value: vessel.registrationNumber,
+              value: _displayRegistrationNumber(vessel.registrationNumber),
             ),
           ),
           const SizedBox(height: 14),
@@ -2162,7 +2262,9 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
                         buildCard(
                           icon: Icons.badge_outlined,
                           label: 'Matricula',
-                          value: vessel.registrationNumber,
+                          value: _displayRegistrationNumber(
+                            vessel.registrationNumber,
+                          ),
                         ),
                         buildCard(
                           icon: Icons.sailing_outlined,
@@ -2364,7 +2466,7 @@ class _VesselHeaderPanel extends StatelessWidget {
               ),
               _VesselSummaryChip(
                 icon: Icons.badge_outlined,
-                label: vessel.registrationNumber,
+                label: _displayRegistrationNumber(vessel.registrationNumber),
               ),
               _VesselSummaryChip(
                 icon: Icons.speed_outlined,

@@ -97,7 +97,7 @@ class FleetService {
   Future<Vessel> createVessel(
     String token, {
     required String name,
-    required String registrationNumber,
+    required String? registrationNumber,
     String? model,
     int? engineCount,
     List<String>? engineLabels,
@@ -135,7 +135,7 @@ class FleetService {
     String token, {
     required int vesselId,
     required String name,
-    required String registrationNumber,
+    required String? registrationNumber,
     String? model,
     int? engineCount,
     List<String>? engineLabels,

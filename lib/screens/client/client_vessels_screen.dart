@@ -11,6 +11,11 @@ import '../../widgets/navalgo_ui.dart';
 bool isPlaceholderClientVessel(Vessel vessel) =>
     vessel.registrationNumber.trim().toUpperCase().startsWith('TMP-');
 
+String displayClientVesselRegistration(String? registrationNumber) {
+  final normalized = registrationNumber?.trim() ?? '';
+  return normalized.isEmpty ? 'Sin matrícula' : normalized;
+}
+
 Future<List<Vessel>> loadClientVessels(BuildContext context) async {
   final session = context.read<SessionViewModel>();
   final token = session.token;
@@ -289,7 +294,9 @@ class _ClientVesselsScreenState extends State<ClientVesselsScreen> {
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
-                                vessel.registrationNumber,
+                                displayClientVesselRegistration(
+                                  vessel.registrationNumber,
+                                ),
                                 style: Theme.of(context).textTheme.labelLarge
                                     ?.copyWith(
                                       color: NavalgoColors.tide,
@@ -364,7 +371,9 @@ class _CreateClientVesselDialogState extends State<_CreateClientVesselDialog> {
     Navigator.of(context).pop(
       _ClientVesselDraft(
         name: _nameCtrl.text.trim(),
-        registrationNumber: _registrationCtrl.text.trim(),
+        registrationNumber: _registrationCtrl.text.trim().isEmpty
+            ? null
+            : _registrationCtrl.text.trim(),
         model: _modelCtrl.text.trim().isEmpty ? null : _modelCtrl.text.trim(),
       ),
     );
@@ -394,6 +403,9 @@ class _CreateClientVesselDialogState extends State<_CreateClientVesselDialog> {
                   if (value == null || value.trim().isEmpty) {
                     return 'Indica el nombre de la embarcación';
                   }
+                  if (value.trim().length > 255) {
+                    return 'Máximo 255 caracteres';
+                  }
                   return null;
                 },
               ),
@@ -402,11 +414,11 @@ class _CreateClientVesselDialogState extends State<_CreateClientVesselDialog> {
                 controller: _registrationCtrl,
                 decoration: const InputDecoration(
                   labelText: 'Matrícula',
-                  hintText: 'Ej. 7ª-MA-3-22-24',
+                  hintText: 'Opcional',
                 ),
                 validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Indica la matrícula';
+                  if ((value?.trim() ?? '').length > 255) {
+                    return 'Máximo 255 caracteres';
                   }
                   return null;
                 },
@@ -418,6 +430,12 @@ class _CreateClientVesselDialogState extends State<_CreateClientVesselDialog> {
                   labelText: 'Modelo',
                   hintText: 'Opcional',
                 ),
+                validator: (value) {
+                  if ((value?.trim() ?? '').length > 255) {
+                    return 'Máximo 255 caracteres';
+                  }
+                  return null;
+                },
               ),
             ],
           ),
@@ -437,11 +455,11 @@ class _CreateClientVesselDialogState extends State<_CreateClientVesselDialog> {
 class _ClientVesselDraft {
   const _ClientVesselDraft({
     required this.name,
-    required this.registrationNumber,
+    this.registrationNumber,
     this.model,
   });
 
   final String name;
-  final String registrationNumber;
+  final String? registrationNumber;
   final String? model;
 }

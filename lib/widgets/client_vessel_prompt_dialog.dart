@@ -80,7 +80,9 @@ class _ClientVesselPromptDialogState extends State<_ClientVesselPromptDialog> {
     Navigator.of(context).pop(
       ClientVesselPromptResult(
         name: _nameCtrl.text.trim(),
-        registrationNumber: _registrationCtrl.text.trim(),
+        registrationNumber: _registrationCtrl.text.trim().isEmpty
+            ? null
+            : _registrationCtrl.text.trim(),
         model: _modelCtrl.text.trim().isEmpty ? null : _modelCtrl.text.trim(),
       ),
     );
@@ -106,9 +108,13 @@ class _ClientVesselPromptDialogState extends State<_ClientVesselPromptDialog> {
                   labelText: 'Nombre de la embarcación',
                 ),
                 validator: (value) {
-                  if (_registrationCtrl.text.trim().isNotEmpty &&
+                  if ((_registrationCtrl.text.trim().isNotEmpty ||
+                          _modelCtrl.text.trim().isNotEmpty) &&
                       (value == null || value.trim().isEmpty)) {
                     return 'Indica el nombre de la embarcación';
+                  }
+                  if ((value?.trim() ?? '').length > 255) {
+                    return 'Máximo 255 caracteres';
                   }
                   return null;
                 },
@@ -116,11 +122,13 @@ class _ClientVesselPromptDialogState extends State<_ClientVesselPromptDialog> {
               const SizedBox(height: 12),
               TextFormField(
                 controller: _registrationCtrl,
-                decoration: const InputDecoration(labelText: 'Matrícula'),
+                decoration: const InputDecoration(
+                  labelText: 'Matrícula',
+                  hintText: 'Opcional',
+                ),
                 validator: (value) {
-                  if (_nameCtrl.text.trim().isNotEmpty &&
-                      (value == null || value.trim().isEmpty)) {
-                    return 'Indica la matrícula';
+                  if ((value?.trim() ?? '').length > 255) {
+                    return 'Máximo 255 caracteres';
                   }
                   return null;
                 },
@@ -129,6 +137,12 @@ class _ClientVesselPromptDialogState extends State<_ClientVesselPromptDialog> {
               TextFormField(
                 controller: _modelCtrl,
                 decoration: const InputDecoration(labelText: 'Modelo'),
+                validator: (value) {
+                  if ((value?.trim() ?? '').length > 255) {
+                    return 'Máximo 255 caracteres';
+                  }
+                  return null;
+                },
               ),
             ],
           ),

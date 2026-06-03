@@ -195,7 +195,7 @@ public class FleetController {
                 "reductoras"
         );
         vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
-        vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
+        vessel.setRegistrationNumber(inputSanitizer.optionalText(request.registrationNumber(), 255));
         vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
@@ -351,7 +351,7 @@ public class FleetController {
         );
 
         vessel.setName(inputSanitizer.requiredText(request.name(), "El nombre de la embarcacion", 255));
-        vessel.setRegistrationNumber(inputSanitizer.requiredText(request.registrationNumber(), "La matricula", 255));
+        vessel.setRegistrationNumber(inputSanitizer.optionalText(request.registrationNumber(), 255));
         vessel.setModel(inputSanitizer.optionalText(request.model(), 255));
         vessel.setEngineCount(engineLabels.isEmpty() ? request.engineCount() : engineLabels.size());
         vessel.setEngineLabels(engineLabels);
