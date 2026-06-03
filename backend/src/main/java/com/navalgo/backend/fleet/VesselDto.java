@@ -14,6 +14,7 @@ public record VesselDto(
         boolean hasGearboxes,
         java.util.List<String> gearboxLabels,
         java.util.List<String> gearboxSerialNumbers,
+        java.util.List<VesselComponentDto> components,
         Double lengthMeters,
         Long ownerId,
         String ownerName
@@ -33,6 +34,9 @@ public record VesselDto(
                 !vessel.getGearboxLabels().isEmpty(),
                 vessel.getGearboxLabels(),
                 vessel.getGearboxSerialNumbers(),
+                vessel.getComponents().stream()
+                        .map(VesselComponentDto::from)
+                        .toList(),
                 vessel.getLengthMeters(),
                 vessel.getOwner().getId(),
                 vessel.getOwner().getDisplayName()

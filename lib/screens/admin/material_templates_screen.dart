@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/work_order.dart';
+import '../../models/vessel.dart';
+import '../../services/fleet_service.dart';
 import '../../services/material_checklist_template_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
@@ -26,6 +28,7 @@ class _MaterialTemplatesScreenState extends State<MaterialTemplatesScreen> {
   int? _deletingTemplateId;
   List<MaterialChecklistTemplate> _templates =
       const <MaterialChecklistTemplate>[];
+  List<Vessel> _vessels = const <Vessel>[];
 
   @override
   void initState() {
@@ -64,14 +67,16 @@ class _MaterialTemplatesScreenState extends State<MaterialTemplatesScreen> {
       _error = null;
     });
     try {
-      final templates = await context
-          .read<MaterialChecklistTemplateService>()
-          .getTemplates(token);
+      final results = await Future.wait([
+        context.read<MaterialChecklistTemplateService>().getTemplates(token),
+        context.read<FleetService>().getVessels(token),
+      ]);
       if (!mounted) {
         return;
       }
       setState(() {
-        _templates = templates;
+        _templates = results[0] as List<MaterialChecklistTemplate>;
+        _vessels = results[1] as List<Vessel>;
       });
     } catch (e) {
       if (!mounted) {
@@ -172,9 +177,34 @@ class _MaterialTemplatesScreenState extends State<MaterialTemplatesScreen> {
         _materialTemplateTypeLabel(template.templateType),
         ...template.items.map((item) => item.articleName),
         ...template.items.map((item) => item.reference),
+        ..._componentSearchTermsForTemplate(template.id),
       ].join(' ').toLowerCase();
       return haystack.contains(query);
     }).toList();
+  }
+
+  List<String> _componentSearchTermsForTemplate(int? templateId) {
+    if (templateId == null) {
+      return const <String>[];
+    }
+    final terms = <String>[];
+    for (final vessel in _vessels) {
+      for (final component in vessel.components) {
+        if (!component.templateIds.contains(templateId)) {
+          continue;
+        }
+        terms.addAll([
+          vessel.name,
+          vessel.ownerName,
+          component.type,
+          component.label,
+          component.manufacturer ?? '',
+          component.model ?? '',
+          component.serialNumber ?? '',
+        ]);
+      }
+    }
+    return terms;
   }
 
   @override

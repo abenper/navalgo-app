@@ -3949,6 +3949,10 @@ class _EditPartDialogState extends State<_EditPartDialog> {
     final validVessel = ownerVessels.any((v) => v.id == _vesselId)
         ? _vesselId
         : null;
+    final selectedVessel = ownerVessels
+        .where((v) => v.id == validVessel)
+        .cast<Vessel?>()
+        .firstOrNull;
 
     return NavalgoFormDialog(
       title: 'Editar parte',
@@ -4132,8 +4136,7 @@ class _EditPartDialogState extends State<_EditPartDialog> {
               const SizedBox(height: 14),
               NavalgoFormFieldBlock(
                 label: 'Mecánicos asignados',
-                caption:
-                    'Selecciona el equipo que trabajará sobre este parte.',
+                caption: 'Selecciona el equipo que trabajará sobre este parte.',
                 child: NavalgoPanel(
                   tint: Colors.white.withValues(alpha: 0.96),
                   child: _WorkerAssignmentList(
@@ -4154,6 +4157,7 @@ class _EditPartDialogState extends State<_EditPartDialog> {
             ],
             const SizedBox(height: 14),
             _MaterialTemplateAssignmentField(
+              vessel: selectedVessel,
               selectedTemplateId: _selectedMaterialTemplateId,
               onChanged: (value) {
                 setState(() {
@@ -4238,6 +4242,10 @@ class _QuickCreatePartDialogState extends State<_QuickCreatePartDialog> {
   @override
   Widget build(BuildContext context) {
     final vessels = _sortedVessels();
+    final selectedVessel = vessels
+        .where((vessel) => vessel.id == _vesselId)
+        .cast<Vessel?>()
+        .firstOrNull;
 
     return NavalgoFormDialog(
       title: 'Nuevo parte',
@@ -4311,6 +4319,7 @@ class _QuickCreatePartDialogState extends State<_QuickCreatePartDialog> {
             ),
             const SizedBox(height: 14),
             _MaterialTemplateAssignmentField(
+              vessel: selectedVessel,
               selectedTemplateId: _selectedMaterialTemplateId,
               onChanged: (value) {
                 setState(() {
@@ -4489,6 +4498,10 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
     final availableVessels = widget.vessels
         .where((vessel) => vessel.ownerId == _ownerId)
         .toList();
+    final selectedVessel = availableVessels
+        .where((vessel) => vessel.id == _vesselId)
+        .cast<Vessel?>()
+        .firstOrNull;
 
     return NavalgoFormDialog(
       title: 'Nuevo parte',
@@ -4690,6 +4703,7 @@ class _CreatePartDialogState extends State<_CreatePartDialog> {
             ],
             const SizedBox(height: 14),
             _MaterialTemplateAssignmentField(
+              vessel: selectedVessel,
               selectedTemplateId: _selectedMaterialTemplateId,
               onChanged: (value) {
                 setState(() {
@@ -5060,10 +5074,12 @@ class _MaterialRevisionRequestCard extends StatelessWidget {
 
 class _MaterialTemplateAssignmentField extends StatefulWidget {
   const _MaterialTemplateAssignmentField({
+    required this.vessel,
     required this.selectedTemplateId,
     required this.onChanged,
   });
 
+  final Vessel? vessel;
   final int? selectedTemplateId;
   final ValueChanged<int?> onChanged;
 
@@ -5083,6 +5099,14 @@ class _MaterialTemplateAssignmentFieldState
   void initState() {
     super.initState();
     Future<void>.microtask(_loadTemplates);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MaterialTemplateAssignmentField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.vessel?.id != widget.vessel?.id) {
+      _clearUnavailableSelectedTemplate();
+    }
   }
 
   Future<void> _loadTemplates({int? selectTemplateId}) async {
@@ -5106,11 +5130,14 @@ class _MaterialTemplateAssignmentFieldState
       setState(() {
         _templates = templates;
       });
+      final availableTemplates = _filterTemplatesForVessel(templates);
       if (selectTemplateId != null &&
-          templates.any((item) => item.id == selectTemplateId)) {
+          availableTemplates.any((item) => item.id == selectTemplateId)) {
         widget.onChanged(selectTemplateId);
       } else if (widget.selectedTemplateId != null &&
-          !templates.any((item) => item.id == widget.selectedTemplateId)) {
+          !availableTemplates.any(
+            (item) => item.id == widget.selectedTemplateId,
+          )) {
         widget.onChanged(null);
       }
     } catch (e) {
@@ -5137,7 +5164,7 @@ class _MaterialTemplateAssignmentFieldState
     final selection = await showDialog<_MaterialTemplateSelectionResult>(
       context: context,
       builder: (_) => _MaterialTemplatePickerDialog(
-        templates: _templates,
+        templates: _availableTemplates,
         selectedTemplateId: widget.selectedTemplateId,
       ),
     );
@@ -5161,20 +5188,66 @@ class _MaterialTemplateAssignmentFieldState
     await _loadTemplates();
   }
 
+  Set<int> get _vesselTemplateIds {
+    final vessel = widget.vessel;
+    if (vessel == null) {
+      return const <int>{};
+    }
+    return vessel.components
+        .expand((component) => component.templateIds)
+        .where((templateId) => templateId > 0)
+        .toSet();
+  }
+
+  List<MaterialChecklistTemplate> get _availableTemplates =>
+      _filterTemplatesForVessel(_templates);
+
+  List<MaterialChecklistTemplate> _filterTemplatesForVessel(
+    List<MaterialChecklistTemplate> templates,
+  ) {
+    final allowedTemplateIds = _vesselTemplateIds;
+    if (allowedTemplateIds.isEmpty) {
+      return templates;
+    }
+    return templates
+        .where((template) => allowedTemplateIds.contains(template.id))
+        .toList();
+  }
+
+  void _clearUnavailableSelectedTemplate() {
+    final selectedTemplateId = widget.selectedTemplateId;
+    if (selectedTemplateId == null || _templates.isEmpty) {
+      return;
+    }
+    if (_availableTemplates.any(
+      (template) => template.id == selectedTemplateId,
+    )) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.selectedTemplateId == selectedTemplateId) {
+        widget.onChanged(null);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final selectedTemplate = _templates
+    final availableTemplates = _availableTemplates;
+    final selectedTemplate = availableTemplates
         .where((item) => item.id == widget.selectedTemplateId)
         .cast<MaterialChecklistTemplate?>()
         .firstOrNull;
     final selectedLabel = selectedTemplate == null
         ? 'Sin plantilla'
         : _materialTemplateDisplayName(selectedTemplate);
+    final filteredByVessel = _vesselTemplateIds.isNotEmpty;
 
     return NavalgoFormFieldBlock(
       label: 'Plantilla de material',
-      caption:
-          'Opcional. Se clona al parte como checklist independiente para no alterar históricos cuando cambie la plantilla original.',
+      caption: filteredByVessel
+          ? 'Solo se muestran las plantillas vinculadas a los componentes configurados en esta embarcacion.'
+          : 'Opcional. Se clona al parte como checklist independiente para no alterar históricos cuando cambie la plantilla original.',
       child: NavalgoPanel(
         tint: Colors.white.withValues(alpha: 0.96),
         child: Column(

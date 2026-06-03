@@ -12,6 +12,7 @@ import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../admin/partes_screen.dart';
 import '../admin/admin_shell_screen.dart';
+import '../admin/componentes_screen.dart';
 import '../admin/flota_screen.dart';
 import '../client/client_shell_screen.dart';
 import '../commercial/commercial_shell_screen.dart';
@@ -130,6 +131,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       const WorkerDashboardScreen(),
       const PartesScreen(),
       if (_canManageFleet) const FlotaScreen(),
+      if (_canManageFleet) const ComponentesScreen(),
       const FichajeScreen(),
       const AusenciasScreen(),
     ];
@@ -140,6 +142,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       'Inicio',
       'Partes',
       if (_canManageFleet) 'Flota',
+      if (_canManageFleet) 'Componentes',
       'Fichaje',
       'Ausencias',
     ];
@@ -150,6 +153,7 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       Icons.dashboard_outlined,
       Icons.assignment_outlined,
       if (_canManageFleet) Icons.directions_boat_outlined,
+      if (_canManageFleet) Icons.precision_manufacturing_outlined,
       Icons.access_time_outlined,
       Icons.event_note_outlined,
     ];
@@ -172,6 +176,12 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
           icon: Icon(Icons.directions_boat_outlined),
           selectedIcon: Icon(Icons.directions_boat),
           label: Text('Flota'),
+        ),
+      if (_canManageFleet)
+        const NavigationRailDestination(
+          icon: Icon(Icons.precision_manufacturing_outlined),
+          selectedIcon: Icon(Icons.precision_manufacturing),
+          label: Text('Componentes'),
         ),
       const NavigationRailDestination(
         icon: Icon(Icons.access_time_outlined),
@@ -203,9 +213,9 @@ class _WorkerShellScreenState extends State<WorkerShellScreen> {
       case 'FLOTA':
         return _canManageFleet ? 2 : 1;
       case 'FICHAJES':
-        return _canManageFleet ? 3 : 2;
+        return _canManageFleet ? 4 : 2;
       case 'AUSENCIAS':
-        return _canManageFleet ? 4 : 3;
+        return _canManageFleet ? 5 : 3;
       default:
         return 0;
     }

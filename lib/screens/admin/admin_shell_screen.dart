@@ -19,6 +19,7 @@ import '../worker/ausencias_screen.dart';
 import '../worker/worker_shell_screen.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_time_tracking_overview_screen.dart';
+import 'componentes_screen.dart';
 import 'equipo_screen.dart';
 import 'flota_screen.dart';
 import 'material_templates_screen.dart';
@@ -43,6 +44,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     const AdminDashboardScreen(),
     const PartesScreen(),
     const MaterialTemplatesScreen(),
+    const ComponentesScreen(),
     const CommercialBudgetsScreen(),
     const FlotaScreen(),
     const EquipoScreen(),
@@ -55,6 +57,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     'Panel',
     'Partes',
     'Plantillas',
+    'Componentes',
     'Presupuestos',
     'Flota',
     'Equipo',
@@ -67,6 +70,7 @@ class _AdminShellScreenState extends State<AdminShellScreen> {
     Icons.dashboard_outlined,
     Icons.assignment_outlined,
     Icons.inventory_2_outlined,
+    Icons.precision_manufacturing_outlined,
     Icons.request_quote_outlined,
     Icons.directions_boat_outlined,
     Icons.people_outline,

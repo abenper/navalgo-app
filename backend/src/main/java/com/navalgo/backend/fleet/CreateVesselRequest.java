@@ -17,6 +17,7 @@ public record CreateVesselRequest(
         List<@Size(max = 255) String> jetSerialNumbers,
         Boolean hasGearboxes,
         List<@Size(max = 255) String> gearboxSerialNumbers,
+        List<@jakarta.validation.Valid VesselComponentRequest> components,
         Double lengthMeters,
         @NotNull Long ownerId
 ) {

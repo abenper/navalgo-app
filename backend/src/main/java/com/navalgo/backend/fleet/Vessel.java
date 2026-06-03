@@ -4,7 +4,9 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Entity
@@ -46,6 +48,10 @@ public class Vessel {
 
     @ManyToOne(optional = false, fetch = FetchType.LAZY)
     private Owner owner;
+
+    @OneToMany(mappedBy = "vessel", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("type ASC, label ASC, id ASC")
+    private Set<VesselComponent> components = new LinkedHashSet<>();
 
     @Column(nullable = false)
     private boolean archived = false;
@@ -173,6 +179,9 @@ public class Vessel {
 
     public Owner getOwner() { return owner; }
     public void setOwner(Owner owner) { this.owner = owner; }
+
+    public Set<VesselComponent> getComponents() { return components; }
+    public void setComponents(Set<VesselComponent> components) { this.components = components; }
 
     public boolean isArchived() { return archived; }
     public void setArchived(boolean archived) { this.archived = archived; }

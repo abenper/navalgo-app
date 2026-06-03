@@ -36,6 +36,76 @@ class FleetService {
     return data.map((e) => Vessel.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  Future<List<MarineComponent>> getComponents(String token) async {
+    final data = await _apiClient.get(
+      '/fleet/components',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+
+    if (data is! List) {
+      return <MarineComponent>[];
+    }
+
+    return data
+        .whereType<Map<String, dynamic>>()
+        .map(MarineComponent.fromJson)
+        .toList();
+  }
+
+  Future<MarineComponent> createComponent(
+    String token, {
+    required String type,
+    required String name,
+    String? manufacturer,
+    String? model,
+    required List<int> templateIds,
+  }) async {
+    final data = await _apiClient.post(
+      '/fleet/components',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'type': type,
+        'name': name,
+        'manufacturer': manufacturer,
+        'model': model,
+        'templateIds': templateIds,
+      },
+    );
+
+    return MarineComponent.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<MarineComponent> updateComponent(
+    String token, {
+    required int componentId,
+    required String type,
+    required String name,
+    String? manufacturer,
+    String? model,
+    required List<int> templateIds,
+  }) async {
+    final data = await _apiClient.put(
+      '/fleet/components/$componentId',
+      headers: {'Authorization': 'Bearer $token'},
+      body: {
+        'type': type,
+        'name': name,
+        'manufacturer': manufacturer,
+        'model': model,
+        'templateIds': templateIds,
+      },
+    );
+
+    return MarineComponent.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteComponent(String token, {required int componentId}) async {
+    await _apiClient.delete(
+      '/fleet/components/$componentId',
+      headers: {'Authorization': 'Bearer $token'},
+    );
+  }
+
   Future<Owner> createOwner(
     String token, {
     required String type,
@@ -106,6 +176,7 @@ class FleetService {
     List<String>? jetSerialNumbers,
     bool? hasGearboxes,
     List<String>? gearboxSerialNumbers,
+    List<Map<String, dynamic>>? components,
     double? lengthMeters,
     required int ownerId,
   }) async {
@@ -123,6 +194,7 @@ class FleetService {
         'jetSerialNumbers': jetSerialNumbers,
         'hasGearboxes': hasGearboxes,
         'gearboxSerialNumbers': gearboxSerialNumbers,
+        'components': components,
         'lengthMeters': lengthMeters,
         'ownerId': ownerId,
       },
@@ -144,6 +216,7 @@ class FleetService {
     List<String>? jetSerialNumbers,
     bool? hasGearboxes,
     List<String>? gearboxSerialNumbers,
+    List<Map<String, dynamic>>? components,
     double? lengthMeters,
     required int ownerId,
   }) async {
@@ -161,6 +234,7 @@ class FleetService {
         'jetSerialNumbers': jetSerialNumbers,
         'hasGearboxes': hasGearboxes,
         'gearboxSerialNumbers': gearboxSerialNumbers,
+        'components': components,
         'lengthMeters': lengthMeters,
         'ownerId': ownerId,
       },

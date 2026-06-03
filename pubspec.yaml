@@ -80,6 +80,10 @@ flutter:
   uses-material-design: true
   assets:
     - assets/branding/
+    - assets/icons/marine/generador.png
+    - assets/icons/marine/jet.png
+    - assets/icons/marine/motor.png
+    - assets/icons/marine/reductora.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

@@ -174,6 +174,101 @@ class VesselStats {
   }
 }
 
+class VesselComponent {
+  const VesselComponent({
+    required this.id,
+    this.componentId,
+    required this.type,
+    required this.label,
+    this.manufacturer,
+    this.model,
+    this.serialNumber,
+    this.currentHours,
+    required this.templateIds,
+    required this.templateNames,
+  });
+
+  final int id;
+  final int? componentId;
+  final String type;
+  final String label;
+  final String? manufacturer;
+  final String? model;
+  final String? serialNumber;
+  final int? currentHours;
+  final List<int> templateIds;
+  final List<String> templateNames;
+
+  factory VesselComponent.fromJson(Map<String, dynamic> json) {
+    return VesselComponent(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      componentId: (json['componentId'] as num?)?.toInt(),
+      type: json['type']?.toString() ?? 'OTHER',
+      label: json['label']?.toString() ?? 'Componente',
+      manufacturer: json['manufacturer']?.toString(),
+      model: json['model']?.toString(),
+      serialNumber: json['serialNumber']?.toString(),
+      currentHours: (json['currentHours'] as num?)?.toInt(),
+      templateIds: (json['templateIds'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => (item as num).toInt())
+          .toList(),
+      templateNames:
+          (json['templateNames'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => item.toString())
+              .toList(),
+    );
+  }
+}
+
+class MarineComponent {
+  const MarineComponent({
+    required this.id,
+    required this.type,
+    required this.name,
+    this.manufacturer,
+    this.model,
+    required this.templateIds,
+    required this.templateNames,
+    required this.installedCount,
+  });
+
+  final int id;
+  final String type;
+  final String name;
+  final String? manufacturer;
+  final String? model;
+  final List<int> templateIds;
+  final List<String> templateNames;
+  final int installedCount;
+
+  String get displayName {
+    final parts = <String>[
+      if ((manufacturer ?? '').trim().isNotEmpty) manufacturer!.trim(),
+      if ((model ?? '').trim().isNotEmpty) model!.trim(),
+      name.trim(),
+    ].where((part) => part.isNotEmpty).toList();
+    return parts.isEmpty ? 'Componente' : parts.join(' · ');
+  }
+
+  factory MarineComponent.fromJson(Map<String, dynamic> json) {
+    return MarineComponent(
+      id: (json['id'] as num?)?.toInt() ?? 0,
+      type: json['type']?.toString() ?? 'OTHER',
+      name: json['name']?.toString() ?? 'Componente',
+      manufacturer: json['manufacturer']?.toString(),
+      model: json['model']?.toString(),
+      templateIds: (json['templateIds'] as List<dynamic>? ?? const <dynamic>[])
+          .map((item) => (item as num).toInt())
+          .toList(),
+      templateNames:
+          (json['templateNames'] as List<dynamic>? ?? const <dynamic>[])
+              .map((item) => item.toString())
+              .toList(),
+      installedCount: (json['installedCount'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
 class Vessel {
   const Vessel({
     required this.id,
@@ -189,6 +284,7 @@ class Vessel {
     required this.hasGearboxes,
     required this.gearboxLabels,
     required this.gearboxSerialNumbers,
+    required this.components,
     this.lengthMeters,
     required this.ownerId,
     required this.ownerName,
@@ -207,6 +303,7 @@ class Vessel {
   final bool hasGearboxes;
   final List<String> gearboxLabels;
   final List<String> gearboxSerialNumbers;
+  final List<VesselComponent> components;
   final double? lengthMeters;
   final int ownerId;
   final String ownerName;
@@ -243,6 +340,10 @@ class Vessel {
           (json['gearboxSerialNumbers'] as List<dynamic>? ?? const <dynamic>[])
               .map((item) => '$item'.trim())
               .toList(),
+      components: (json['components'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map<String, dynamic>>()
+          .map(VesselComponent.fromJson)
+          .toList(),
       lengthMeters: (json['lengthMeters'] as num?)?.toDouble(),
       ownerId: json['ownerId'] as int,
       ownerName: json['ownerName'] as String,

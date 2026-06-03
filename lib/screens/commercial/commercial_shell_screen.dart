@@ -11,6 +11,7 @@ import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_logo.dart';
 import '../../widgets/profile_dialogs.dart';
 import '../admin/flota_screen.dart';
+import '../admin/componentes_screen.dart';
 import '../admin/admin_shell_screen.dart';
 import '../client/client_shell_screen.dart';
 import '../common/login_screen.dart';
@@ -37,6 +38,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
     WorkerDashboardScreen(),
     CommercialBudgetsScreen(),
     FlotaScreen(),
+    ComponentesScreen(),
     FichajeScreen(),
     AusenciasScreen(),
   ];
@@ -45,6 +47,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
     'Inicio',
     'Presupuestos',
     'Flota',
+    'Componentes',
     'Fichaje',
     'Ausencias',
   ];
@@ -53,6 +56,7 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
     Icons.dashboard_outlined,
     Icons.request_quote_outlined,
     Icons.directions_boat_outlined,
+    Icons.precision_manufacturing_outlined,
     Icons.access_time_outlined,
     Icons.event_note_outlined,
   ];
@@ -810,6 +814,11 @@ class _CommercialShellScreenState extends State<CommercialShellScreen> {
                           icon: Icon(Icons.directions_boat_outlined),
                           selectedIcon: Icon(Icons.directions_boat),
                           label: Text('Flota'),
+                        ),
+                        NavigationRailDestination(
+                          icon: Icon(Icons.precision_manufacturing_outlined),
+                          selectedIcon: Icon(Icons.precision_manufacturing),
+                          label: Text('Componentes'),
                         ),
                         NavigationRailDestination(
                           icon: Icon(Icons.access_time_outlined),

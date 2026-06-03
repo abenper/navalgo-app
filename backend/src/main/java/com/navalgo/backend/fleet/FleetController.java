@@ -7,6 +7,8 @@ import com.navalgo.backend.company.CompanyRepository;
 import com.navalgo.backend.budget.BudgetRepository;
 import com.navalgo.backend.workorder.EngineHourLog;
 import com.navalgo.backend.workorder.EngineHourSummaryDto;
+import com.navalgo.backend.workorder.MaterialChecklistTemplate;
+import com.navalgo.backend.workorder.MaterialChecklistTemplateRepository;
 import com.navalgo.backend.workorder.WorkOrder;
 import com.navalgo.backend.workorder.WorkOrderRepository;
 import com.navalgo.backend.worker.Worker;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +45,8 @@ public class FleetController {
     private final WorkOrderRepository workOrderRepository;
     private final WorkerRepository workerRepository;
     private final InputSanitizer inputSanitizer;
+    private final MaterialChecklistTemplateRepository materialChecklistTemplateRepository;
+    private final MarineComponentRepository marineComponentRepository;
 
     public FleetController(OwnerRepository ownerRepository,
                            VesselRepository vesselRepository,
@@ -49,7 +54,9 @@ public class FleetController {
                            BudgetRepository budgetRepository,
                            WorkOrderRepository workOrderRepository,
                            WorkerRepository workerRepository,
-                           InputSanitizer inputSanitizer) {
+                           InputSanitizer inputSanitizer,
+                           MaterialChecklistTemplateRepository materialChecklistTemplateRepository,
+                           MarineComponentRepository marineComponentRepository) {
         this.ownerRepository = ownerRepository;
         this.vesselRepository = vesselRepository;
         this.companyRepository = companyRepository;
@@ -57,6 +64,59 @@ public class FleetController {
         this.workOrderRepository = workOrderRepository;
         this.workerRepository = workerRepository;
         this.inputSanitizer = inputSanitizer;
+        this.materialChecklistTemplateRepository = materialChecklistTemplateRepository;
+        this.marineComponentRepository = marineComponentRepository;
+    }
+
+    @GetMapping("/components")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
+    public ResponseEntity<List<MarineComponentDto>> listComponents() {
+        return ResponseEntity.ok(marineComponentRepository
+                .findAllByArchivedFalseOrderByTypeAscManufacturerAscModelAscNameAsc()
+                .stream()
+                .map(component -> MarineComponentDto.from(
+                        component,
+                        vesselRepository.findAll().stream()
+                                .flatMap(vessel -> vessel.getComponents().stream())
+                                .filter(installed -> installed.getMarineComponent() != null
+                                        && installed.getMarineComponent().getId().equals(component.getId()))
+                                .count()
+                ))
+                .toList());
+    }
+
+    @PostMapping("/components")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
+    @Transactional
+    public ResponseEntity<MarineComponentDto> createComponent(@RequestBody @Valid MarineComponentRequest request,
+                                                              Authentication authentication) {
+        ensureCanManageFleetCreation(authentication);
+        MarineComponent component = new MarineComponent();
+        applyMarineComponentRequest(component, request);
+        MarineComponent saved = marineComponentRepository.save(component);
+        return ResponseEntity.ok(MarineComponentDto.from(saved, 0));
+    }
+
+    @PutMapping("/components/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
+    @Transactional
+    public ResponseEntity<MarineComponentDto> updateComponent(@PathVariable Long id,
+                                                              @RequestBody @Valid MarineComponentRequest request) {
+        MarineComponent component = marineComponentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Componente no encontrado"));
+        applyMarineComponentRequest(component, request);
+        MarineComponent saved = marineComponentRepository.save(component);
+        return ResponseEntity.ok(MarineComponentDto.from(saved, 0));
+    }
+
+    @DeleteMapping("/components/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL')")
+    @Transactional
+    public ResponseEntity<Void> deleteComponent(@PathVariable Long id) {
+        MarineComponent component = marineComponentRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Componente no encontrado"));
+        component.setArchived(true);
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/owners")
@@ -204,6 +264,16 @@ public class FleetController {
         vessel.setJetSerialNumbers(jetSerialNumbers);
         vessel.setGearboxLabels(gearboxLabels);
         vessel.setGearboxSerialNumbers(gearboxSerialNumbers);
+        applyComponents(
+                vessel,
+                request.components(),
+                engineLabels,
+                engineSerialNumbers,
+                jetLabels,
+                jetSerialNumbers,
+                gearboxLabels,
+                gearboxSerialNumbers
+        );
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
@@ -360,10 +430,131 @@ public class FleetController {
         vessel.setJetSerialNumbers(jetSerialNumbers);
         vessel.setGearboxLabels(gearboxLabels);
         vessel.setGearboxSerialNumbers(gearboxSerialNumbers);
+        applyComponents(
+                vessel,
+                request.components(),
+                engineLabels,
+                engineSerialNumbers,
+                jetLabels,
+                jetSerialNumbers,
+                gearboxLabels,
+                gearboxSerialNumbers
+        );
         vessel.setLengthMeters(request.lengthMeters());
         vessel.setOwner(owner);
 
         return vessel;
+    }
+
+    private void applyComponents(Vessel vessel,
+                                 List<VesselComponentRequest> componentRequests,
+                                 List<String> engineLabels,
+                                 List<String> engineSerialNumbers,
+                                 List<String> jetLabels,
+                                 List<String> jetSerialNumbers,
+                                 List<String> gearboxLabels,
+                                 List<String> gearboxSerialNumbers) {
+        vessel.getComponents().clear();
+
+        List<VesselComponentRequest> requests = componentRequests == null
+                ? List.of()
+                : componentRequests;
+        if (requests.isEmpty()) {
+            requests = buildLegacyComponentRequests(
+                    engineLabels,
+                    engineSerialNumbers,
+                    jetLabels,
+                    jetSerialNumbers,
+                    gearboxLabels,
+                    gearboxSerialNumbers
+            );
+        }
+
+        for (VesselComponentRequest request : requests) {
+            if (request == null) {
+                continue;
+            }
+            VesselComponent component = new VesselComponent();
+            component.setVessel(vessel);
+            MarineComponent baseComponent = request.componentId() == null
+                    ? null
+                    : marineComponentRepository.findById(request.componentId())
+                    .orElseThrow(() -> new EntityNotFoundException("Componente no encontrado"));
+            component.setMarineComponent(baseComponent);
+            component.setType(baseComponent == null
+                    ? (request.type() == null ? VesselComponentType.OTHER : request.type())
+                    : baseComponent.getType());
+            component.setLabel(inputSanitizer.requiredText(
+                    request.label() == null && baseComponent != null ? baseComponent.getName() : request.label(),
+                    "El nombre del componente",
+                    255
+            ));
+            component.setManufacturer(baseComponent == null
+                    ? inputSanitizer.optionalText(request.manufacturer(), 255)
+                    : baseComponent.getManufacturer());
+            component.setModel(baseComponent == null
+                    ? inputSanitizer.optionalText(request.model(), 255)
+                    : baseComponent.getModel());
+            component.setSerialNumber(inputSanitizer.optionalText(request.serialNumber(), 255));
+            component.setCurrentHours(request.currentHours());
+            component.setTemplates(baseComponent == null
+                    ? resolveComponentTemplates(request.templateIds())
+                    : new LinkedHashSet<>(baseComponent.getTemplates()));
+            vessel.getComponents().add(component);
+        }
+    }
+
+    private List<VesselComponentRequest> buildLegacyComponentRequests(List<String> engineLabels,
+                                                                      List<String> engineSerialNumbers,
+                                                                      List<String> jetLabels,
+                                                                      List<String> jetSerialNumbers,
+                                                                      List<String> gearboxLabels,
+                                                                      List<String> gearboxSerialNumbers) {
+        List<VesselComponentRequest> requests = new ArrayList<>();
+        addLegacyComponents(requests, VesselComponentType.ENGINE, engineLabels, engineSerialNumbers);
+        addLegacyComponents(requests, VesselComponentType.JET, jetLabels, jetSerialNumbers);
+        addLegacyComponents(requests, VesselComponentType.GEARBOX, gearboxLabels, gearboxSerialNumbers);
+        return requests;
+    }
+
+    private void addLegacyComponents(List<VesselComponentRequest> requests,
+                                     VesselComponentType type,
+                                     List<String> labels,
+                                     List<String> serialNumbers) {
+        for (int index = 0; index < labels.size(); index++) {
+            String serialNumber = index < serialNumbers.size() ? serialNumbers.get(index) : null;
+            requests.add(new VesselComponentRequest(
+                    null,
+                    type,
+                    labels.get(index),
+                    null,
+                    null,
+                    serialNumber,
+                    null,
+                    List.of()
+            ));
+        }
+    }
+
+    private Set<MaterialChecklistTemplate> resolveComponentTemplates(List<Long> templateIds) {
+        if (templateIds == null || templateIds.isEmpty()) {
+            return new LinkedHashSet<>();
+        }
+
+        Set<Long> requestedIds = new LinkedHashSet<>(templateIds);
+        List<MaterialChecklistTemplate> templates = materialChecklistTemplateRepository.findAllById(requestedIds);
+        if (templates.size() != requestedIds.size()) {
+            throw new EntityNotFoundException("Plantilla de revision no encontrada");
+        }
+        return new LinkedHashSet<>(templates);
+    }
+
+    private void applyMarineComponentRequest(MarineComponent component, MarineComponentRequest request) {
+        component.setType(request.type() == null ? VesselComponentType.OTHER : request.type());
+        component.setName(inputSanitizer.requiredText(request.name(), "El nombre del componente", 255));
+        component.setManufacturer(inputSanitizer.optionalText(request.manufacturer(), 255));
+        component.setModel(inputSanitizer.optionalText(request.model(), 255));
+        component.setTemplates(resolveComponentTemplates(request.templateIds()));
     }
 
     private List<String> normalizeEngineLabels(List<String> engineLabels, Integer engineCount) {

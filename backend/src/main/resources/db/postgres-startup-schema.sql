@@ -34,6 +34,64 @@ ALTER TABLE vessels
 ALTER TABLE vessels
     ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE;
 
+CREATE TABLE IF NOT EXISTS vessel_components (
+    id BIGSERIAL PRIMARY KEY,
+    vessel_id BIGINT NOT NULL REFERENCES vessels(id) ON DELETE CASCADE,
+    marine_component_id BIGINT,
+    type VARCHAR(30) NOT NULL,
+    label VARCHAR(255) NOT NULL,
+    manufacturer VARCHAR(255),
+    model VARCHAR(255),
+    serial_number VARCHAR(255),
+    current_hours INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS marine_components (
+    id BIGSERIAL PRIMARY KEY,
+    type VARCHAR(30) NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    manufacturer VARCHAR(255),
+    model VARCHAR(255),
+    archived BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE IF NOT EXISTS marine_component_templates (
+    component_id BIGINT NOT NULL REFERENCES marine_components(id) ON DELETE CASCADE,
+    template_id BIGINT NOT NULL REFERENCES material_checklist_templates(id) ON DELETE CASCADE,
+    PRIMARY KEY (component_id, template_id)
+);
+
+ALTER TABLE vessel_components
+    ADD COLUMN IF NOT EXISTS marine_component_id BIGINT;
+
+ALTER TABLE vessel_components
+    DROP CONSTRAINT IF EXISTS fk_vessel_components_marine_component;
+
+ALTER TABLE vessel_components
+    ADD CONSTRAINT fk_vessel_components_marine_component
+    FOREIGN KEY (marine_component_id) REFERENCES marine_components(id);
+
+CREATE TABLE IF NOT EXISTS vessel_component_templates (
+    component_id BIGINT NOT NULL REFERENCES vessel_components(id) ON DELETE CASCADE,
+    template_id BIGINT NOT NULL REFERENCES material_checklist_templates(id) ON DELETE CASCADE,
+    PRIMARY KEY (component_id, template_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_vessel_components_vessel_id
+    ON vessel_components(vessel_id);
+
+CREATE INDEX IF NOT EXISTS idx_vessel_components_marine_component_id
+    ON vessel_components(marine_component_id);
+
+CREATE INDEX IF NOT EXISTS idx_marine_components_type_archived
+    ON marine_components(type, archived);
+
+CREATE INDEX IF NOT EXISTS idx_marine_component_templates_template_id
+    ON marine_component_templates(template_id);
+
+CREATE INDEX IF NOT EXISTS idx_vessel_component_templates_template_id
+    ON vessel_component_templates(template_id);
+
 ALTER TABLE vessels
     DROP CONSTRAINT IF EXISTS vessels_registration_number_key;
 
