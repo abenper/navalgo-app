@@ -3023,6 +3023,64 @@ String _buildEngineSerialSummary(Vessel vessel) {
   return lines.join('\n');
 }
 
+List<VesselComponent> _vesselComponentsOfType(Vessel vessel, String type) {
+  return vessel.components
+      .where((component) => component.type.toUpperCase() == type)
+      .toList();
+}
+
+bool _hasText(String? value) => (value ?? '').trim().isNotEmpty;
+
+bool _hasEngineSpecs(Vessel vessel) {
+  return (vessel.engineCount ?? 0) > 0 ||
+      vessel.engineLabels.isNotEmpty ||
+      vessel.engineSerialNumbers.any(_hasText) ||
+      _vesselComponentsOfType(vessel, 'ENGINE').isNotEmpty;
+}
+
+bool _hasAssociatedSpecs({
+  required List<String> labels,
+  required List<String> serialNumbers,
+}) {
+  return labels.any(_hasText) || serialNumbers.any(_hasText);
+}
+
+bool _hasComponentSpecs(Vessel vessel, String type) {
+  return _vesselComponentsOfType(vessel, type).any((component) {
+    return _hasText(component.label) ||
+        _hasText(component.manufacturer) ||
+        _hasText(component.model) ||
+        _hasText(component.serialNumber);
+  });
+}
+
+String _buildEngineSpecSummary(Vessel vessel) {
+  final components = _vesselComponentsOfType(vessel, 'ENGINE');
+  if (components.isNotEmpty) {
+    return _buildComponentTypeSummary(components);
+  }
+  return _buildEngineSerialSummary(vessel);
+}
+
+String _buildComponentTypeSummary(List<VesselComponent> components) {
+  return components
+      .map((component) {
+        final label = component.label.trim().isNotEmpty
+            ? component.label.trim()
+            : _fleetComponentTypeLabel(component.type);
+        final serial = component.serialNumber?.trim() ?? '';
+        final details = <String>[
+          if (_hasText(component.manufacturer)) component.manufacturer!.trim(),
+          if (_hasText(component.model)) component.model!.trim(),
+        ];
+        final title = details.isEmpty
+            ? label
+            : '$label · ${details.join(' · ')}';
+        return serial.isEmpty ? title : '$title: $serial';
+      })
+      .join('\n');
+}
+
 String _buildAssociatedSerialSummary({
   required List<String> labels,
   required List<String> serialNumbers,
@@ -3202,7 +3260,8 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
                     final wideWidth = constraints.maxWidth;
 
                     Widget buildCard({
-                      required IconData icon,
+                      IconData? icon,
+                      String? iconAsset,
                       required String label,
                       required String value,
                       bool wide = false,
@@ -3211,8 +3270,110 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
                         width: wide ? wideWidth : normalWidth,
                         child: _VesselSpecCard(
                           icon: icon,
+                          iconAsset: iconAsset,
                           label: label,
                           value: value,
+                        ),
+                      );
+                    }
+
+                    final specCards = <Widget>[
+                      buildCard(
+                        icon: Icons.person_outline,
+                        label: 'Propietario',
+                        value: vessel.ownerName,
+                      ),
+                      buildCard(
+                        icon: Icons.badge_outlined,
+                        label: 'Matricula',
+                        value: _displayRegistrationNumber(
+                          vessel.registrationNumber,
+                        ),
+                      ),
+                      buildCard(
+                        icon: Icons.sailing_outlined,
+                        label: 'Modelo',
+                        value: vessel.model ?? 'No indicado',
+                      ),
+                      buildCard(
+                        icon: Icons.straighten_outlined,
+                        label: 'Eslora',
+                        value: vessel.lengthMeters == null
+                            ? 'No indicada'
+                            : '${vessel.lengthMeters!.toStringAsFixed(1)} m',
+                      ),
+                    ];
+
+                    if (_hasEngineSpecs(vessel)) {
+                      specCards.add(
+                        buildCard(
+                          iconAsset: _marineComponentIconAsset('ENGINE'),
+                          label: 'Motores',
+                          value: _buildEngineSpecSummary(vessel),
+                          wide: true,
+                        ),
+                      );
+                    }
+
+                    if (_hasComponentSpecs(vessel, 'JET') ||
+                        _hasAssociatedSpecs(
+                          labels: vessel.jetLabels,
+                          serialNumbers: vessel.jetSerialNumbers,
+                        )) {
+                      final jetComponents = _vesselComponentsOfType(
+                        vessel,
+                        'JET',
+                      );
+                      specCards.add(
+                        buildCard(
+                          iconAsset: _marineComponentIconAsset('JET'),
+                          label: 'Jets',
+                          value: jetComponents.isNotEmpty
+                              ? _buildComponentTypeSummary(jetComponents)
+                              : _buildAssociatedSerialSummary(
+                                  labels: vessel.jetLabels,
+                                  serialNumbers: vessel.jetSerialNumbers,
+                                  emptyLabel: 'No configurados',
+                                ),
+                          wide: true,
+                        ),
+                      );
+                    }
+
+                    if (_hasComponentSpecs(vessel, 'GEARBOX') ||
+                        _hasAssociatedSpecs(
+                          labels: vessel.gearboxLabels,
+                          serialNumbers: vessel.gearboxSerialNumbers,
+                        )) {
+                      final gearboxComponents = _vesselComponentsOfType(
+                        vessel,
+                        'GEARBOX',
+                      );
+                      specCards.add(
+                        buildCard(
+                          iconAsset: _marineComponentIconAsset('GEARBOX'),
+                          label: 'Reductoras',
+                          value: gearboxComponents.isNotEmpty
+                              ? _buildComponentTypeSummary(gearboxComponents)
+                              : _buildAssociatedSerialSummary(
+                                  labels: vessel.gearboxLabels,
+                                  serialNumbers: vessel.gearboxSerialNumbers,
+                                  emptyLabel: 'No configuradas',
+                                ),
+                          wide: true,
+                        ),
+                      );
+                    }
+
+                    if (_hasComponentSpecs(vessel, 'GENERATOR')) {
+                      specCards.add(
+                        buildCard(
+                          iconAsset: _marineComponentIconAsset('GENERATOR'),
+                          label: 'Generadores',
+                          value: _buildComponentTypeSummary(
+                            _vesselComponentsOfType(vessel, 'GENERATOR'),
+                          ),
+                          wide: true,
                         ),
                       );
                     }
@@ -3220,64 +3381,7 @@ class _VesselAnalyticsDialogState extends State<_VesselAnalyticsDialog> {
                     return Wrap(
                       spacing: 12,
                       runSpacing: 12,
-                      children: [
-                        buildCard(
-                          icon: Icons.person_outline,
-                          label: 'Propietario',
-                          value: vessel.ownerName,
-                        ),
-                        buildCard(
-                          icon: Icons.badge_outlined,
-                          label: 'Matricula',
-                          value: _displayRegistrationNumber(
-                            vessel.registrationNumber,
-                          ),
-                        ),
-                        buildCard(
-                          icon: Icons.sailing_outlined,
-                          label: 'Modelo',
-                          value: vessel.model ?? 'No indicado',
-                        ),
-                        buildCard(
-                          icon: Icons.straighten_outlined,
-                          label: 'Eslora',
-                          value: vessel.lengthMeters == null
-                              ? 'No indicada'
-                              : '${vessel.lengthMeters!.toStringAsFixed(1)} m',
-                        ),
-                        buildCard(
-                          icon: Icons.settings_suggest_outlined,
-                          label: 'Motores',
-                          value: '${vessel.engineCount ?? 0} - $engineSummary',
-                          wide: true,
-                        ),
-                        buildCard(
-                          icon: Icons.dialpad,
-                          label: 'Series',
-                          value: _buildEngineSerialSummary(vessel),
-                          wide: true,
-                        ),
-                        buildCard(
-                          icon: Icons.settings_input_component_outlined,
-                          label: 'Jets',
-                          value: _buildAssociatedSerialSummary(
-                            labels: vessel.jetLabels,
-                            serialNumbers: vessel.jetSerialNumbers,
-                            emptyLabel: 'No configurados',
-                          ),
-                          wide: true,
-                        ),
-                        buildCard(
-                          icon: Icons.precision_manufacturing_outlined,
-                          label: 'Reductoras',
-                          value: _buildAssociatedSerialSummary(
-                            labels: vessel.gearboxLabels,
-                            serialNumbers: vessel.gearboxSerialNumbers,
-                            emptyLabel: 'No configuradas',
-                          ),
-                          wide: true,
-                        ),
-                      ],
+                      children: specCards,
                     );
                   },
                 ),
@@ -3590,12 +3694,14 @@ class _VesselCompactStatsCard extends StatelessWidget {
 
 class _VesselSpecCard extends StatelessWidget {
   const _VesselSpecCard({
-    required this.icon,
+    this.icon,
+    this.iconAsset,
     required this.label,
     required this.value,
   });
 
-  final IconData icon;
+  final IconData? icon;
+  final String? iconAsset;
   final String label;
   final String value;
 
@@ -3625,7 +3731,22 @@ class _VesselSpecCard extends StatelessWidget {
               color: NavalgoColors.mist,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(icon, color: NavalgoColors.tide),
+            alignment: Alignment.center,
+            child: iconAsset == null
+                ? Icon(icon ?? Icons.info_outline, color: NavalgoColors.tide)
+                : Image.asset(
+                    iconAsset!,
+                    width: 30,
+                    height: 30,
+                    fit: BoxFit.contain,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Icon(
+                        icon ?? Icons.info_outline,
+                        color: NavalgoColors.tide,
+                      );
+                    },
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(

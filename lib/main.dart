@@ -305,12 +305,16 @@ class _AndroidUpdateGate extends StatefulWidget {
   State<_AndroidUpdateGate> createState() => _AndroidUpdateGateState();
 }
 
-class _AndroidUpdateGateState extends State<_AndroidUpdateGate> {
+class _AndroidUpdateGateState extends State<_AndroidUpdateGate>
+    with WidgetsBindingObserver {
   bool _checked = false;
+  bool _checking = false;
+  int? _dismissedBuildNumber;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _checked) {
         return;
@@ -320,11 +324,31 @@ class _AndroidUpdateGateState extends State<_AndroidUpdateGate> {
     });
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_checkForAndroidUpdate());
+    }
+  }
+
   Future<void> _checkForAndroidUpdate() async {
+    if (_checking) {
+      return;
+    }
+    _checking = true;
     try {
       final service = context.read<AppUpdateService>();
       final update = await service.checkAndroidUpdate();
       if (!mounted || update == null) {
+        return;
+      }
+      if (_dismissedBuildNumber == update.buildNumber) {
         return;
       }
 
@@ -354,18 +378,11 @@ class _AndroidUpdateGateState extends State<_AndroidUpdateGate> {
       );
 
       if (!mounted || shouldDownload != true) {
+        _dismissedBuildNumber = update.buildNumber;
         return;
       }
 
-      await service.downloadAndroidApk(update);
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Descargando APK en la carpeta Descargas.'),
-        ),
-      );
+      await _showAndroidDownloadDialog(service, update);
     } catch (error) {
       debugPrint('Android update check failed: $error');
       if (!mounted) {
@@ -376,7 +393,94 @@ class _AndroidUpdateGateState extends State<_AndroidUpdateGate> {
           content: Text('No se pudo descargar la actualizacion: $error'),
         ),
       );
+    } finally {
+      _checking = false;
     }
+  }
+
+  Future<void> _showAndroidDownloadDialog(
+    AppUpdateService service,
+    AndroidAppUpdate update,
+  ) async {
+    final dialogContext = appNavigatorKey.currentContext ?? context;
+    final message = ValueNotifier<String>(
+      'Preparando descarga de NavalGO ${update.versionName}...',
+    );
+    final progress = ValueNotifier<double?>(null);
+    final canClose = ValueNotifier<bool>(false);
+    StreamSubscription<AndroidUpdateDownloadEvent>? subscription;
+
+    subscription = service.downloadEvents.listen((event) {
+      message.value = event.message;
+      progress.value = event.progress;
+      if (event.isFinal) {
+        canClose.value = true;
+      }
+    });
+
+    unawaited(() async {
+      try {
+        await service.downloadAndroidApk(update);
+        await Future<void>.delayed(const Duration(seconds: 2));
+        if (!canClose.value) {
+          message.value =
+              'Descarga iniciada. Si Android no abre el instalador, revisa Descargas o pulsa abrir enlace.';
+          canClose.value = true;
+        }
+      } catch (error) {
+        message.value = 'No se pudo descargar la actualizacion: $error';
+        canClose.value = true;
+      }
+    }());
+
+    await showDialog<void>(
+      context: dialogContext,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Descargando actualizacion'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ValueListenableBuilder<String>(
+                valueListenable: message,
+                builder: (_, value, _) => Text(value),
+              ),
+              const SizedBox(height: 16),
+              ValueListenableBuilder<double?>(
+                valueListenable: progress,
+                builder: (_, value, _) {
+                  return LinearProgressIndicator(value: value);
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                unawaited(service.openAndroidApkUrl(update));
+              },
+              child: const Text('Abrir enlace'),
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: canClose,
+              builder: (_, value, _) {
+                return TextButton(
+                  onPressed: value ? () => Navigator.of(context).pop() : null,
+                  child: const Text('Cerrar'),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+
+    await subscription.cancel();
+    message.dispose();
+    progress.dispose();
+    canClose.dispose();
   }
 
   @override

@@ -17,19 +17,25 @@ import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.BufferedInputStream
 import java.io.File
+import java.io.FileOutputStream
+import java.net.HttpURLConnection
+import java.net.URL
 
 class MainActivity : FlutterActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val handledDownloadIds = mutableSetOf<Long>()
+    private var updateChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(
+        updateChannel = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             "com.example.navalgo/app_update"
-        ).setMethodCallHandler { call, result ->
+        )
+        updateChannel?.setMethodCallHandler { call, result ->
             when (call.method) {
                 "downloadApk" -> {
                     val url = call.argument<String>("url")
@@ -37,6 +43,10 @@ class MainActivity : FlutterActivity() {
                     val title = call.argument<String>("title") ?: "NavalGO"
 
                     if (url.isNullOrBlank()) {
+                        sendDownloadStatus(
+                            "failed",
+                            "La URL de descarga de la actualizacion no es valida"
+                        )
                         result.error("invalid_url", "La URL de descarga no es valida", null)
                         return@setMethodCallHandler
                     }
@@ -47,6 +57,10 @@ class MainActivity : FlutterActivity() {
                             .ifBlank { "navalgo-android.apk" }
                         val downloadsDir = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                         if (downloadsDir == null) {
+                            sendDownloadStatus(
+                                "failed",
+                                "No se pudo acceder a la carpeta de descargas"
+                            )
                             result.error(
                                 "download_failed",
                                 "No se pudo acceder a la carpeta de descargas",
@@ -60,30 +74,20 @@ class MainActivity : FlutterActivity() {
                             apkFile.delete()
                         }
 
-                        val request = DownloadManager.Request(Uri.parse(url))
-                            .setTitle(title)
-                            .setDescription("Descargando actualizacion de NavalGO")
-                            .setMimeType("application/vnd.android.package-archive")
-                            .setNotificationVisibility(
-                                DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED
-                            )
-                            .setAllowedOverMetered(true)
-                            .setAllowedOverRoaming(true)
-                            .setDestinationUri(Uri.fromFile(apkFile))
+                        sendDownloadStatus("queued", "Preparando descarga de NavalGO")
 
-                        val downloadManager = getSystemService(
-                            Context.DOWNLOAD_SERVICE
-                        ) as DownloadManager
-                        val downloadId = downloadManager.enqueue(request)
-                        registerApkDownloadReceiver(downloadManager, downloadId, apkFile, url)
-                        watchApkDownload(downloadManager, downloadId, apkFile, url)
+                        downloadApkDirectly(url, apkFile, title)
                         Toast.makeText(
                             this,
                             "Descargando actualizacion de NavalGO",
                             Toast.LENGTH_LONG
                         ).show()
-                        result.success(mapOf("downloadId" to downloadId))
+                        result.success(mapOf("started" to true))
                     } catch (error: Exception) {
+                        sendDownloadStatus(
+                            "failed",
+                            error.message ?: "No se pudo iniciar la descarga"
+                        )
                         result.error(
                             "download_failed",
                             error.message ?: "No se pudo iniciar la descarga",
@@ -93,6 +97,106 @@ class MainActivity : FlutterActivity() {
                 }
                 else -> result.notImplemented()
             }
+        }
+    }
+
+    private fun downloadApkDirectly(
+        sourceUrl: String,
+        apkFile: File,
+        title: String
+    ) {
+        Thread {
+            var connection: HttpURLConnection? = null
+            try {
+                sendDownloadStatus("downloading", "Conectando con la descarga de NavalGO")
+                connection = (URL(sourceUrl).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    instanceFollowRedirects = true
+                    requestMethod = "GET"
+                    setRequestProperty("User-Agent", "NavalGO Android updater")
+                    connect()
+                }
+
+                val statusCode = connection.responseCode
+                if (statusCode !in 200..299) {
+                    throw IllegalStateException("Servidor devolvio HTTP $statusCode")
+                }
+
+                val totalBytes = connection.contentLengthLong
+                var downloadedBytes = 0L
+                var lastProgressSentAt = 0L
+
+                BufferedInputStream(connection.inputStream).use { input ->
+                    FileOutputStream(apkFile).use { output ->
+                        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read == -1) {
+                                break
+                            }
+                            output.write(buffer, 0, read)
+                            downloadedBytes += read.toLong()
+
+                            val now = System.currentTimeMillis()
+                            if (now - lastProgressSentAt > 500L) {
+                                lastProgressSentAt = now
+                                val progress = if (totalBytes > 0L) {
+                                    downloadedBytes.toDouble() / totalBytes.toDouble()
+                                } else {
+                                    null
+                                }
+                                sendDownloadStatus(
+                                    "downloading",
+                                    "Descargando $title",
+                                    progress
+                                )
+                            }
+                        }
+                        output.flush()
+                    }
+                }
+
+                if (!apkFile.exists() || apkFile.length() <= 0L) {
+                    throw IllegalStateException("La APK descargada esta vacia")
+                }
+
+                sendDownloadStatus("success", "APK descargada. Abriendo instalador")
+                mainHandler.post {
+                    openApkInstaller(this, apkFile, sourceUrl)
+                }
+            } catch (error: Exception) {
+                Log.e("NavalGOUpdate", "Descarga directa APK fallida", error)
+                if (apkFile.exists()) {
+                    apkFile.delete()
+                }
+                sendDownloadStatus(
+                    "failed",
+                    error.message ?: "No se pudo descargar la actualizacion"
+                )
+                mainHandler.post {
+                    openApkInBrowser(sourceUrl)
+                }
+            } finally {
+                connection?.disconnect()
+            }
+        }.start()
+    }
+
+    private fun sendDownloadStatus(
+        status: String,
+        message: String,
+        progress: Double? = null
+    ) {
+        mainHandler.post {
+            val payload = mutableMapOf<String, Any>(
+                "status" to status,
+                "message" to message
+            )
+            if (progress != null) {
+                payload["progress"] = progress
+            }
+            updateChannel?.invokeMethod("downloadStatus", payload)
         }
     }
 
@@ -162,6 +266,32 @@ class MainActivity : FlutterActivity() {
             if (status != DownloadManager.STATUS_SUCCESSFUL &&
                 status != DownloadManager.STATUS_FAILED
             ) {
+                if (status == DownloadManager.STATUS_RUNNING ||
+                    status == DownloadManager.STATUS_PENDING ||
+                    status == DownloadManager.STATUS_PAUSED
+                ) {
+                    val downloaded = cursor.getLong(
+                        cursor.getColumnIndexOrThrow(
+                            DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR
+                        )
+                    )
+                    val total = cursor.getLong(
+                        cursor.getColumnIndexOrThrow(
+                            DownloadManager.COLUMN_TOTAL_SIZE_BYTES
+                        )
+                    )
+                    val progress = if (total > 0L) {
+                        downloaded.toDouble() / total.toDouble()
+                    } else {
+                        null
+                    }
+                    val message = when (status) {
+                        DownloadManager.STATUS_PENDING -> "Esperando para descargar NavalGO"
+                        DownloadManager.STATUS_PAUSED -> "Descarga pausada por Android"
+                        else -> "Descargando actualizacion de NavalGO"
+                    }
+                    sendDownloadStatus("downloading", message, progress)
+                }
                 return false
             }
 
@@ -171,12 +301,17 @@ class MainActivity : FlutterActivity() {
 
             if (status == DownloadManager.STATUS_SUCCESSFUL && apkFile.exists()) {
                 Log.i("NavalGOUpdate", "APK descargado: ${apkFile.absolutePath}")
+                sendDownloadStatus("success", "APK descargada. Abriendo instalador")
                 openApkInstaller(this, apkFile, sourceUrl)
             } else {
                 val reason = cursor.getInt(
                     cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)
                 )
                 Log.w("NavalGOUpdate", "Descarga APK fallida. reason=$reason")
+                sendDownloadStatus(
+                    "failed",
+                    "La descarga de NavalGO fallo. Codigo Android: $reason"
+                )
                 Toast.makeText(
                     this,
                     "La descarga de NavalGO fallo ($reason)",
@@ -193,6 +328,10 @@ class MainActivity : FlutterActivity() {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
                 !context.packageManager.canRequestPackageInstalls()
             ) {
+                sendDownloadStatus(
+                    "permission_required",
+                    "Permite instalar apps desconocidas y pulsa descargar de nuevo"
+                )
                 Toast.makeText(
                     context,
                     "Permite instalar actualizaciones de NavalGO y pulsa descargar de nuevo",
@@ -219,9 +358,14 @@ class MainActivity : FlutterActivity() {
                 putExtra(Intent.EXTRA_RETURN_RESULT, true)
             }
             Log.i("NavalGOUpdate", "Abriendo instalador APK")
+            sendDownloadStatus("installer_opened", "Instalador de NavalGO abierto")
             context.startActivity(installIntent)
         } catch (error: Exception) {
             Log.e("NavalGOUpdate", "No se pudo abrir instalador", error)
+            sendDownloadStatus(
+                "failed",
+                error.message ?: "No se pudo abrir el instalador de NavalGO"
+            )
             Toast.makeText(
                 context,
                 error.message ?: "No se pudo abrir el instalador de NavalGO",
@@ -236,9 +380,14 @@ class MainActivity : FlutterActivity() {
             val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(sourceUrl)).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
+            sendDownloadStatus("browser_opened", "Abriendo descarga en el navegador")
             startActivity(browserIntent)
         } catch (error: Exception) {
             Log.e("NavalGOUpdate", "No se pudo abrir URL APK", error)
+            sendDownloadStatus(
+                "failed",
+                error.message ?: "No se pudo abrir la descarga en el navegador"
+            )
         }
     }
 }

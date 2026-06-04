@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -6,6 +7,34 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+class AndroidUpdateDownloadEvent {
+  const AndroidUpdateDownloadEvent({
+    required this.status,
+    required this.message,
+    this.progress,
+  });
+
+  final String status;
+  final String message;
+  final double? progress;
+
+  bool get isFinal =>
+      status == 'success' ||
+      status == 'failed' ||
+      status == 'installer_opened' ||
+      status == 'permission_required' ||
+      status == 'browser_opened';
+
+  factory AndroidUpdateDownloadEvent.fromMap(Map<dynamic, dynamic> map) {
+    final rawProgress = map['progress'];
+    return AndroidUpdateDownloadEvent(
+      status: map['status']?.toString() ?? 'info',
+      message: map['message']?.toString() ?? 'Actualizando NavalGO',
+      progress: rawProgress is num ? rawProgress.toDouble() : null,
+    );
+  }
+}
 
 class AndroidAppUpdate {
   const AndroidAppUpdate({
@@ -25,7 +54,17 @@ class AndroidAppUpdate {
 
 class AppUpdateService {
   AppUpdateService({http.Client? httpClient})
-    : _httpClient = httpClient ?? http.Client();
+    : _httpClient = httpClient ?? http.Client() {
+    _channel.setMethodCallHandler((call) async {
+      if (call.method != 'downloadStatus') {
+        return;
+      }
+      final arguments = call.arguments;
+      if (arguments is Map) {
+        _downloadEvents.add(AndroidUpdateDownloadEvent.fromMap(arguments));
+      }
+    });
+  }
 
   static const String versionUrl =
       'https://naval-go.com/downloads/navalgo-android-version.json';
@@ -34,6 +73,11 @@ class AppUpdateService {
   );
 
   final http.Client _httpClient;
+  final StreamController<AndroidUpdateDownloadEvent> _downloadEvents =
+      StreamController<AndroidUpdateDownloadEvent>.broadcast();
+
+  Stream<AndroidUpdateDownloadEvent> get downloadEvents =>
+      _downloadEvents.stream;
 
   Future<AndroidAppUpdate?> checkAndroidUpdate() async {
     if (kIsWeb || !Platform.isAndroid) {
@@ -44,8 +88,14 @@ class AppUpdateService {
     final currentBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
     final currentVersion = packageInfo.version;
 
+    final versionUri = Uri.parse(versionUrl).replace(
+      queryParameters: <String, String>{
+        't': DateTime.now().millisecondsSinceEpoch.toString(),
+      },
+    );
+
     final response = await _httpClient
-        .get(Uri.parse(versionUrl))
+        .get(versionUri)
         .timeout(const Duration(seconds: 8));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return null;
@@ -89,21 +139,61 @@ class AppUpdateService {
       return;
     }
 
+    _downloadEvents.add(
+      const AndroidUpdateDownloadEvent(
+        status: 'queued',
+        message: 'Preparando descarga de NavalGO',
+      ),
+    );
+
     try {
-      await _channel.invokeMethod<Object?>('downloadApk', <String, Object?>{
-        'url': update.apkUrl,
-        'fileName': update.fileName,
-        'title': 'NavalGO ${update.versionName}',
-      });
-    } on PlatformException {
+      await _channel
+          .invokeMethod<Object?>('downloadApk', <String, Object?>{
+            'url': update.apkUrl,
+            'fileName': update.fileName,
+            'title': 'NavalGO ${update.versionName}',
+          })
+          .timeout(const Duration(seconds: 8));
+    } on PlatformException catch (error) {
+      _downloadEvents.add(
+        AndroidUpdateDownloadEvent(
+          status: 'failed',
+          message:
+              error.message ?? 'Android no pudo iniciar la descarga interna',
+        ),
+      );
       await _openApkUrl(update.apkUrl);
     } on MissingPluginException {
+      _downloadEvents.add(
+        const AndroidUpdateDownloadEvent(
+          status: 'failed',
+          message: 'El instalador interno no esta disponible',
+        ),
+      );
+      await _openApkUrl(update.apkUrl);
+    } on TimeoutException {
+      _downloadEvents.add(
+        const AndroidUpdateDownloadEvent(
+          status: 'failed',
+          message: 'Android no respondio al iniciar la descarga interna',
+        ),
+      );
       await _openApkUrl(update.apkUrl);
     }
   }
 
+  Future<void> openAndroidApkUrl(AndroidAppUpdate update) {
+    return _openApkUrl(update.apkUrl);
+  }
+
   Future<void> _openApkUrl(String apkUrl) async {
     final uri = Uri.parse(apkUrl);
+    _downloadEvents.add(
+      const AndroidUpdateDownloadEvent(
+        status: 'browser_opened',
+        message: 'Abriendo descarga en el navegador',
+      ),
+    );
     final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!opened) {
       throw PlatformException(

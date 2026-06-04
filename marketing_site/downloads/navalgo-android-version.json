@@ -1,7 +1,7 @@
 {
-  "versionName": "1.0.6",
-  "buildNumber": 8,
+  "versionName": "1.0.12",
+  "buildNumber": 14,
   "apkUrl": "https://naval-go.com/downloads/navalgo-android.apk",
   "fileName": "navalgo-android.apk",
-  "releaseNotes": "Correccion de descarga e instalacion de actualizaciones Android."
+  "releaseNotes": "Descarga de actualizaciones corregida con progreso visible y fallback al navegador."
 }
