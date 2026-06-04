@@ -21,7 +21,7 @@ public record TimeEntryDto(
                 entry.getWorker().getId(),
                 entry.getWorker().getFullName(),
                 entry.getClockIn(),
-                entry.getClockOut(),
+                TimeEntryClockOuts.effectiveClockOut(entry),
                 entry.getWorkSite(),
                 entry.getPlannedClockOut(),
                 entry.getAutoClosedAt(),

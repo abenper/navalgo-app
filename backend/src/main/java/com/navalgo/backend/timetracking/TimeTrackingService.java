@@ -39,6 +39,8 @@ import java.util.EnumSet;
 @Transactional(readOnly = true)
 public class TimeTrackingService {
 
+    private static final ZoneId BUSINESS_ZONE = TimeEntryClockOuts.BUSINESS_ZONE;
+
     private final LeaveRequestRepository leaveRequestRepository;
     private final TimeEntryRepository timeEntryRepository;
     private final WorkOrderRepository workOrderRepository;
@@ -152,7 +154,7 @@ public class TimeTrackingService {
     }
 
     public List<WorkerTimeTrackingStatsDto> getWorkerStats() {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         LocalDate today = LocalDate.now(zoneId);
         Instant now = Instant.now();
         YearMonth currentMonth = YearMonth.from(today);
@@ -195,7 +197,7 @@ public class TimeTrackingService {
     }
 
     public WorkerTimeTrackingInsightDto getWorkerInsight(Long workerId) {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         LocalDate today = LocalDate.now(zoneId);
         Instant now = Instant.now();
         YearMonth currentMonth = YearMonth.from(today);
@@ -296,7 +298,7 @@ public class TimeTrackingService {
     }
 
     public TodayClockedWorkersSummaryDto getTodaySummary() {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         LocalDate today = LocalDate.now(zoneId);
         Instant start = today.atStartOfDay(zoneId).toInstant();
         Instant end = today.plusDays(1).atStartOfDay(zoneId).toInstant();
@@ -341,7 +343,7 @@ public class TimeTrackingService {
 
     @Transactional
     public TimeEntryDto clockInNowFromWhatsApp(Long workerId, TimeEntryWorkSite workSite) {
-        return clockInFromWhatsApp(workerId, LocalTime.now(ZoneId.systemDefault()), workSite);
+        return clockInFromWhatsApp(workerId, LocalTime.now(BUSINESS_ZONE), workSite);
     }
 
     @Transactional
@@ -355,7 +357,7 @@ public class TimeTrackingService {
             throw new IllegalArgumentException("Debes indicar una hora valida");
         }
 
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         Instant now = Instant.now();
         Instant reportedClockIn = LocalDate.now(zoneId).atTime(reportedTime).atZone(zoneId).toInstant();
         if (reportedClockIn.isAfter(now)) {
@@ -390,7 +392,7 @@ public class TimeTrackingService {
     }
 
     public List<TimeEntry> findEntriesForDate(Long workerId, LocalDate workDate) {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         Instant start = workDate.atStartOfDay(zoneId).toInstant();
         Instant end = workDate.plusDays(1).atStartOfDay(zoneId).toInstant();
         return timeEntryRepository.findByWorkerIdAndClockInGreaterThanEqualAndClockInLessThanOrderByClockInDesc(
@@ -435,7 +437,7 @@ public class TimeTrackingService {
             }
 
             long minutes = durationMinutes(entry, now);
-            LocalDate workDate = entry.getClockIn().atZone(ZoneId.systemDefault()).toLocalDate();
+            LocalDate workDate = entry.getClockIn().atZone(BUSINESS_ZONE).toLocalDate();
 
             if (workDate.equals(today)) {
                 workedMinutesToday += minutes;
@@ -484,7 +486,7 @@ public class TimeTrackingService {
         List<WorkOrder> workOrders = workOrderRepository.findByAssignedWorkersIdOrderByCreatedAtDesc(workerId).stream()
                 .filter(order -> order.getStatus() == WorkOrderStatus.DONE)
                 .toList();
-        LocalDate today = LocalDate.now(ZoneId.systemDefault());
+        LocalDate today = LocalDate.now(BUSINESS_ZONE);
         YearMonth month = YearMonth.from(today);
 
         return List.of(
@@ -500,7 +502,7 @@ public class TimeTrackingService {
                                                                          Instant now,
                                                                          java.util.function.Predicate<LocalDate> matchesDate) {
         long workedMinutes = entries.stream()
-                .filter(entry -> matchesDate.test(entry.getClockIn().atZone(ZoneId.systemDefault()).toLocalDate()))
+                .filter(entry -> matchesDate.test(entry.getClockIn().atZone(BUSINESS_ZONE).toLocalDate()))
                 .mapToLong(entry -> durationMinutes(entry, now))
                 .sum();
 
@@ -533,7 +535,7 @@ public class TimeTrackingService {
                 : workOrder.getSignedAt() != null
                 ? workOrder.getSignedAt()
                 : workOrder.getCreatedAt();
-        return resolvedAt.atZone(ZoneId.systemDefault()).toLocalDate();
+        return resolvedAt.atZone(BUSINESS_ZONE).toLocalDate();
     }
 
     private double calculateThroughputScoreBasis(Long workerId, Instant now) {
@@ -601,7 +603,7 @@ public class TimeTrackingService {
             return 0.0;
         }
 
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         double totalScore = 0.0;
         long evaluatedDays = 0;
         for (LocalDate date = start; date.isBefore(endExclusive); date = date.plusDays(1)) {
@@ -684,7 +686,8 @@ public class TimeTrackingService {
     }
 
     private long durationMinutes(TimeEntry entry, Instant now) {
-        Instant end = entry.getClockOut() != null ? entry.getClockOut() : now;
+        Instant effectiveClockOut = TimeEntryClockOuts.effectiveClockOut(entry);
+        Instant end = effectiveClockOut != null ? effectiveClockOut : now;
         if (end.isBefore(entry.getClockIn())) {
             return 0;
         }
@@ -700,8 +703,8 @@ public class TimeTrackingService {
             throw new IllegalArgumentException("La hora prevista de cierre debe ser posterior al inicio");
         }
 
-        LocalDate clockInDate = ZonedDateTime.ofInstant(clockIn, ZoneId.systemDefault()).toLocalDate();
-        LocalDate plannedDate = ZonedDateTime.ofInstant(plannedClockOut, ZoneId.systemDefault()).toLocalDate();
+        LocalDate clockInDate = ZonedDateTime.ofInstant(clockIn, BUSINESS_ZONE).toLocalDate();
+        LocalDate plannedDate = ZonedDateTime.ofInstant(plannedClockOut, BUSINESS_ZONE).toLocalDate();
         if (!plannedDate.equals(clockInDate)) {
             throw new IllegalArgumentException("La hora prevista de cierre debe estar dentro del mismo dia");
         }

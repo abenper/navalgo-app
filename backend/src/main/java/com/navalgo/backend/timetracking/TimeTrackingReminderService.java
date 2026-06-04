@@ -27,6 +27,7 @@ import java.util.List;
 public class TimeTrackingReminderService {
 
     private static final Logger log = LoggerFactory.getLogger(TimeTrackingReminderService.class);
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Madrid");
     private static final LocalTime FORCE_CLOSE_DEADLINE = LocalTime.of(23, 59);
     private static final LocalTime FORCE_CLOSE_RECORDED_CLOCK_OUT = LocalTime.of(15, 0);
 
@@ -54,7 +55,7 @@ public class TimeTrackingReminderService {
     @Transactional
     @Scheduled(cron = "${app.scheduling.time-tracking-missing-clock-in-cron:0 0 8 * * MON-FRI}")
     public void sendMissingClockInReminders() {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         LocalDate today = LocalDate.now(zoneId);
         List<Worker> workers = workerRepository.findByRoleInAndActiveTrueOrderByFullNameAsc(
                 EnumSet.of(Role.WORKER, Role.COMERCIAL)
@@ -100,7 +101,7 @@ public class TimeTrackingReminderService {
     @Transactional
     @Scheduled(cron = "${app.scheduling.time-tracking-open-shift-reminder-cron:0 0 16 * * MON-FRI}")
     public void sendOpenShiftReminders() {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         LocalDate today = LocalDate.now(zoneId);
         Instant now = Instant.now();
         List<TimeEntry> entries = timeEntryRepository.findByClockOutIsNullOrderByClockInAsc();
@@ -162,7 +163,7 @@ public class TimeTrackingReminderService {
     }
 
     private void handleEndOfDayForceClosures(Instant now) {
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = BUSINESS_ZONE;
         List<TimeEntry> entries = timeEntryRepository.findByClockOutIsNullOrderByClockInAsc();
 
         for (TimeEntry entry : entries) {
