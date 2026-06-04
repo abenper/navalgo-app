@@ -220,6 +220,41 @@ class VesselComponent {
   }
 }
 
+class MarineComponentInstallation {
+  const MarineComponentInstallation({
+    required this.vesselId,
+    required this.vesselName,
+    required this.ownerId,
+    required this.ownerName,
+    required this.vesselComponentId,
+    required this.label,
+    this.serialNumber,
+    this.currentHours,
+  });
+
+  final int vesselId;
+  final String vesselName;
+  final int ownerId;
+  final String ownerName;
+  final int vesselComponentId;
+  final String label;
+  final String? serialNumber;
+  final int? currentHours;
+
+  factory MarineComponentInstallation.fromJson(Map<String, dynamic> json) {
+    return MarineComponentInstallation(
+      vesselId: (json['vesselId'] as num?)?.toInt() ?? 0,
+      vesselName: json['vesselName']?.toString() ?? 'Embarcación',
+      ownerId: (json['ownerId'] as num?)?.toInt() ?? 0,
+      ownerName: json['ownerName']?.toString() ?? '',
+      vesselComponentId: (json['vesselComponentId'] as num?)?.toInt() ?? 0,
+      label: json['label']?.toString() ?? 'Componente',
+      serialNumber: json['serialNumber']?.toString(),
+      currentHours: (json['currentHours'] as num?)?.toInt(),
+    );
+  }
+}
+
 class MarineComponent {
   const MarineComponent({
     required this.id,
@@ -230,6 +265,7 @@ class MarineComponent {
     required this.templateIds,
     required this.templateNames,
     required this.installedCount,
+    required this.installations,
   });
 
   final int id;
@@ -240,6 +276,7 @@ class MarineComponent {
   final List<int> templateIds;
   final List<String> templateNames;
   final int installedCount;
+  final List<MarineComponentInstallation> installations;
 
   String get displayName {
     final parts = <String>[
@@ -265,6 +302,11 @@ class MarineComponent {
               .map((item) => item.toString())
               .toList(),
       installedCount: (json['installedCount'] as num?)?.toInt() ?? 0,
+      installations:
+          (json['installations'] as List<dynamic>? ?? const <dynamic>[])
+              .whereType<Map<String, dynamic>>()
+              .map(MarineComponentInstallation.fromJson)
+              .toList(),
     );
   }
 }

@@ -5,9 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/owner.dart';
 import '../../models/vessel.dart';
-import '../../models/work_order.dart';
 import '../../services/fleet_service.dart';
-import '../../services/material_checklist_template_service.dart';
 import '../../services/work_order_service.dart';
 import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
@@ -1038,7 +1036,6 @@ class _OwnerDialogState extends State<_OwnerDialog> {
             if (form == null || !form.validate()) {
               return;
             }
-
             Navigator.pop(
               context,
               _OwnerInput(
@@ -1221,55 +1218,6 @@ class _VesselInput {
   final int ownerId;
 }
 
-class _VesselExtraComponentDraft {
-  _VesselExtraComponentDraft({
-    this.componentId,
-    this.type = 'OTHER',
-    String label = '',
-    String manufacturer = '',
-    String model = '',
-    String serialNumber = '',
-    int? currentHours,
-    Set<int>? templateIds,
-  }) : labelCtrl = TextEditingController(text: label),
-       manufacturerCtrl = TextEditingController(text: manufacturer),
-       modelCtrl = TextEditingController(text: model),
-       serialCtrl = TextEditingController(text: serialNumber),
-       currentHoursCtrl = TextEditingController(
-         text: currentHours?.toString() ?? '',
-       ),
-       templateIds = templateIds ?? <int>{};
-
-  String type;
-  final int? componentId;
-  final TextEditingController labelCtrl;
-  final TextEditingController manufacturerCtrl;
-  final TextEditingController modelCtrl;
-  final TextEditingController serialCtrl;
-  final TextEditingController currentHoursCtrl;
-  final Set<int> templateIds;
-
-  void dispose() {
-    labelCtrl.dispose();
-    manufacturerCtrl.dispose();
-    modelCtrl.dispose();
-    serialCtrl.dispose();
-    currentHoursCtrl.dispose();
-  }
-}
-
-class _ConfiguredVesselComponent {
-  const _ConfiguredVesselComponent({
-    required this.type,
-    required this.label,
-    this.serialNumber,
-  });
-
-  final String type;
-  final String label;
-  final String? serialNumber;
-}
-
 class _VesselDialog extends StatefulWidget {
   const _VesselDialog({required this.owners, this.initialVessel});
 
@@ -1291,6 +1239,7 @@ class _VesselDialogState extends State<_VesselDialog> {
   List<String> _enginePositions = <String>[];
   final List<TextEditingController> _engineSerialCtrls =
       <TextEditingController>[];
+  List<int?> _engineComponentIds = <int?>[];
   bool _hasJets = false;
   bool _hasGearboxes = false;
   bool _hasGenerators = false;
@@ -1298,17 +1247,15 @@ class _VesselDialogState extends State<_VesselDialog> {
   final List<TextEditingController> _jetSerialCtrls = <TextEditingController>[];
   final List<TextEditingController> _gearboxSerialCtrls =
       <TextEditingController>[];
+  List<int?> _jetComponentIds = <int?>[];
+  List<int?> _gearboxComponentIds = <int?>[];
   late final TextEditingController _generatorCountCtrl;
   final List<TextEditingController> _generatorSerialCtrls =
       <TextEditingController>[];
-  final Map<String, Set<int>> _templateIdsByComponentKey = <String, Set<int>>{};
-  final List<_VesselExtraComponentDraft> _extraComponents =
-      <_VesselExtraComponentDraft>[];
+  List<int?> _generatorComponentIds = <int?>[];
   List<MarineComponent> _catalogComponents = const <MarineComponent>[];
-  List<MaterialChecklistTemplate> _materialTemplates =
-      const <MaterialChecklistTemplate>[];
-  bool _loadingTemplates = false;
-  String? _templateLoadError;
+  bool _loadingComponents = false;
+  String? _componentLoadError;
 
   @override
   void initState() {
@@ -1367,7 +1314,7 @@ class _VesselDialogState extends State<_VesselDialog> {
               .toList() ??
           const <String>[],
     );
-    Future<void>.microtask(_loadMaterialTemplates);
+    Future<void>.microtask(_loadCatalogComponents);
   }
 
   @override
@@ -1389,9 +1336,6 @@ class _VesselDialogState extends State<_VesselDialog> {
     }
     for (final controller in _generatorSerialCtrls) {
       controller.dispose();
-    }
-    for (final component in _extraComponents) {
-      component.dispose();
     }
     super.dispose();
   }
@@ -1417,6 +1361,9 @@ class _VesselDialogState extends State<_VesselDialog> {
           onPressed: () {
             final form = _formKey.currentState;
             if (form == null || !form.validate()) {
+              return;
+            }
+            if (!_validateSelectedComponents()) {
               return;
             }
 
@@ -1601,6 +1548,20 @@ class _VesselDialogState extends State<_VesselDialog> {
                                 },
                               ),
                               const SizedBox(height: 10),
+                              _buildCatalogComponentSelector(
+                                type: 'ENGINE',
+                                label: 'Modelo del motor',
+                                selectedComponentId:
+                                    index < _engineComponentIds.length
+                                    ? _engineComponentIds[index]
+                                    : null,
+                                onChanged: (component) {
+                                  setState(() {
+                                    _engineComponentIds[index] = component.id;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 10),
                               TextFormField(
                                 controller: _engineSerialCtrls[index],
                                 textInputAction: TextInputAction.next,
@@ -1626,6 +1587,7 @@ class _VesselDialogState extends State<_VesselDialog> {
             const SizedBox(height: 14),
             _buildAssociatedComponentSection(
               title: 'Jets',
+              type: 'JET',
               value: _hasJets,
               onChanged: _associatedComponentLabels.isEmpty
                   ? null
@@ -1635,6 +1597,12 @@ class _VesselDialogState extends State<_VesselDialog> {
                       });
                     },
               serialControllers: _jetSerialCtrls,
+              componentIds: _jetComponentIds,
+              onComponentChanged: (index, component) {
+                setState(() {
+                  _jetComponentIds[index] = component.id;
+                });
+              },
               serialFieldLabel: (index) => _associatedSerialFieldLabel(
                 componentName: 'jet',
                 engineLabel: _associatedComponentLabels[index],
@@ -1643,6 +1611,7 @@ class _VesselDialogState extends State<_VesselDialog> {
             const SizedBox(height: 14),
             _buildAssociatedComponentSection(
               title: 'Reductoras',
+              type: 'GEARBOX',
               value: _hasGearboxes,
               onChanged: _associatedComponentLabels.isEmpty
                   ? null
@@ -1652,6 +1621,12 @@ class _VesselDialogState extends State<_VesselDialog> {
                       });
                     },
               serialControllers: _gearboxSerialCtrls,
+              componentIds: _gearboxComponentIds,
+              onComponentChanged: (index, component) {
+                setState(() {
+                  _gearboxComponentIds[index] = component.id;
+                });
+              },
               serialFieldLabel: (index) => _associatedSerialFieldLabel(
                 componentName: 'reductora',
                 engineLabel: _associatedComponentLabels[index],
@@ -1659,8 +1634,6 @@ class _VesselDialogState extends State<_VesselDialog> {
             ),
             const SizedBox(height: 14),
             _buildGeneratorSection(),
-            const SizedBox(height: 14),
-            _buildComponentTemplateSection(),
             const SizedBox(height: 14),
             NavalgoFormFieldBlock(
               label: 'Eslora (m)',
@@ -1755,12 +1728,18 @@ class _VesselDialogState extends State<_VesselDialog> {
     int count, {
     List<String>? positions,
     List<String>? serialNumbers,
+    List<int?>? componentIds,
   }) {
     final safeCount = count < 0 ? 0 : count;
     setState(() {
+      final previousComponentIds = List<int?>.of(_engineComponentIds);
       _enginePositions = _resizeEnginePositions(
         safeCount,
         positions ?? _enginePositions,
+      );
+      _engineComponentIds = _resizeComponentIds(
+        safeCount,
+        componentIds ?? previousComponentIds,
       );
 
       final normalizedSerials = _resizeEngineSerialNumbers(
@@ -1810,6 +1789,16 @@ class _VesselDialogState extends State<_VesselDialog> {
     return <String>[
       ...normalized,
       ...List<String>.filled(count - normalized.length, ''),
+    ];
+  }
+
+  List<int?> _resizeComponentIds(int count, List<int?> componentIds) {
+    if (componentIds.length >= count) {
+      return componentIds.take(count).toList();
+    }
+    return <int?>[
+      ...componentIds,
+      ...List<int?>.filled(count - componentIds.length, null),
     ];
   }
 
@@ -1892,6 +1881,11 @@ class _VesselDialogState extends State<_VesselDialog> {
       previousLabels,
       _gearboxSerialCtrls,
     );
+    final jetComponentIds = _mapComponentIds(previousLabels, _jetComponentIds);
+    final gearboxComponentIds = _mapComponentIds(
+      previousLabels,
+      _gearboxComponentIds,
+    );
 
     _associatedComponentLabels = updatedLabels;
     _syncAssociatedComponentControllers(
@@ -1899,10 +1893,15 @@ class _VesselDialogState extends State<_VesselDialog> {
       labels: updatedLabels,
       valuesByLabel: jetValues,
     );
+    _jetComponentIds = _componentIdsFromLabels(updatedLabels, jetComponentIds);
     _syncAssociatedComponentControllers(
       _gearboxSerialCtrls,
       labels: updatedLabels,
       valuesByLabel: gearboxValues,
+    );
+    _gearboxComponentIds = _componentIdsFromLabels(
+      updatedLabels,
+      gearboxComponentIds,
     );
 
     if (updatedLabels.isEmpty) {
@@ -1924,6 +1923,21 @@ class _VesselDialogState extends State<_VesselDialog> {
       values[labels[index]] = controllers[index].text.trim();
     }
     return values;
+  }
+
+  Map<String, int?> _mapComponentIds(List<String> labels, List<int?> ids) {
+    final values = <String, int?>{};
+    for (var index = 0; index < labels.length && index < ids.length; index++) {
+      values[labels[index]] = ids[index];
+    }
+    return values;
+  }
+
+  List<int?> _componentIdsFromLabels(
+    List<String> labels,
+    Map<String, int?> valuesByLabel,
+  ) {
+    return labels.map((label) => valuesByLabel[label]).toList();
   }
 
   void _syncAssociatedComponentControllers(
@@ -1951,8 +1965,15 @@ class _VesselDialogState extends State<_VesselDialog> {
     }
   }
 
-  void _syncGeneratorSerialControllers({List<String>? serialNumbers}) {
+  void _syncGeneratorSerialControllers({
+    List<String>? serialNumbers,
+    List<int?>? componentIds,
+  }) {
     final count = _generatorCount;
+    _generatorComponentIds = _resizeComponentIds(
+      count,
+      componentIds ?? _generatorComponentIds,
+    );
     final normalizedSerials = _resizeEngineSerialNumbers(
       count,
       serialNumbers ?? _generatorSerialCtrls.map((ctrl) => ctrl.text).toList(),
@@ -1973,38 +1994,36 @@ class _VesselDialogState extends State<_VesselDialog> {
     }
   }
 
-  Future<void> _loadMaterialTemplates() async {
+  Future<void> _loadCatalogComponents() async {
     final token = context.read<SessionViewModel>().token;
     if (token == null) {
       return;
     }
     setState(() {
-      _loadingTemplates = true;
-      _templateLoadError = null;
+      _loadingComponents = true;
+      _componentLoadError = null;
     });
     try {
-      final results = await Future.wait([
-        context.read<MaterialChecklistTemplateService>().getTemplates(token),
-        context.read<FleetService>().getComponents(token),
-      ]);
+      final components = await context.read<FleetService>().getComponents(
+        token,
+      );
       if (!mounted) {
         return;
       }
       setState(() {
-        _materialTemplates = results[0] as List<MaterialChecklistTemplate>;
-        _catalogComponents = results[1] as List<MarineComponent>;
+        _catalogComponents = components;
       });
     } catch (e) {
       if (!mounted) {
         return;
       }
       setState(() {
-        _templateLoadError = '$e';
+        _componentLoadError = '$e';
       });
     } finally {
       if (mounted) {
         setState(() {
-          _loadingTemplates = false;
+          _loadingComponents = false;
         });
       }
     }
@@ -2014,49 +2033,64 @@ class _VesselDialogState extends State<_VesselDialog> {
     if (initial == null) {
       return;
     }
+    final engineLabels = _buildEngineLabels(_enginePositions);
+    _engineComponentIds = _componentIdsFor(
+      initial.components,
+      'ENGINE',
+      engineLabels,
+    );
+
+    _jetComponentIds = _componentIdsFor(
+      initial.components,
+      'JET',
+      _associatedComponentLabels,
+    );
+    _gearboxComponentIds = _componentIdsFor(
+      initial.components,
+      'GEARBOX',
+      _associatedComponentLabels,
+    );
+
     final generatorComponents = initial.components
         .where((component) => component.type == 'GENERATOR')
         .toList();
     if (generatorComponents.isNotEmpty) {
       _hasGenerators = true;
       _generatorCountCtrl.text = generatorComponents.length.toString();
-      for (var index = 0; index < generatorComponents.length; index++) {
-        final component = generatorComponents[index];
-        _templateIdsByComponentKey[_componentKey(
-          'GENERATOR',
-          _generatorLabel(index, generatorComponents.length),
-        )] = component.templateIds
-            .toSet();
-      }
-    }
-    for (final component in initial.components) {
-      final type = component.type.trim().isEmpty ? 'OTHER' : component.type;
-      final templateIds = component.templateIds.toSet();
-      if (type == 'GENERATOR') {
-        continue;
-      }
-      if (type == 'ENGINE' || type == 'JET' || type == 'GEARBOX') {
-        _templateIdsByComponentKey[_componentKey(type, component.label)] =
-            templateIds;
-        continue;
-      }
-      _extraComponents.add(
-        _VesselExtraComponentDraft(
-          componentId: component.componentId,
-          type: type,
-          label: component.label,
-          manufacturer: component.manufacturer ?? '',
-          model: component.model ?? '',
-          serialNumber: component.serialNumber ?? '',
-          currentHours: component.currentHours,
-          templateIds: templateIds,
-        ),
+      final generatorLabels = List<String>.generate(
+        generatorComponents.length,
+        (index) => _generatorLabel(index, generatorComponents.length),
+      );
+      _generatorComponentIds = _componentIdsFor(
+        initial.components,
+        'GENERATOR',
+        generatorLabels,
       );
     }
   }
 
-  String _componentKey(String type, String label) =>
-      '${type.trim().toUpperCase()}:${label.trim().toLowerCase()}';
+  List<int?> _componentIdsFor(
+    List<VesselComponent> components,
+    String type,
+    List<String> labels,
+  ) {
+    final available = components
+        .where((component) => component.type == type)
+        .toList();
+    return List<int?>.generate(labels.length, (index) {
+      final label = labels[index].trim().toLowerCase();
+      final byLabel = available.where(
+        (component) => component.label.trim().toLowerCase() == label,
+      );
+      if (byLabel.isNotEmpty) {
+        return byLabel.first.componentId;
+      }
+      if (index < available.length) {
+        return available[index].componentId;
+      }
+      return null;
+    });
+  }
 
   String _componentTypeLabel(String type) {
     switch (type) {
@@ -2073,371 +2107,240 @@ class _VesselDialogState extends State<_VesselDialog> {
     }
   }
 
-  List<_ConfiguredVesselComponent> _autoComponents() {
-    final components = <_ConfiguredVesselComponent>[];
+  List<Map<String, dynamic>> _buildComponentPayload() {
+    final payload = <Map<String, dynamic>>[];
     final engineLabels = _buildEngineLabels(_enginePositions);
     for (var index = 0; index < engineLabels.length; index++) {
-      components.add(
-        _ConfiguredVesselComponent(
-          type: 'ENGINE',
-          label: engineLabels[index],
-          serialNumber: index < _engineSerialCtrls.length
-              ? _engineSerialCtrls[index].text.trim()
-              : null,
-        ),
+      _addInstalledComponentPayload(
+        payload,
+        type: 'ENGINE',
+        label: engineLabels[index],
+        componentId: index < _engineComponentIds.length
+            ? _engineComponentIds[index]
+            : null,
+        serialNumber: index < _engineSerialCtrls.length
+            ? _engineSerialCtrls[index].text.trim()
+            : null,
       );
     }
     if (_hasJets) {
       for (var index = 0; index < _associatedComponentLabels.length; index++) {
-        components.add(
-          _ConfiguredVesselComponent(
-            type: 'JET',
-            label: _associatedComponentLabels[index],
-            serialNumber: index < _jetSerialCtrls.length
-                ? _jetSerialCtrls[index].text.trim()
-                : null,
-          ),
+        _addInstalledComponentPayload(
+          payload,
+          type: 'JET',
+          label: _associatedComponentLabels[index],
+          componentId: index < _jetComponentIds.length
+              ? _jetComponentIds[index]
+              : null,
+          serialNumber: index < _jetSerialCtrls.length
+              ? _jetSerialCtrls[index].text.trim()
+              : null,
         );
       }
     }
     if (_hasGearboxes) {
       for (var index = 0; index < _associatedComponentLabels.length; index++) {
-        components.add(
-          _ConfiguredVesselComponent(
-            type: 'GEARBOX',
-            label: _associatedComponentLabels[index],
-            serialNumber: index < _gearboxSerialCtrls.length
-                ? _gearboxSerialCtrls[index].text.trim()
-                : null,
-          ),
+        _addInstalledComponentPayload(
+          payload,
+          type: 'GEARBOX',
+          label: _associatedComponentLabels[index],
+          componentId: index < _gearboxComponentIds.length
+              ? _gearboxComponentIds[index]
+              : null,
+          serialNumber: index < _gearboxSerialCtrls.length
+              ? _gearboxSerialCtrls[index].text.trim()
+              : null,
         );
       }
     }
     final generatorCount = _generatorCount;
-    if (generatorCount > 0) {
-      for (var index = 0; index < generatorCount; index++) {
-        components.add(
-          _ConfiguredVesselComponent(
-            type: 'GENERATOR',
-            label: _generatorLabel(index, generatorCount),
-            serialNumber: index < _generatorSerialCtrls.length
-                ? _generatorSerialCtrls[index].text.trim()
-                : null,
-          ),
-        );
-      }
-    }
-    return components;
-  }
-
-  List<Map<String, dynamic>> _buildComponentPayload() {
-    final payload = <Map<String, dynamic>>[];
-    for (final component in _autoComponents()) {
-      final templateIds =
-          _templateIdsByComponentKey[_componentKey(
-            component.type,
-            component.label,
-          )] ??
-          <int>{};
-      payload.add({
-        'type': component.type,
-        'label': component.label,
-        'serialNumber': component.serialNumber,
-        'templateIds': templateIds.toList(),
-      });
-    }
-    for (final component in _extraComponents) {
-      final label = component.labelCtrl.text.trim();
-      if (label.isEmpty) {
-        continue;
-      }
-      payload.add({
-        'componentId': component.componentId,
-        'type': component.type,
-        'label': label,
-        'manufacturer': component.manufacturerCtrl.text.trim().isEmpty
-            ? null
-            : component.manufacturerCtrl.text.trim(),
-        'model': component.modelCtrl.text.trim().isEmpty
-            ? null
-            : component.modelCtrl.text.trim(),
-        'serialNumber': component.serialCtrl.text.trim().isEmpty
-            ? null
-            : component.serialCtrl.text.trim(),
-        'currentHours': int.tryParse(component.currentHoursCtrl.text.trim()),
-        'templateIds': component.templateIds.toList(),
-      });
+    for (var index = 0; index < generatorCount; index++) {
+      _addInstalledComponentPayload(
+        payload,
+        type: 'GENERATOR',
+        label: _generatorLabel(index, generatorCount),
+        componentId: index < _generatorComponentIds.length
+            ? _generatorComponentIds[index]
+            : null,
+        serialNumber: index < _generatorSerialCtrls.length
+            ? _generatorSerialCtrls[index].text.trim()
+            : null,
+      );
     }
     return payload;
   }
 
-  String _templateSummary(Set<int> templateIds) {
-    if (templateIds.isEmpty) {
-      return 'Sin plantilla';
-    }
-    final names = _materialTemplates
-        .where(
-          (template) =>
-              template.id != null && templateIds.contains(template.id),
-        )
-        .map((template) => template.name)
-        .toList();
-    if (names.isEmpty) {
-      return '${templateIds.length} plantilla(s)';
-    }
-    return names.join(', ');
-  }
-
-  Future<void> _attachCatalogComponent() async {
-    final component = await showDialog<MarineComponent>(
-      context: context,
-      builder: (_) =>
-          _CatalogComponentPickerDialog(components: _catalogComponents),
-    );
-    if (!mounted || component == null) {
-      return;
-    }
-    setState(() {
-      _extraComponents.add(
-        _VesselExtraComponentDraft(
-          componentId: component.id,
-          type: component.type,
-          label: component.name,
-          manufacturer: component.manufacturer ?? '',
-          model: component.model ?? '',
-          templateIds: component.templateIds.toSet(),
-        ),
-      );
+  void _addInstalledComponentPayload(
+    List<Map<String, dynamic>> payload, {
+    required String type,
+    required String label,
+    required int? componentId,
+    required String? serialNumber,
+  }) {
+    final component = _catalogComponentById(componentId);
+    payload.add({
+      'componentId': componentId,
+      'type': type,
+      'label': label,
+      'manufacturer': component?.manufacturer,
+      'model': component?.model,
+      'serialNumber': (serialNumber ?? '').trim().isEmpty
+          ? null
+          : serialNumber!.trim(),
+      'templateIds': component?.templateIds.toList() ?? const <int>[],
     });
   }
 
-  Widget _buildComponentTemplateSection() {
-    final autoComponents = _autoComponents();
-    return NavalgoFormFieldBlock(
-      label: 'Resumen de componentes',
-      caption:
-          'Revisa los componentes detectados antes de guardar la embarcación.',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (_loadingTemplates)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          if (_templateLoadError != null) ...[
-            Text(
-              'No se pudieron cargar las plantillas: $_templateLoadError',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
-          if (autoComponents.isEmpty)
-            NavalgoPanel(
-              tint: Colors.white.withValues(alpha: 0.96),
-              child: const Text(
-                'Configura motores o generadores para crear componentes.',
-              ),
-            )
-          else
-            ...autoComponents.map(_buildAutoComponentTemplateCard),
-          if (_extraComponents.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            ..._extraComponents.map(_buildExtraComponentCard),
-          ],
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _attachCatalogComponent,
-            icon: const Icon(Icons.search_rounded),
-            label: const Text('Adjuntar componente'),
-          ),
-        ],
-      ),
-    );
+  MarineComponent? _catalogComponentById(int? componentId) {
+    if (componentId == null) {
+      return null;
+    }
+    for (final component in _catalogComponents) {
+      if (component.id == componentId) {
+        return component;
+      }
+    }
+    return null;
   }
 
-  Widget _buildAutoComponentTemplateCard(_ConfiguredVesselComponent component) {
-    final key = _componentKey(component.type, component.label);
-    final selectedTemplateIds = _templateIdsByComponentKey.putIfAbsent(
-      key,
-      () => <int>{},
-    );
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: NavalgoPanel(
-        tint: Colors.white.withValues(alpha: 0.96),
+  Widget _buildCatalogComponentSelector({
+    required String type,
+    required String label,
+    required int? selectedComponentId,
+    required ValueChanged<MarineComponent> onChanged,
+  }) {
+    final selectedComponent = _catalogComponentById(selectedComponentId);
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: _loadingComponents
+          ? null
+          : () => _selectCatalogComponent(type: type, onChanged: onChanged),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: NavalgoColors.border, width: 1.4),
+        ),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _MarineComponentIcon(type: component.type),
+            _MarineComponentIcon(type: type),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '${_componentTypeLabel(component.type)} · ${component.label}',
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+                    label,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: NavalgoColors.deepSea.withValues(alpha: 0.72),
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
-                    [
-                      if ((component.serialNumber ?? '').trim().isNotEmpty)
-                        'Serie ${component.serialNumber}',
-                      _templateSummary(selectedTemplateIds),
-                    ].join(' · '),
+                    selectedComponent == null
+                        ? 'Seleccionar ${_componentTypeLabel(type).toLowerCase()}'
+                        : selectedComponent.displayName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: NavalgoColors.deepSea,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
+                  if (_componentLoadError != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'No se pudo cargar el catalogo.',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
+            const SizedBox(width: 8),
+            if (_loadingComponents)
+              const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(Icons.chevron_right_rounded),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildExtraComponentCard(_VesselExtraComponentDraft component) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: NavalgoPanel(
-        tint: Colors.white.withValues(alpha: 0.96),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                _MarineComponentIcon(type: component.type),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: component.type,
-                    decoration: NavalgoFormStyles.inputDecoration(
-                      context,
-                      label: 'Tipo',
-                      prefixIcon: const Icon(Icons.category_outlined),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 'ENGINE', child: Text('Motor')),
-                      DropdownMenuItem(
-                        value: 'GENERATOR',
-                        child: Text('Generador'),
-                      ),
-                      DropdownMenuItem(value: 'JET', child: Text('Jet')),
-                      DropdownMenuItem(
-                        value: 'GEARBOX',
-                        child: Text('Reductora'),
-                      ),
-                      DropdownMenuItem(value: 'OTHER', child: Text('Otro')),
-                    ],
-                    onChanged: (value) {
-                      setState(() {
-                        component.type = value ?? 'OTHER';
-                      });
-                    },
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Quitar componente',
-                  onPressed: () {
-                    setState(() {
-                      _extraComponents.remove(component);
-                      component.dispose();
-                    });
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            TextFormField(
-              controller: component.labelCtrl,
-              textInputAction: TextInputAction.next,
-              decoration: NavalgoFormStyles.inputDecoration(
-                context,
-                label: 'Nombre del componente',
-                hint: 'Ej. Bomba hidráulica',
-                prefixIcon: const Icon(Icons.label_outline),
-              ),
-              validator: (value) =>
-                  _validateRequiredText(value, 'Indica el componente.'),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: component.manufacturerCtrl,
-                    textInputAction: TextInputAction.next,
-                    decoration: NavalgoFormStyles.inputDecoration(
-                      context,
-                      label: 'Marca',
-                      prefixIcon: const Icon(Icons.factory_outlined),
-                    ),
-                    validator: (value) => _validateOptionalText(value, 255),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: component.modelCtrl,
-                    textInputAction: TextInputAction.next,
-                    decoration: NavalgoFormStyles.inputDecoration(
-                      context,
-                      label: 'Modelo',
-                      prefixIcon: const Icon(Icons.description_outlined),
-                    ),
-                    validator: (value) => _validateOptionalText(value, 255),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: component.serialCtrl,
-                    textInputAction: TextInputAction.next,
-                    decoration: NavalgoFormStyles.inputDecoration(
-                      context,
-                      label: 'Serie',
-                      prefixIcon: const Icon(Icons.dialpad),
-                    ),
-                    validator: (value) => _validateOptionalText(value, 255),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: TextFormField(
-                    controller: component.currentHoursCtrl,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.next,
-                    decoration: NavalgoFormStyles.inputDecoration(
-                      context,
-                      label: 'Horas',
-                      prefixIcon: const Icon(Icons.schedule_outlined),
-                    ),
-                    validator: (value) {
-                      final trimmed = value?.trim() ?? '';
-                      if (trimmed.isEmpty) {
-                        return null;
-                      }
-                      final parsed = int.tryParse(trimmed);
-                      if (parsed == null || parsed < 0) {
-                        return 'Introduce horas validas.';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+  Future<void> _selectCatalogComponent({
+    required String type,
+    required ValueChanged<MarineComponent> onChanged,
+  }) async {
+    final component = await showDialog<MarineComponent>(
+      context: context,
+      builder: (_) => _CatalogComponentPickerDialog(
+        components: _catalogComponents,
+        typeFilter: type,
       ),
     );
+    if (!mounted || component == null) {
+      return;
+    }
+    if (!_catalogComponents.any((item) => item.id == component.id)) {
+      setState(() {
+        _catalogComponents = [..._catalogComponents, component];
+      });
+    }
+    onChanged(component);
+  }
+
+  bool _validateSelectedComponents() {
+    final engineLabels = _buildEngineLabels(_enginePositions);
+    for (var index = 0; index < engineLabels.length; index++) {
+      if (index >= _engineComponentIds.length ||
+          _engineComponentIds[index] == null) {
+        AppToast.error(context, 'Selecciona el modelo de cada motor.');
+        return false;
+      }
+    }
+    if (_hasJets &&
+        _hasMissingComponent(_associatedComponentLabels, _jetComponentIds)) {
+      AppToast.error(context, 'Selecciona el modelo de cada jet.');
+      return false;
+    }
+    if (_hasGearboxes &&
+        _hasMissingComponent(
+          _associatedComponentLabels,
+          _gearboxComponentIds,
+        )) {
+      AppToast.error(context, 'Selecciona el modelo de cada reductora.');
+      return false;
+    }
+    if (_hasGenerators &&
+        _hasMissingComponent(
+          List<String>.generate(
+            _generatorCount,
+            (index) => _generatorLabel(index, _generatorCount),
+          ),
+          _generatorComponentIds,
+        )) {
+      AppToast.error(context, 'Selecciona el modelo de cada generador.');
+      return false;
+    }
+    return true;
+  }
+
+  bool _hasMissingComponent(List<String> labels, List<int?> componentIds) {
+    for (var index = 0; index < labels.length; index++) {
+      if (index >= componentIds.length || componentIds[index] == null) {
+        return true;
+      }
+    }
+    return false;
   }
 
   Widget _buildGeneratorSection() {
@@ -2517,6 +2420,20 @@ class _VesselDialogState extends State<_VesselDialog> {
                         ),
                       ),
                       const SizedBox(height: 6),
+                      _buildCatalogComponentSelector(
+                        type: 'GENERATOR',
+                        label: 'Modelo del generador',
+                        selectedComponentId:
+                            index < _generatorComponentIds.length
+                            ? _generatorComponentIds[index]
+                            : null,
+                        onChanged: (component) {
+                          setState(() {
+                            _generatorComponentIds[index] = component.id;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 10),
                       TextFormField(
                         controller: _generatorSerialCtrls[index],
                         textInputAction: TextInputAction.next,
@@ -2541,9 +2458,13 @@ class _VesselDialogState extends State<_VesselDialog> {
 
   Widget _buildAssociatedComponentSection({
     required String title,
+    required String type,
     required bool value,
     required ValueChanged<bool?>? onChanged,
     required List<TextEditingController> serialControllers,
+    required List<int?> componentIds,
+    required void Function(int index, MarineComponent component)
+    onComponentChanged,
     required String Function(int index) serialFieldLabel,
   }) {
     final hasEligibleMotors = _associatedComponentLabels.isNotEmpty;
@@ -2588,6 +2509,16 @@ class _VesselDialogState extends State<_VesselDialog> {
                       ),
                     ),
                     const SizedBox(height: 6),
+                    _buildCatalogComponentSelector(
+                      type: type,
+                      label: 'Modelo de ${title.toLowerCase()}',
+                      selectedComponentId: index < componentIds.length
+                          ? componentIds[index]
+                          : null,
+                      onChanged: (component) =>
+                          onComponentChanged(index, component),
+                    ),
+                    const SizedBox(height: 10),
                     TextFormField(
                       controller: serialControllers[index],
                       textInputAction: TextInputAction.next,
@@ -2611,9 +2542,13 @@ class _VesselDialogState extends State<_VesselDialog> {
 }
 
 class _CatalogComponentPickerDialog extends StatefulWidget {
-  const _CatalogComponentPickerDialog({required this.components});
+  const _CatalogComponentPickerDialog({
+    required this.components,
+    required this.typeFilter,
+  });
 
   final List<MarineComponent> components;
+  final String typeFilter;
 
   @override
   State<_CatalogComponentPickerDialog> createState() =>
@@ -2644,10 +2579,13 @@ class _CatalogComponentPickerDialogState
 
   List<MarineComponent> get _filteredComponents {
     final query = _searchCtrl.text.trim().toLowerCase();
+    final byType = _components
+        .where((component) => component.type == widget.typeFilter)
+        .toList();
     if (query.isEmpty) {
-      return _components;
+      return byType;
     }
-    return _components.where((component) {
+    return byType.where((component) {
       final haystack = [
         component.name,
         component.manufacturer ?? '',
@@ -2661,7 +2599,8 @@ class _CatalogComponentPickerDialogState
   Future<void> _createQuickComponent() async {
     final input = await showDialog<_QuickCatalogComponentInput>(
       context: context,
-      builder: (_) => const _QuickCatalogComponentDialog(),
+      builder: (_) =>
+          _QuickCatalogComponentDialog(initialType: widget.typeFilter),
     );
     if (!mounted || input == null) {
       return;
@@ -2673,7 +2612,7 @@ class _CatalogComponentPickerDialogState
     try {
       final saved = await context.read<FleetService>().createComponent(
         token,
-        type: input.type,
+        type: widget.typeFilter,
         name: input.name,
         manufacturer: input.manufacturer,
         model: input.model,
@@ -2684,8 +2623,8 @@ class _CatalogComponentPickerDialogState
       }
       setState(() {
         _components = [..._components, saved];
-        _searchCtrl.text = saved.name;
       });
+      Navigator.pop(context, saved);
     } catch (e) {
       if (mounted) {
         AppToast.error(context, 'No se pudo crear: $e');
@@ -2698,7 +2637,8 @@ class _CatalogComponentPickerDialogState
     final components = _filteredComponents;
     return NavalgoFormDialog(
       eyebrow: 'FLOTA',
-      title: 'Adjuntar componente',
+      title:
+          'Seleccionar ${_fleetComponentTypeLabel(widget.typeFilter).toLowerCase()}',
       maxWidth: 620,
       actions: [
         TextButton.icon(
@@ -2739,20 +2679,20 @@ class _CatalogComponentPickerDialogState
 
 class _QuickCatalogComponentInput {
   const _QuickCatalogComponentInput({
-    required this.type,
     required this.name,
     this.manufacturer,
     this.model,
   });
 
-  final String type;
   final String name;
   final String? manufacturer;
   final String? model;
 }
 
 class _QuickCatalogComponentDialog extends StatefulWidget {
-  const _QuickCatalogComponentDialog();
+  const _QuickCatalogComponentDialog({required this.initialType});
+
+  final String initialType;
 
   @override
   State<_QuickCatalogComponentDialog> createState() =>
@@ -2761,7 +2701,6 @@ class _QuickCatalogComponentDialog extends StatefulWidget {
 
 class _QuickCatalogComponentDialogState
     extends State<_QuickCatalogComponentDialog> {
-  String _type = 'ENGINE';
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _manufacturerCtrl = TextEditingController();
   final TextEditingController _modelCtrl = TextEditingController();
@@ -2778,7 +2717,8 @@ class _QuickCatalogComponentDialogState
   Widget build(BuildContext context) {
     return NavalgoFormDialog(
       eyebrow: 'COMPONENTES',
-      title: 'Nuevo componente',
+      title:
+          'Nuevo ${_fleetComponentTypeLabel(widget.initialType).toLowerCase()}',
       maxWidth: 560,
       actions: [
         NavalgoGhostButton(
@@ -2796,7 +2736,6 @@ class _QuickCatalogComponentDialogState
             Navigator.pop(
               context,
               _QuickCatalogComponentInput(
-                type: _type,
                 name: name,
                 manufacturer: _manufacturerCtrl.text.trim().isEmpty
                     ? null
@@ -2812,22 +2751,6 @@ class _QuickCatalogComponentDialogState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          DropdownButtonFormField<String>(
-            initialValue: _type,
-            decoration: NavalgoFormStyles.inputDecoration(
-              context,
-              label: 'Tipo',
-              prefixIcon: const Icon(Icons.category_outlined),
-            ),
-            items: const [
-              DropdownMenuItem(value: 'ENGINE', child: Text('Motor')),
-              DropdownMenuItem(value: 'GENERATOR', child: Text('Generador')),
-              DropdownMenuItem(value: 'JET', child: Text('Jet')),
-              DropdownMenuItem(value: 'GEARBOX', child: Text('Reductora')),
-            ],
-            onChanged: (value) => setState(() => _type = value ?? 'ENGINE'),
-          ),
-          const SizedBox(height: 12),
           TextFormField(
             controller: _nameCtrl,
             decoration: NavalgoFormStyles.inputDecoration(

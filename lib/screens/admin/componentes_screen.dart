@@ -5,6 +5,7 @@ import '../../models/vessel.dart';
 import '../../models/work_order.dart';
 import '../../services/fleet_service.dart';
 import '../../services/material_checklist_template_service.dart';
+import '../../theme/navalgo_theme.dart';
 import '../../utils/app_toast.dart';
 import '../../viewmodels/session_view_model.dart';
 import '../../widgets/navalgo_ui.dart';
@@ -197,6 +198,13 @@ class _ComponentesScreenState extends State<ComponentesScreen> {
     }
   }
 
+  Future<void> _openDetails(MarineComponent component) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => _ComponentDetailDialog(component: component),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final components = _filteredComponents;
@@ -265,6 +273,7 @@ class _ComponentesScreenState extends State<ComponentesScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _ComponentCard(
                     component: component,
+                    onTap: () => _openDetails(component),
                     onEdit: () => _openEditor(component: component),
                     onDelete: () => _deleteComponent(component),
                   ),
@@ -304,11 +313,13 @@ class _TypeChip extends StatelessWidget {
 class _ComponentCard extends StatelessWidget {
   const _ComponentCard({
     required this.component,
+    required this.onTap,
     required this.onEdit,
     required this.onDelete,
   });
 
   final MarineComponent component;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -316,6 +327,7 @@ class _ComponentCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       child: ListTile(
+        onTap: onTap,
         leading: SizedBox.square(
           dimension: 32,
           child: Image.asset(_componentIconAsset(component.type)),
@@ -346,6 +358,157 @@ class _ComponentCard extends StatelessWidget {
             PopupMenuItem(value: 'delete', child: Text('Eliminar')),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ComponentDetailDialog extends StatelessWidget {
+  const _ComponentDetailDialog({required this.component});
+
+  final MarineComponent component;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return NavalgoFormDialog(
+      eyebrow: _componentTypeLabel(component.type).toUpperCase(),
+      title: component.displayName,
+      maxWidth: 620,
+      actions: [
+        NavalgoGhostButton(
+          label: 'Cerrar',
+          onPressed: () => Navigator.pop(context),
+        ),
+      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _DetailPill(
+                icon: Icons.build_circle_outlined,
+                label: _componentTypeLabel(component.type),
+              ),
+              _DetailPill(
+                icon: Icons.directions_boat_outlined,
+                label: '${component.installedCount} instalado(s)',
+              ),
+            ],
+          ),
+          if (component.templateNames.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Text(
+              component.templateNames.join(', '),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: NavalgoColors.storm,
+                height: 1.25,
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (component.installations.isEmpty)
+            const NavalgoPanel(child: Text('Sin instalaciones.'))
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 420),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: component.installations.length,
+                separatorBuilder: (context, index) =>
+                    const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  final installation = component.installations[index];
+                  return _InstallationTile(installation: installation);
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailPill extends StatelessWidget {
+  const _DetailPill({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: NavalgoColors.foam,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: NavalgoColors.tide),
+          const SizedBox(width: 7),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+}
+
+class _InstallationTile extends StatelessWidget {
+  const _InstallationTile({required this.installation});
+
+  final MarineComponentInstallation installation;
+
+  @override
+  Widget build(BuildContext context) {
+    final details = <String>[
+      if (installation.ownerName.trim().isNotEmpty)
+        installation.ownerName.trim(),
+      installation.label,
+      if ((installation.serialNumber ?? '').trim().isNotEmpty)
+        'Serie ${installation.serialNumber!.trim()}',
+      if (installation.currentHours != null) '${installation.currentHours} h',
+    ];
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: NavalgoColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.directions_boat_filled_outlined,
+            color: NavalgoColors.tide,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  installation.vesselName,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                if (details.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    details.join(' · '),
+                    style: const TextStyle(color: NavalgoColors.storm),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -71,16 +71,26 @@ public class FleetController {
     @GetMapping("/components")
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<MarineComponentDto>> listComponents() {
+        List<VesselComponent> installedComponents = vesselRepository.findAll().stream()
+                .filter(vessel -> !vessel.isArchived())
+                .flatMap(vessel -> vessel.getComponents().stream())
+                .filter(installed -> installed.getMarineComponent() != null)
+                .toList();
+
         return ResponseEntity.ok(marineComponentRepository
                 .findAllByArchivedFalseOrderByTypeAscManufacturerAscModelAscNameAsc()
                 .stream()
                 .map(component -> MarineComponentDto.from(
                         component,
-                        vesselRepository.findAll().stream()
-                                .flatMap(vessel -> vessel.getComponents().stream())
+                        installedComponents.stream()
                                 .filter(installed -> installed.getMarineComponent() != null
                                         && installed.getMarineComponent().getId().equals(component.getId()))
-                                .count()
+                                .sorted(Comparator
+                                        .comparing((VesselComponent installed) -> installed.getVessel().getName(),
+                                                String.CASE_INSENSITIVE_ORDER)
+                                        .thenComparing(VesselComponent::getLabel, String.CASE_INSENSITIVE_ORDER))
+                                .map(MarineComponentDto.Installation::from)
+                                .toList()
                 ))
                 .toList());
     }
@@ -94,7 +104,7 @@ public class FleetController {
         MarineComponent component = new MarineComponent();
         applyMarineComponentRequest(component, request);
         MarineComponent saved = marineComponentRepository.save(component);
-        return ResponseEntity.ok(MarineComponentDto.from(saved, 0));
+        return ResponseEntity.ok(MarineComponentDto.from(saved, List.of()));
     }
 
     @PutMapping("/components/{id}")
@@ -106,7 +116,7 @@ public class FleetController {
                 .orElseThrow(() -> new EntityNotFoundException("Componente no encontrado"));
         applyMarineComponentRequest(component, request);
         MarineComponent saved = marineComponentRepository.save(component);
-        return ResponseEntity.ok(MarineComponentDto.from(saved, 0));
+        return ResponseEntity.ok(MarineComponentDto.from(saved, List.of()));
     }
 
     @DeleteMapping("/components/{id}")
