@@ -428,6 +428,8 @@ class _PartesScreenState extends State<PartesScreen> {
                         padding: const EdgeInsets.only(bottom: 14),
                         child: Material(
                           color: Colors.transparent,
+                          borderRadius: BorderRadius.circular(24),
+                          clipBehavior: Clip.antiAlias,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(24),
                             onTap: () => _openPartDetails(parte),
@@ -5205,9 +5207,12 @@ class _MaterialTemplateAssignmentFieldState
   List<MaterialChecklistTemplate> _filterTemplatesForVessel(
     List<MaterialChecklistTemplate> templates,
   ) {
+    if (widget.vessel == null) {
+      return templates;
+    }
     final allowedTemplateIds = _vesselTemplateIds;
     if (allowedTemplateIds.isEmpty) {
-      return templates;
+      return const <MaterialChecklistTemplate>[];
     }
     return templates
         .where((template) => allowedTemplateIds.contains(template.id))
@@ -5241,7 +5246,7 @@ class _MaterialTemplateAssignmentFieldState
     final selectedLabel = selectedTemplate == null
         ? 'Sin plantilla'
         : _materialTemplateDisplayName(selectedTemplate);
-    final filteredByVessel = _vesselTemplateIds.isNotEmpty;
+    final filteredByVessel = widget.vessel != null;
 
     return NavalgoFormFieldBlock(
       label: 'Plantilla de material',

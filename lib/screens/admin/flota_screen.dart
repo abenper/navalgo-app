@@ -2249,9 +2249,7 @@ class _VesselDialogState extends State<_VesselDialog> {
           ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
-            onPressed: _catalogComponents.isEmpty
-                ? null
-                : _attachCatalogComponent,
+            onPressed: _attachCatalogComponent,
             icon: const Icon(Icons.search_rounded),
             label: const Text('Adjuntar componente'),
           ),
@@ -2321,6 +2319,11 @@ class _VesselDialogState extends State<_VesselDialog> {
                       prefixIcon: const Icon(Icons.category_outlined),
                     ),
                     items: const [
+                      DropdownMenuItem(value: 'ENGINE', child: Text('Motor')),
+                      DropdownMenuItem(
+                        value: 'GENERATOR',
+                        child: Text('Generador'),
+                      ),
                       DropdownMenuItem(value: 'JET', child: Text('Jet')),
                       DropdownMenuItem(
                         value: 'GEARBOX',
