@@ -148,6 +148,7 @@ class _PartesScreenState extends State<PartesScreen> {
     final input = await showDialog<_QuickCreatePartInput>(
       context: context,
       builder: (_) => _QuickCreatePartDialog(
+        owners: fleetVm.owners,
         vessels: fleetVm.vessels,
         workers: session.user?.role == 'ADMIN'
             ? _assignableWorkers(workersVm.workers)
@@ -4205,11 +4206,13 @@ class _QuickCreatePartInput {
 
 class _QuickCreatePartDialog extends StatefulWidget {
   const _QuickCreatePartDialog({
+    required this.owners,
     required this.vessels,
     required this.workers,
     required this.canAssignWorkers,
   });
 
+  final List<Owner> owners;
   final List<Vessel> vessels;
   final List<WorkerProfile> workers;
   final bool canAssignWorkers;
@@ -4220,8 +4223,11 @@ class _QuickCreatePartDialog extends StatefulWidget {
 
 class _QuickCreatePartDialogState extends State<_QuickCreatePartDialog> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _ownerSearchCtrl = TextEditingController();
+  final TextEditingController _vesselSearchCtrl = TextEditingController();
   final TextEditingController _descriptionCtrl = TextEditingController();
   final Set<int> _selectedWorkers = <int>{};
+  int? _ownerId;
   int? _vesselId;
   int? _selectedMaterialTemplateId;
   String? _validationError;
@@ -4229,22 +4235,29 @@ class _QuickCreatePartDialogState extends State<_QuickCreatePartDialog> {
   @override
   void initState() {
     super.initState();
-    final vessels = _sortedVessels();
-    if (vessels.isNotEmpty) {
-      _vesselId = vessels.first.id;
+    final owners = _sortedOwners();
+    if (owners.isNotEmpty) {
+      _ownerId = owners.first.id;
+      final vessels = _filteredOwnerVessels();
+      if (vessels.isNotEmpty) {
+        _vesselId = vessels.first.id;
+      }
     }
   }
 
   @override
   void dispose() {
+    _ownerSearchCtrl.dispose();
+    _vesselSearchCtrl.dispose();
     _descriptionCtrl.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final vessels = _sortedVessels();
-    final selectedVessel = vessels
+    final owners = _filteredOwners();
+    final ownerVessels = _filteredOwnerVessels();
+    final selectedVessel = ownerVessels
         .where((vessel) => vessel.id == _vesselId)
         .cast<Vessel?>()
         .firstOrNull;
@@ -4270,31 +4283,106 @@ class _QuickCreatePartDialogState extends State<_QuickCreatePartDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             NavalgoFormFieldBlock(
+              label: 'Cliente',
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _ownerSearchCtrl,
+                    decoration: NavalgoFormStyles.inputDecoration(
+                      context,
+                      label: 'Buscar cliente',
+                      prefixIcon: const Icon(Icons.search_outlined),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey(
+                      'owner-${_ownerId ?? 'none'}-${owners.length}',
+                    ),
+                    initialValue: owners.any((owner) => owner.id == _ownerId)
+                        ? _ownerId
+                        : null,
+                    dropdownColor: NavalgoColors.shell,
+                    decoration: NavalgoFormStyles.inputDecoration(
+                      context,
+                      label: 'Cliente',
+                      prefixIcon: const Icon(Icons.person_pin_outlined),
+                    ),
+                    items: owners
+                        .map(
+                          (owner) => DropdownMenuItem<int>(
+                            value: owner.id,
+                            child: Text(_ownerLabel(owner)),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      if (value == null) {
+                        return;
+                      }
+                      setState(() {
+                        _ownerId = value;
+                        _vesselId = _filteredOwnerVessels().firstOrNull?.id;
+                        _selectedMaterialTemplateId = null;
+                        _validationError = null;
+                      });
+                    },
+                    validator: (value) =>
+                        value == null ? 'Selecciona un cliente.' : null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            NavalgoFormFieldBlock(
               label: 'Embarcacion',
-              child: DropdownButtonFormField<int>(
-                initialValue: _vesselId,
-                dropdownColor: NavalgoColors.shell,
-                decoration: NavalgoFormStyles.inputDecoration(
-                  context,
-                  label: 'Embarcacion',
-                  prefixIcon: const Icon(Icons.directions_boat_outlined),
-                ),
-                items: vessels
-                    .map(
-                      (vessel) => DropdownMenuItem<int>(
-                        value: vessel.id,
-                        child: Text('${vessel.name} - ${vessel.ownerName}'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _vesselId = value;
-                    _validationError = null;
-                  });
-                },
-                validator: (value) =>
-                    value == null ? 'Selecciona una embarcacion.' : null,
+              child: Column(
+                children: [
+                  TextFormField(
+                    controller: _vesselSearchCtrl,
+                    enabled: _ownerId != null,
+                    decoration: NavalgoFormStyles.inputDecoration(
+                      context,
+                      label: 'Buscar embarcacion',
+                      prefixIcon: const Icon(Icons.search_outlined),
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<int>(
+                    key: ValueKey(
+                      'vessel-${_ownerId ?? 'none'}-${_vesselId ?? 'none'}-${ownerVessels.length}',
+                    ),
+                    initialValue:
+                        ownerVessels.any((vessel) => vessel.id == _vesselId)
+                        ? _vesselId
+                        : null,
+                    dropdownColor: NavalgoColors.shell,
+                    decoration: NavalgoFormStyles.inputDecoration(
+                      context,
+                      label: 'Embarcacion',
+                      prefixIcon: const Icon(Icons.directions_boat_outlined),
+                    ),
+                    items: ownerVessels
+                        .map(
+                          (vessel) => DropdownMenuItem<int>(
+                            value: vessel.id,
+                            child: Text(vessel.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _vesselId = value;
+                        _selectedMaterialTemplateId = null;
+                        _validationError = null;
+                      });
+                    },
+                    validator: (value) =>
+                        value == null ? 'Selecciona una embarcacion.' : null,
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 14),
@@ -4406,16 +4494,81 @@ class _QuickCreatePartDialogState extends State<_QuickCreatePartDialog> {
     );
   }
 
-  List<Vessel> _sortedVessels() {
-    return List<Vessel>.of(widget.vessels)..sort((a, b) {
-      final ownerCompare = a.ownerName.toLowerCase().compareTo(
-        b.ownerName.toLowerCase(),
-      );
-      if (ownerCompare != 0) {
-        return ownerCompare;
-      }
-      return a.name.toLowerCase().compareTo(b.name.toLowerCase());
-    });
+  List<Owner> _sortedOwners() {
+    return List<Owner>.of(widget.owners)..sort(
+      (a, b) =>
+          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+    );
+  }
+
+  List<Owner> _filteredOwners() {
+    final query = _normalizeSearch(_ownerSearchCtrl.text);
+    final owners = _sortedOwners();
+    if (query.isEmpty) {
+      return owners;
+    }
+    return owners.where((owner) {
+      return _matchesQuery(query, [
+        owner.displayName,
+        owner.documentId,
+        owner.email ?? '',
+        owner.phone ?? '',
+      ]);
+    }).toList();
+  }
+
+  List<Vessel> _filteredOwnerVessels() {
+    final ownerId = _ownerId;
+    if (ownerId == null) {
+      return const <Vessel>[];
+    }
+    final query = _normalizeSearch(_vesselSearchCtrl.text);
+    final vessels =
+        widget.vessels.where((vessel) => vessel.ownerId == ownerId).toList()
+          ..sort(
+            (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+          );
+    if (query.isEmpty) {
+      return vessels;
+    }
+    return vessels.where((vessel) {
+      return _matchesQuery(query, [
+        vessel.name,
+        vessel.registrationNumber,
+        vessel.model ?? '',
+      ]);
+    }).toList();
+  }
+
+  String _ownerLabel(Owner owner) {
+    final email = owner.email?.trim() ?? '';
+    return email.isEmpty ? owner.displayName : '${owner.displayName} - $email';
+  }
+
+  bool _matchesQuery(String query, List<String> values) {
+    return values.any((value) => _normalizeSearch(value).contains(query));
+  }
+
+  String _normalizeSearch(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('à', 'a')
+        .replaceAll('ä', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('è', 'e')
+        .replaceAll('ë', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ì', 'i')
+        .replaceAll('ï', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ò', 'o')
+        .replaceAll('ö', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ù', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n');
   }
 }
 

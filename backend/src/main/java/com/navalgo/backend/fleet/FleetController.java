@@ -132,7 +132,6 @@ public class FleetController {
     @GetMapping("/owners")
     @PreAuthorize("hasAnyRole('ADMIN','COMERCIAL','WORKER')")
     public ResponseEntity<List<OwnerDto>> listOwners(Authentication authentication) {
-        ensureCanManageFleetCreation(authentication);
         return ResponseEntity.ok(ownerRepository.findAllByArchivedFalseOrderByDisplayNameAsc().stream().map(OwnerDto::from).toList());
     }
 

@@ -39,9 +39,7 @@ class FleetViewModel extends ChangeNotifier {
 
     try {
       final role = _session.user?.role;
-      if (role == 'ADMIN' ||
-          role == 'COMERCIAL' ||
-          _session.user?.canEditWorkOrders == true) {
+      if (role == 'ADMIN' || role == 'COMERCIAL' || role == 'WORKER') {
         _owners = await _fleetService.getOwners(token);
       } else {
         _owners = <Owner>[];
